@@ -12,6 +12,10 @@ import {
   type TeamRole,
 } from "@/lib/team";
 import { getShippingZones, type ShippingZone } from "@/lib/shipping";
+import { getAllOpenSessions, type CashSession } from "@/lib/caja";
+import { getOrders, getOrderItemsWithProduct, type Order } from "@/lib/orders";
+import { getProducts, type Product } from "@/lib/products";
+import { useAdminSettings } from "@/lib/admin-settings";
 import SectorEyebrow from "@/components/admin/SectorEyebrow";
 import Chip from "@/components/admin/Chip";
 import StatusBadge, { type StatusTone } from "@/components/admin/StatusBadge";
@@ -25,6 +29,8 @@ type DraftMember = {
   zone: string;
 };
 
+type CredentialsDraft = { username: string; password: string };
+
 const ROLE_TONE: Record<TeamRole, StatusTone> = {
   admin: "negocio",
   vendedor: "gold",
@@ -34,8 +40,12 @@ const ROLE_TONE: Record<TeamRole, StatusTone> = {
 const ROLE_ORDER: TeamRole[] = ["admin", "vendedor", "tecnico"];
 
 export default function AdminEquipoPage() {
+  const { formatPrice } = useAdminSettings();
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [zones, setZones] = useState<ShippingZone[]>([]);
+  const [openSessions, setOpenSessions] = useState<CashSession[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [roleFilter, setRoleFilter] = useState<TeamRole | "todos">("todos");
   const [panelOpen, setPanelOpen] = useState(false);
@@ -48,15 +58,46 @@ export default function AdminEquipoPage() {
     commissionPct: "5",
     zone: "",
   });
+  const [credentials, setCredentials] = useState<CredentialsDraft>({ username: "", password: "" });
+  const [credentialsSaving, setCredentialsSaving] = useState(false);
+  const [credentialsMessage, setCredentialsMessage] = useState<string | null>(null);
+
+  function loadAll() {
+    return Promise.all([
+      getTeam(),
+      getShippingZones(),
+      getAllOpenSessions(),
+      getOrders(),
+      getProducts(),
+    ]).then(([team, shippingZones, sessions, allOrders, allProducts]) => {
+      setMembers(team);
+      setZones(shippingZones);
+      setOpenSessions(sessions);
+      setOrders(allOrders);
+      setProducts(allProducts);
+    });
+  }
 
   useEffect(() => {
-    Promise.all([getTeam(), getShippingZones()])
-      .then(([team, shippingZones]) => {
-        setMembers(team);
-        setZones(shippingZones);
-      })
-      .finally(() => setLoading(false));
+    loadAll().finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  function cajaStatus(memberId: string) {
+    return openSessions.find((s) => s.openedBy === memberId) ?? null;
+  }
+
+  function todaySales(memberId: string) {
+    const today = new Date().toDateString();
+    const memberOrders = orders.filter(
+      (o) => o.soldBy === memberId && new Date(o.createdAt).toDateString() === today,
+    );
+    const totalUSD = memberOrders.reduce((sum, o) => {
+      const items = getOrderItemsWithProduct(o, products);
+      return sum + items.reduce((s, i) => s + (i.product?.priceUSD ?? 0) * i.qty, 0);
+    }, 0);
+    return { count: memberOrders.length, totalUSD };
+  }
 
   const visible = members.filter(
     (m) => roleFilter === "todos" || m.role === roleFilter,
@@ -72,6 +113,8 @@ export default function AdminEquipoPage() {
       commissionPct: "5",
       zone: zones[0]?.region ?? "",
     });
+    setCredentials({ username: "", password: "" });
+    setCredentialsMessage(null);
     setPanelOpen(true);
   }
 
@@ -85,7 +128,36 @@ export default function AdminEquipoPage() {
       commissionPct: String(member.commissionPct ?? ""),
       zone: member.zone ?? zones[0]?.region ?? "",
     });
+    setCredentials({ username: member.username ?? "", password: "" });
+    setCredentialsMessage(null);
     setPanelOpen(true);
+  }
+
+  async function saveCredentials() {
+    if (!editingId || !credentials.username.trim() || !credentials.password) return;
+    setCredentialsSaving(true);
+    setCredentialsMessage(null);
+    try {
+      const res = await fetch("/api/admin/team-credentials", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          teamMemberId: editingId,
+          username: credentials.username,
+          password: credentials.password,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setCredentialsMessage(data.error ?? "No se pudo guardar el acceso.");
+        return;
+      }
+      setCredentialsMessage("Acceso guardado.");
+      setCredentials((prev) => ({ ...prev, password: "" }));
+      await loadAll();
+    } finally {
+      setCredentialsSaving(false);
+    }
   }
 
   async function toggleActive(id: string) {
@@ -151,9 +223,9 @@ export default function AdminEquipoPage() {
         </div>
 
         <div className="mt-4 rounded-xl border border-dashed border-ink/20 bg-surface p-4 text-xs text-body">
-          Conectado a Supabase — todavía no hay inicio de sesión real. Cuando
-          agreguemos autenticación, cada persona va a entrar con su propia
-          cuenta y va a ver solo lo que le corresponde según su rol.
+          Para darle acceso a alguien, primero guardala acá y después volvé
+          a abrirla con &ldquo;Editar&rdquo; — ahí aparece la sección para
+          asignarle usuario y contraseña.
         </div>
 
         {loading && <p className="mt-5 text-sm text-body">Cargando equipo…</p>}
@@ -198,6 +270,24 @@ export default function AdminEquipoPage() {
 
               <p className="mt-3 text-xs text-body">{member.email}</p>
               <p className="text-xs text-body">{member.phone}</p>
+
+              {member.role !== "admin" && (
+                <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-ink/10 pt-3 text-xs">
+                  <StatusBadge tone={cajaStatus(member.id) ? "done" : "neutral"}>
+                    {cajaStatus(member.id) ? "Caja abierta" : "Caja cerrada"}
+                  </StatusBadge>
+                  {(() => {
+                    const { count, totalUSD } = todaySales(member.id);
+                    return count > 0 ? (
+                      <span className="text-body">
+                        Hoy vendió {count} · {formatPrice(totalUSD)}
+                      </span>
+                    ) : (
+                      <span className="text-body">Sin ventas hoy</span>
+                    );
+                  })()}
+                </div>
+              )}
 
               {(member.zone || member.commissionPct !== undefined) && (
                 <div className="mt-3 flex flex-wrap gap-2 border-t border-ink/10 pt-3 text-xs">
@@ -344,6 +434,49 @@ export default function AdminEquipoPage() {
                 </Field>
               )}
             </div>
+
+            {editingId && (
+              <div className="mt-6 rounded-xl border border-ink/10 bg-background p-4">
+                <p className="text-xs font-bold uppercase tracking-wide text-body">
+                  Acceso al sistema
+                </p>
+                <p className="mt-1 text-[11px] text-body">
+                  {credentials.username
+                    ? "Ya tiene acceso — podés cambiar su usuario o contraseña acá."
+                    : "Todavía no tiene usuario para entrar al sistema."}
+                </p>
+                <div className="mt-3 flex flex-col gap-3">
+                  <Field label="Usuario">
+                    <input
+                      value={credentials.username}
+                      onChange={(e) => setCredentials({ ...credentials, username: e.target.value })}
+                      placeholder="ej: camila"
+                      className="w-full rounded-lg border border-ink/10 bg-surface px-3 py-2.5 text-sm text-ink"
+                    />
+                  </Field>
+                  <Field label={credentials.username ? "Nueva contraseña" : "Contraseña"}>
+                    <input
+                      type="password"
+                      value={credentials.password}
+                      onChange={(e) => setCredentials({ ...credentials, password: e.target.value })}
+                      placeholder="Al menos 6 caracteres"
+                      className="w-full rounded-lg border border-ink/10 bg-surface px-3 py-2.5 text-sm text-ink"
+                    />
+                  </Field>
+                  <button
+                    type="button"
+                    onClick={saveCredentials}
+                    disabled={credentialsSaving || !credentials.username.trim() || !credentials.password}
+                    className="cursor-pointer touch-manipulation rounded-lg border border-ink/15 bg-surface py-2.5 text-xs font-semibold text-ink shadow-sm transition-all hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {credentialsSaving ? "Guardando…" : "Guardar acceso"}
+                  </button>
+                  {credentialsMessage && (
+                    <p className="text-[11px] text-body">{credentialsMessage}</p>
+                  )}
+                </div>
+              </div>
+            )}
 
             <button
               type="submit"

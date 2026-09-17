@@ -78,13 +78,6 @@ export default function AdminPage() {
             </Link>
           ))}
         </div>
-
-        <p className="mx-auto mt-10 max-w-xl text-center text-xs text-body">
-          <b className="text-ink">Vista previa sin conexión a base de datos.</b>{" "}
-          Todo lo que ves en estos 3 sistemas es de ejemplo — los cambios que
-          hagas solo se ven en tu propia pantalla hasta que conectemos
-          Supabase.
-        </p>
       </div>
     </section>
   );

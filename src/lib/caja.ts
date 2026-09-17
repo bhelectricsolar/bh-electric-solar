@@ -1,4 +1,6 @@
-import { supabase } from "./supabase";
+import { createClient } from "./supabase/client";
+
+const supabase = createClient();
 
 export type CashMovementType = "ingreso" | "egreso";
 
@@ -12,6 +14,7 @@ export type CashMovement = {
 
 export type CashSession = {
   id: string;
+  openedBy: string | null;
   openedAt: string;
   openingAmount: number;
   movements: CashMovement[];
@@ -28,6 +31,7 @@ export function sessionMovementsTotal(session: CashSession, type: CashMovementTy
 
 type SessionRow = {
   id: string;
+  opened_by: string | null;
   opened_at: string;
   opening_amount: number;
   closed_at: string | null;
@@ -47,6 +51,7 @@ type MovementRow = {
 function fromRows(row: SessionRow, movements: MovementRow[]): CashSession {
   return {
     id: row.id,
+    openedBy: row.opened_by,
     openedAt: row.opened_at,
     openingAmount: Number(row.opening_amount),
     movements: movements
@@ -64,10 +69,12 @@ function fromRows(row: SessionRow, movements: MovementRow[]): CashSession {
   };
 }
 
-export async function getOpenSession(): Promise<CashSession | null> {
+// La caja de una persona puntual (la usa cada vendedor/técnico para la suya).
+export async function getOpenSessionFor(teamMemberId: string): Promise<CashSession | null> {
   const { data: session, error } = await supabase
     .from("cash_sessions")
     .select("*")
+    .eq("opened_by", teamMemberId)
     .is("closed_at", null)
     .order("opened_at", { ascending: false })
     .maybeSingle();
@@ -82,20 +89,33 @@ export async function getOpenSession(): Promise<CashSession | null> {
   return fromRows(session, movements ?? []);
 }
 
-export async function getCashHistory(): Promise<CashSession[]> {
+// Todas las cajas abiertas ahora mismo, de cualquier persona (para el dueño).
+export async function getAllOpenSessions(): Promise<CashSession[]> {
   const { data: sessions, error } = await supabase
     .from("cash_sessions")
     .select("*")
-    .not("closed_at", "is", null)
-    .order("closed_at", { ascending: false });
+    .is("closed_at", null)
+    .order("opened_at", { ascending: false });
   if (error) throw error;
   return (sessions ?? []).map((s) => fromRows(s, []));
 }
 
-export async function openCashSession(openingAmount: number): Promise<CashSession> {
+export async function getCashHistory(teamMemberId?: string): Promise<CashSession[]> {
+  let query = supabase
+    .from("cash_sessions")
+    .select("*")
+    .not("closed_at", "is", null)
+    .order("closed_at", { ascending: false });
+  if (teamMemberId) query = query.eq("opened_by", teamMemberId);
+  const { data: sessions, error } = await query;
+  if (error) throw error;
+  return (sessions ?? []).map((s) => fromRows(s, []));
+}
+
+export async function openCashSession(teamMemberId: string, openingAmount: number): Promise<CashSession> {
   const { data, error } = await supabase
     .from("cash_sessions")
-    .insert({ opening_amount: openingAmount })
+    .insert({ opened_by: teamMemberId, opening_amount: openingAmount })
     .select()
     .single();
   if (error) throw error;

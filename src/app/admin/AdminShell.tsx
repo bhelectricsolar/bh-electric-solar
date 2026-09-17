@@ -1,10 +1,87 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { useTheme } from "./ThemeProvider";
 import { ICONS, SECTORS, sectorForPath, type Sector } from "@/lib/admin-sectors";
+import { useCurrentTeamMember, useCurrentDeveloper, signOut } from "@/lib/current-user";
+
+// Las únicas rutas a las que puede entrar alguien que NO es administrador ni desarrollador.
+const RESTRICTED_ALLOWED_PATHS = ["/admin/caja"];
+const RESTRICTED_HOME = "/admin/caja";
+
+export default function AdminShell({ children }: { children: React.ReactNode }) {
+  const { member, loading: memberLoading } = useCurrentTeamMember();
+  const { developer, loading: devLoading } = useCurrentDeveloper();
+  const pathname = usePathname();
+  const router = useRouter();
+
+  const loading = memberLoading || devLoading;
+  const isDeveloper = !!developer;
+  // El desarrollador tiene acceso total (por encima del dueño) para poder
+  // reparar cualquier cosa — nunca queda restringido como un empleado más.
+  const isRestricted = !isDeveloper && !!member && member.role !== "admin";
+
+  useEffect(() => {
+    if (!isRestricted) return;
+    if (!RESTRICTED_ALLOWED_PATHS.some((p) => pathname.startsWith(p))) {
+      router.replace(RESTRICTED_HOME);
+    }
+  }, [isRestricted, pathname, router]);
+
+  if (loading) {
+    return (
+      <div className="grid min-h-dvh place-items-center bg-background">
+        <p className="text-sm text-body">Cargando…</p>
+      </div>
+    );
+  }
+
+  if (isRestricted) {
+    return <RestrictedShell member={member}>{children}</RestrictedShell>;
+  }
+
+  return <FullAdminShell isDeveloper={isDeveloper} developerName={developer?.name}>{children}</FullAdminShell>;
+}
+
+function RestrictedShell({
+  member,
+  children,
+}: {
+  member: { name: string; role: string };
+  children: React.ReactNode;
+}) {
+  const roleLabel = member.role === "vendedor" ? "Vendedor" : "Técnico / Instalador";
+  return (
+    <div className="flex min-h-dvh flex-col bg-background">
+      <header className="flex items-center justify-between border-b border-ink/10 bg-surface px-4 py-3">
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-navy-900">
+            <svg viewBox="0 0 32 32" className="h-5 w-5">
+              <path d="M16 2 29 9v14L16 30 3 23V9Z" fill="none" stroke="#ffb648" strokeWidth="1.6" />
+              <circle cx="16" cy="16" r="3.4" fill="#ffb648" />
+            </svg>
+          </span>
+          <div className="flex flex-col leading-none">
+            <span className="text-sm font-bold text-ink">{member.name}</span>
+            <span className="mt-0.5 text-[10px] font-bold uppercase tracking-wide text-gold-600">
+              {roleLabel}
+            </span>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => signOut()}
+          className="cursor-pointer touch-manipulation rounded-lg border border-ink/15 bg-background px-3 py-2 text-xs font-semibold text-ink shadow-sm hover:shadow-md"
+        >
+          Cerrar sesión
+        </button>
+      </header>
+      <main className="flex-1">{children}</main>
+    </div>
+  );
+}
 
 const ACCENT_TEXT: Record<Sector["accent"], string> = {
   tienda: "text-tienda",
@@ -22,7 +99,15 @@ const ACCENT_BG_SOLID: Record<Sector["accent"], string> = {
   sitio: "bg-sitio",
 };
 
-export default function AdminShell({ children }: { children: React.ReactNode }) {
+function FullAdminShell({
+  children,
+  isDeveloper,
+  developerName,
+}: {
+  children: React.ReactNode;
+  isDeveloper?: boolean;
+  developerName?: string;
+}) {
   const pathname = usePathname();
   const { theme, toggle } = useTheme();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -128,6 +213,30 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
           ))}
         </nav>
 
+        {isDeveloper && (
+          <div className="mt-5">
+            <div className="flex items-center gap-2 px-3 pb-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-violet-500" />
+              <span className="text-[10px] font-bold uppercase tracking-wide text-body">
+                {developerName ?? "Desarrollador"}
+              </span>
+            </div>
+            <Link
+              href="/admin/developer"
+              className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                pathname.startsWith("/admin/developer")
+                  ? "bg-violet-500/15 text-violet-600"
+                  : "text-ink hover:bg-cream-200"
+              }`}
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M8 9l-4 3 4 3M16 9l4 3-4 3M13 5l-2 14" />
+              </svg>
+              Panel de desarrollador
+            </Link>
+          </div>
+        )}
+
         <div className="mt-auto flex flex-col gap-1 pt-4">
           <button
             type="button"
@@ -143,6 +252,13 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
           >
             ← Volver al sitio
           </Link>
+          <button
+            type="button"
+            onClick={() => signOut()}
+            className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-xs font-medium text-red-500 hover:bg-red-500/10"
+          >
+            Cerrar sesión
+          </button>
         </div>
       </aside>
 
@@ -264,6 +380,19 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
               </>
             )}
 
+            {isDeveloper && (
+              <Link
+                href="/admin/developer"
+                onClick={() => setMoreOpen(false)}
+                className="mt-5 flex cursor-pointer touch-manipulation items-center gap-3 rounded-lg border border-violet-500/25 bg-violet-500/10 px-3 py-3 text-sm font-bold text-violet-600"
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M8 9l-4 3 4 3M16 9l4 3-4 3M13 5l-2 14" />
+                </svg>
+                Panel de desarrollador
+              </Link>
+            )}
+
             <Link
               href="/"
               onClick={() => setMoreOpen(false)}
@@ -271,6 +400,13 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
             >
               ← Volver al sitio
             </Link>
+            <button
+              type="button"
+              onClick={() => signOut()}
+              className="flex cursor-pointer touch-manipulation items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium text-red-500 hover:bg-red-500/10"
+            >
+              Cerrar sesión
+            </button>
           </div>
         </div>
       )}

@@ -19,6 +19,7 @@ import {
 import { getProducts, type Product } from "@/lib/products";
 import { getShippingZones, type ShippingZone } from "@/lib/shipping";
 import { useAdminSettings } from "@/lib/admin-settings";
+import { useCurrentTeamMember } from "@/lib/current-user";
 import { downloadCSV } from "@/lib/csv-export";
 import { openWhatsApp } from "@/lib/whatsapp";
 import PrintDocument from "@/components/admin/PrintDocument";
@@ -38,6 +39,7 @@ const EMPTY_MANUAL = {
 
 export default function AdminPedidosPage() {
   const { formatPrice, settings } = useAdminSettings();
+  const { member } = useCurrentTeamMember();
   const [orders, setOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [zones, setZones] = useState<ShippingZone[]>([]);
@@ -127,6 +129,7 @@ export default function AdminPedidosPage() {
       status: "nuevo",
       paymentMethod: manualForm.paymentMethod,
       origin: "manual",
+      soldBy: member?.id ?? null,
       createdAt: new Date().toISOString().slice(0, 10),
     };
     await createOrder(newOrder);

@@ -5,9 +5,10 @@ import { getOrders, getOrderItemsWithProduct, type Order } from "@/lib/orders";
 import { getShippingZones, type ShippingZone } from "@/lib/shipping";
 import { getProducts, type Product } from "@/lib/products";
 import { useAdminSettings } from "@/lib/admin-settings";
+import { useCurrentTeamMember } from "@/lib/current-user";
 import {
   sessionMovementsTotal,
-  getOpenSession,
+  getOpenSessionFor,
   getCashHistory,
   openCashSession,
   addCashMovement,
@@ -26,6 +27,7 @@ const fmtARS = new Intl.NumberFormat("es-AR", {
 
 export default function AdminCajaPage() {
   const { settings } = useAdminSettings();
+  const { member, loading: memberLoading } = useCurrentTeamMember();
   const [session, setSession] = useState<CashSession | null>(null);
   const [history, setHistory] = useState<CashSession[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -43,7 +45,14 @@ export default function AdminCajaPage() {
   const [countedAmount, setCountedAmount] = useState("");
 
   useEffect(() => {
-    Promise.all([getOpenSession(), getCashHistory(), getOrders(), getProducts(), getShippingZones()])
+    if (memberLoading || !member) return;
+    Promise.all([
+      getOpenSessionFor(member.id),
+      getCashHistory(member.id),
+      getOrders(),
+      getProducts(),
+      getShippingZones(),
+    ])
       .then(([openSession, hist, o, p, z]) => {
         setSession(openSession);
         setHistory(hist);
@@ -52,7 +61,7 @@ export default function AdminCajaPage() {
         setZones(z);
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [member, memberLoading]);
 
   function orderTotalUSD(orderId: string) {
     const order = orders.find((o) => o.id === orderId);
@@ -65,7 +74,10 @@ export default function AdminCajaPage() {
 
   const today = new Date().toDateString();
   const cashOrdersToday = orders.filter(
-    (o) => o.paymentMethod === "efectivo" && new Date(o.createdAt).toDateString() === today,
+    (o) =>
+      o.paymentMethod === "efectivo" &&
+      o.soldBy === member?.id &&
+      new Date(o.createdAt).toDateString() === today,
   );
   const cashSalesARS = cashOrdersToday.reduce(
     (sum, o) => sum + orderTotalUSD(o.id) * settings.exchangeRate,
@@ -78,8 +90,9 @@ export default function AdminCajaPage() {
 
   async function abrirCaja(e: React.FormEvent) {
     e.preventDefault();
+    if (!member) return;
     const amount = Number(openingAmount) || 0;
-    const created = await openCashSession(amount);
+    const created = await openCashSession(member.id, amount);
     setSession(created);
     setOpeningAmount("");
   }
@@ -117,9 +130,11 @@ export default function AdminCajaPage() {
     <section className="px-4 py-6 sm:px-8 sm:py-10">
       <div className="mx-auto max-w-3xl">
         <SectorEyebrow />
-        <h1 className="mt-1 text-2xl font-extrabold text-ink sm:text-3xl">Caja diaria</h1>
+        <h1 className="mt-1 text-2xl font-extrabold text-ink sm:text-3xl">
+          {member ? `Caja de ${member.name.split(" ")[0]}` : "Mi caja"}
+        </h1>
         <p className="mt-1 text-sm text-body">
-          Apertura, movimientos y cierre de caja del local — siempre en pesos argentinos.
+          Tu apertura, movimientos y cierre — siempre en pesos argentinos. Cada persona tiene la suya.
         </p>
 
         <div className="mt-4 rounded-xl border border-dashed border-ink/20 bg-surface p-4 text-xs text-body">

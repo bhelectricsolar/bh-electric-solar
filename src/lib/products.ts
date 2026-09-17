@@ -1,4 +1,11 @@
 import { supabase } from "./supabase";
+import { createClient } from "./supabase/client";
+
+// Lecturas públicas (usadas también en Server Components de /tienda) van
+// por el cliente anónimo de arriba. Todo lo que solo corre en el admin
+// (listar TODO el catálogo incluyendo lo no publicado, y cualquier
+// escritura) necesita ir autenticado o las políticas RLS lo rechazan.
+const supabaseAuth = createClient();
 
 export type ProductCategory =
   | "paneles"
@@ -80,22 +87,22 @@ export async function getCategories(): Promise<Category[]> {
 }
 
 export async function createCategory(value: string, label: string) {
-  const { error } = await supabase.from("categories").insert({ value, label });
+  const { error } = await supabaseAuth.from("categories").insert({ value, label });
   if (error) throw error;
 }
 
 export async function updateCategoryLabel(value: string, label: string) {
-  const { error } = await supabase.from("categories").update({ label }).eq("value", value);
+  const { error } = await supabaseAuth.from("categories").update({ label }).eq("value", value);
   if (error) throw error;
 }
 
 export async function deleteCategory(value: string) {
-  const { error } = await supabase.from("categories").delete().eq("value", value);
+  const { error } = await supabaseAuth.from("categories").delete().eq("value", value);
   if (error) throw error;
 }
 
 export async function getProducts(): Promise<Product[]> {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAuth
     .from("products")
     .select("*")
     .order("created_at", { ascending: false });
@@ -138,16 +145,16 @@ export async function getRelatedProducts(product: Product, limit = 3): Promise<P
 }
 
 export async function createProduct(product: Product) {
-  const { error } = await supabase.from("products").insert({ id: product.id, ...toRow(product) });
+  const { error } = await supabaseAuth.from("products").insert({ id: product.id, ...toRow(product) });
   if (error) throw error;
 }
 
 export async function updateProduct(id: string, patch: Partial<Product>) {
-  const { error } = await supabase.from("products").update(toRow(patch)).eq("id", id);
+  const { error } = await supabaseAuth.from("products").update(toRow(patch)).eq("id", id);
   if (error) throw error;
 }
 
 export async function deleteProduct(id: string) {
-  const { error } = await supabase.from("products").delete().eq("id", id);
+  const { error } = await supabaseAuth.from("products").delete().eq("id", id);
   if (error) throw error;
 }

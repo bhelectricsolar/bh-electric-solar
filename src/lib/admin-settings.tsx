@@ -7,7 +7,9 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { supabase } from "./supabase";
+import { createClient } from "./supabase/client";
+
+const supabase = createClient();
 
 export type Currency = "USD" | "ARS";
 export type ExchangeRateMode = "auto" | "manual";

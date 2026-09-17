@@ -1,4 +1,6 @@
-import { supabase } from "./supabase";
+import { createClient } from "./supabase/client";
+
+const supabase = createClient();
 
 export type TeamRole = "admin" | "vendedor" | "tecnico";
 
@@ -23,6 +25,7 @@ export type TeamMember = {
   active: boolean;
   commissionPct?: number; // solo vendedores
   zone?: string; // zona de cobertura, principalmente para vendedores/técnicos
+  username?: string; // usuario de acceso al sistema, si ya lo tiene asignado
 };
 
 type TeamMemberRow = {
@@ -34,6 +37,7 @@ type TeamMemberRow = {
   active: boolean;
   commission_pct: number | null;
   zone: string | null;
+  username: string | null;
 };
 
 function fromRow(row: TeamMemberRow): TeamMember {
@@ -46,6 +50,7 @@ function fromRow(row: TeamMemberRow): TeamMember {
     active: row.active,
     commissionPct: row.commission_pct != null ? Number(row.commission_pct) : undefined,
     zone: row.zone ?? undefined,
+    username: row.username ?? undefined,
   };
 }
 

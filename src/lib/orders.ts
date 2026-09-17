@@ -1,4 +1,6 @@
-import { supabase } from "./supabase";
+import { createClient } from "./supabase/client";
+
+const supabase = createClient();
 import type { Product } from "./products";
 import type { StatusTone } from "@/components/admin/StatusBadge";
 
@@ -16,6 +18,7 @@ export type Order = {
   status: OrderStatus;
   paymentMethod: PaymentMethod;
   origin: OrderOrigin;
+  soldBy: string | null;
   createdAt: string;
 };
 
@@ -69,6 +72,7 @@ type OrderRow = {
   status: OrderStatus;
   payment_method: PaymentMethod;
   origin: OrderOrigin;
+  sold_by: string | null;
   created_at: string;
 };
 
@@ -87,6 +91,7 @@ function fromRows(order: OrderRow, items: OrderItemRow[]): Order {
     status: order.status,
     paymentMethod: order.payment_method,
     origin: order.origin,
+    soldBy: order.sold_by,
     createdAt: order.created_at,
   };
 }
@@ -111,6 +116,7 @@ export async function createOrder(order: Order) {
     status: order.status,
     payment_method: order.paymentMethod,
     origin: order.origin,
+    sold_by: order.soldBy,
     created_at: order.createdAt,
   });
   if (error) throw error;
