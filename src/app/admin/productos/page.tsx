@@ -39,6 +39,7 @@ type DraftProduct = {
   name: string;
   category: ProductCategory;
   priceUSD: string;
+  priceARS: string;
   costUSD: string;
   stock: string;
   shortDescription: string;
@@ -49,6 +50,7 @@ const EMPTY_DRAFT: DraftProduct = {
   name: "",
   category: "paneles",
   priceUSD: "",
+  priceARS: "",
   costUSD: "",
   stock: "",
   shortDescription: "",
@@ -56,7 +58,7 @@ const EMPTY_DRAFT: DraftProduct = {
 };
 
 export default function AdminProductosPage() {
-  const { formatPrice } = useAdminSettings();
+  const { formatProductPrice } = useAdminSettings();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -121,12 +123,15 @@ export default function AdminProductosPage() {
       name: product.name,
       category: product.category,
       priceUSD: String(product.priceUSD),
+      priceARS: product.priceARS !== undefined ? String(product.priceARS) : "",
       costUSD: product.costUSD !== undefined ? String(product.costUSD) : "",
       stock: String(product.stock),
       shortDescription: product.shortDescription,
       description: product.description,
     });
-    setImages([]);
+    setImages(
+      (product.images ?? []).map((url, i) => ({ id: `${product.id}-${i}`, url, name: url })),
+    );
     setPanelOpen(true);
   }
 
@@ -141,15 +146,18 @@ export default function AdminProductosPage() {
     if (!draft.name.trim()) return;
     setSaving(true);
     try {
+      const imageUrls = images.map((i) => i.url);
       if (editingId) {
         const patch = {
           name: draft.name,
           category: draft.category,
           priceUSD: Number(draft.priceUSD) || 0,
+          priceARS: draft.priceARS ? Number(draft.priceARS) : undefined,
           costUSD: draft.costUSD ? Number(draft.costUSD) : undefined,
           stock: Number(draft.stock) || 0,
           shortDescription: draft.shortDescription,
           description: draft.description,
+          images: imageUrls,
         };
         await updateProduct(editingId, patch);
         setProducts((prev) =>
@@ -162,12 +170,14 @@ export default function AdminProductosPage() {
           name: draft.name,
           category: draft.category,
           priceUSD: Number(draft.priceUSD) || 0,
+          priceARS: draft.priceARS ? Number(draft.priceARS) : undefined,
           costUSD: draft.costUSD ? Number(draft.costUSD) : undefined,
           stock: Number(draft.stock) || 0,
           shortDescription: draft.shortDescription,
           description: draft.description || draft.shortDescription,
           specs: [],
           gradient: GRADIENTS[products.length % GRADIENTS.length],
+          images: imageUrls,
           publishedOnline: true,
         };
         await createProduct(newProduct);
@@ -214,6 +224,7 @@ export default function AdminProductosPage() {
         description: "",
         specs: [],
         gradient: GRADIENTS[(products.length + idx) % GRADIENTS.length],
+        images: [],
         publishedOnline: true,
       });
     });
@@ -299,7 +310,7 @@ export default function AdminProductosPage() {
                 <p className="font-semibold leading-snug text-ink">{product.name}</p>
                 <div className="mt-3 flex items-center justify-between">
                   <span className="font-data text-lg font-semibold text-ink">
-                    {formatPrice(product.priceUSD)}
+                    {formatProductPrice(product)}
                   </span>
                   <span className="font-data text-xs text-body">
                     Stock {product.stock}
@@ -385,7 +396,7 @@ export default function AdminProductosPage() {
               {internalOnly.map((product) => (
                 <div key={product.id} className="rounded-2xl border border-ink/15 bg-background p-4 shadow-sm">
                   <p className="text-sm font-bold text-ink">{product.name}</p>
-                  <p className="mt-1 text-xs text-body">Stock: {product.stock} · {formatPrice(product.priceUSD)}</p>
+                  <p className="mt-1 text-xs text-body">Stock: {product.stock} · {formatProductPrice(product)}</p>
                   <button
                     type="button"
                     onClick={() => publishFromInventory(product.id)}
@@ -483,6 +494,17 @@ export default function AdminProductosPage() {
                   />
                 </Field>
               </div>
+
+              <Field label="Precio fijo en pesos (opcional)">
+                <input
+                  type="number"
+                  min={0}
+                  value={draft.priceARS}
+                  onChange={(e) => setDraft({ ...draft, priceARS: e.target.value })}
+                  placeholder="Dejalo vacío para usar el dólar convertido"
+                  className="w-full rounded-lg border border-ink/10 bg-background px-3 py-2.5 text-sm text-ink"
+                />
+              </Field>
 
               <Field label="Stock">
                 <input

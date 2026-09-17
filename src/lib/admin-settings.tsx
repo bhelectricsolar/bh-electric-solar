@@ -98,6 +98,7 @@ type SettingsContextValue = {
   settings: StoreSettings;
   updateSettings: (patch: Partial<StoreSettings>) => void;
   formatPrice: (usdValue: number) => string;
+  formatProductPrice: (product: { priceUSD: number; priceARS?: number }) => string;
   refreshExchangeRate: () => Promise<void>;
   exchangeRateStatus: "idle" | "loading" | "error";
 };
@@ -172,9 +173,22 @@ export function AdminSettingsProvider({ children }: { children: ReactNode }) {
     }).format(usdValue);
   }
 
+  // Si el producto tiene un precio fijo en pesos cargado, se usa ese en vez
+  // de convertir el dólar — para productos que se venden a un ARS fijo.
+  function formatProductPrice(product: { priceUSD: number; priceARS?: number }) {
+    if (settings.currency === "ARS" && product.priceARS != null) {
+      return new Intl.NumberFormat("es-AR", {
+        style: "currency",
+        currency: "ARS",
+        maximumFractionDigits: 0,
+      }).format(product.priceARS);
+    }
+    return formatPrice(product.priceUSD);
+  }
+
   return (
     <SettingsContext.Provider
-      value={{ settings, updateSettings, formatPrice, refreshExchangeRate, exchangeRateStatus }}
+      value={{ settings, updateSettings, formatPrice, formatProductPrice, refreshExchangeRate, exchangeRateStatus }}
     >
       {children}
     </SettingsContext.Provider>

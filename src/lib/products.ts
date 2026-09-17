@@ -20,12 +20,16 @@ export type Product = {
   name: string;
   category: ProductCategory;
   priceUSD: number;
+  // Precio de lista fijo en pesos, opcional — si no se carga, la tienda
+  // muestra priceUSD convertido con la cotización de Configuración.
+  priceARS?: number;
   costUSD?: number;
   stock: number;
   shortDescription: string;
   description: string;
   specs: { label: string; value: string }[];
   gradient: string;
+  images: string[];
   // false = existe en el inventario interno pero todavía no se publicó en /tienda.
   publishedOnline?: boolean;
 };
@@ -38,12 +42,14 @@ type ProductRow = {
   name: string;
   category: string;
   price_usd: number;
+  price_ars: number | null;
   cost_usd: number | null;
   stock: number;
   short_description: string;
   description: string;
   specs: { label: string; value: string }[];
   gradient: string;
+  images: string[] | null;
   published_online: boolean;
 };
 
@@ -54,12 +60,14 @@ function fromRow(row: ProductRow): Product {
     name: row.name,
     category: row.category as ProductCategory,
     priceUSD: Number(row.price_usd),
+    priceARS: row.price_ars != null ? Number(row.price_ars) : undefined,
     costUSD: row.cost_usd != null ? Number(row.cost_usd) : undefined,
     stock: row.stock,
     shortDescription: row.short_description ?? "",
     description: row.description ?? "",
     specs: row.specs ?? [],
     gradient: row.gradient ?? "",
+    images: row.images ?? [],
     publishedOnline: row.published_online,
   };
 }
@@ -70,12 +78,14 @@ function toRow(patch: Partial<Product>) {
   if (patch.name !== undefined) row.name = patch.name;
   if (patch.category !== undefined) row.category = patch.category;
   if (patch.priceUSD !== undefined) row.price_usd = patch.priceUSD;
+  if (patch.priceARS !== undefined) row.price_ars = patch.priceARS ?? null;
   if (patch.costUSD !== undefined) row.cost_usd = patch.costUSD;
   if (patch.stock !== undefined) row.stock = patch.stock;
   if (patch.shortDescription !== undefined) row.short_description = patch.shortDescription;
   if (patch.description !== undefined) row.description = patch.description;
   if (patch.specs !== undefined) row.specs = patch.specs;
   if (patch.gradient !== undefined) row.gradient = patch.gradient;
+  if (patch.images !== undefined) row.images = patch.images;
   if (patch.publishedOnline !== undefined) row.published_online = patch.publishedOnline;
   return row;
 }

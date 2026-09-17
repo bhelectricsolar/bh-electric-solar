@@ -105,6 +105,17 @@
   background: var(--color-gold-600);
 }
 
+/* Chrome pinta los campos "autocompletados" con un fondo claro propio que
+   no respeta el tema — lo forzamos a quedar igual que el input normal.
+   (El login tiene su propio fix más abajo porque siempre es oscuro,
+   independientemente del tema claro/oscuro del resto del admin.) */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--color-ink);
+  transition: background-color 9999s ease-in-out 0s;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

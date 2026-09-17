@@ -55,8 +55,19 @@ export default function CartDrawer() {
                 {items.map(({ product, qty }) => (
                   <li key={product.id} className="flex gap-3">
                     <div
-                      className={`h-16 w-16 shrink-0 rounded-lg bg-gradient-to-br ${product.gradient}`}
-                    />
+                      className={`h-16 w-16 shrink-0 overflow-hidden rounded-lg ${
+                        product.images?.[0] ? "bg-white" : `bg-gradient-to-br ${product.gradient}`
+                      }`}
+                    >
+                      {product.images?.[0] && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={product.images[0]}
+                          alt={product.name}
+                          className="h-full w-full object-contain p-1"
+                        />
+                      )}
+                    </div>
                     <div className="flex flex-1 flex-col">
                       <p className="text-sm font-semibold leading-snug text-ink">
                         {product.name}

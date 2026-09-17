@@ -1,10 +1,12 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 export type UploadedImage = { id: string; url: string; name: string };
 
 const ACCEPTED = ".png,.jpg,.jpeg,.webp,.gif,.svg,.avif";
+const BUCKET = "product-images";
 
 export default function ImageUploader({
   images,
@@ -15,17 +17,33 @@ export default function ImageUploader({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  function addFiles(files: FileList | null) {
+  async function addFiles(files: FileList | null) {
     if (!files) return;
-    const next: UploadedImage[] = Array.from(files)
-      .filter((f) => f.type.startsWith("image/"))
-      .map((f) => ({
-        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        url: URL.createObjectURL(f),
-        name: f.name,
-      }));
-    if (next.length) onChange([...images, ...next]);
+    const toUpload = Array.from(files).filter((f) => f.type.startsWith("image/"));
+    if (!toUpload.length) return;
+
+    setUploading(true);
+    setError(null);
+    const supabase = createClient();
+    const uploaded: UploadedImage[] = [];
+
+    for (const file of toUpload) {
+      const ext = file.name.split(".").pop() ?? "jpg";
+      const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const { error: uploadError } = await supabase.storage.from(BUCKET).upload(path, file);
+      if (uploadError) {
+        setError(`No se pudo subir "${file.name}": ${uploadError.message}`);
+        continue;
+      }
+      const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+      uploaded.push({ id: path, url: data.publicUrl, name: file.name });
+    }
+
+    if (uploaded.length) onChange([...images, ...uploaded]);
+    setUploading(false);
   }
 
   function removeImage(id: string) {
@@ -45,17 +63,17 @@ export default function ImageUploader({
           setDragOver(false);
           addFiles(e.dataTransfer.files);
         }}
-        onClick={() => inputRef.current?.click()}
+        onClick={() => !uploading && inputRef.current?.click()}
         className={`flex cursor-pointer touch-manipulation flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-6 text-center transition-colors ${
           dragOver ? "border-gold-500 bg-gold-500/5" : "border-ink/15 hover:border-ink/30"
-        }`}
+        } ${uploading ? "pointer-events-none opacity-60" : ""}`}
       >
         <svg viewBox="0 0 24 24" className="h-7 w-7 text-body" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
           <path d="M12 16V4M12 4 7 9M12 4l5 5" />
           <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
         </svg>
         <p className="text-sm font-semibold text-ink">
-          Arrastrá imágenes acá o tocá para elegir
+          {uploading ? "Subiendo…" : "Arrastrá imágenes acá o tocá para elegir"}
         </p>
         <p className="text-xs text-body">
           PNG, JPG, WEBP, GIF, SVG o AVIF — incluye imágenes sin fondo (PNG
@@ -70,6 +88,12 @@ export default function ImageUploader({
           onChange={(e) => addFiles(e.target.files)}
         />
       </div>
+
+      {error && (
+        <p className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-500">
+          {error}
+        </p>
+      )}
 
       {images.length > 0 && (
         <div className="mt-4 grid grid-cols-3 gap-3">
@@ -104,9 +128,9 @@ export default function ImageUploader({
       )}
 
       <p className="mt-3 text-xs text-body">
-        Vista previa local — las imágenes se ven acá pero todavía no se suben
-        a ningún servidor. Con Supabase Storage conectado, se van a guardar
-        de verdad y quedar disponibles en <b className="text-ink">/tienda</b>.
+        La primera imagen es la que se muestra como principal en /tienda. Se
+        suben de verdad a Supabase — no hace falta guardar el producto para
+        que queden cargadas, pero sí para que se asocien a él.
       </p>
     </div>
   );

@@ -2,10 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getAllSlugs, getProductBySlug, getRelatedProducts } from "@/lib/products";
-import { formatUSD } from "@/lib/currency";
+import { formatUSD, formatARS } from "@/lib/currency";
 import Badge from "@/components/Badge";
 import AddToCartButton from "@/components/store/AddToCartButton";
 import ProductCard from "@/components/store/ProductCard";
+import ProductGallery from "@/components/store/ProductGallery";
 
 export const revalidate = 0;
 
@@ -51,15 +52,12 @@ export default async function ProductPage({
         </nav>
 
         <div className="mt-6 grid gap-10 lg:grid-cols-2 lg:items-start">
-          <div
-            className={`flex h-72 items-end justify-end rounded-2xl bg-gradient-to-br p-4 sm:h-96 ${product.gradient}`}
-          >
-            {product.stock <= 8 && (
-              <span className="rounded-full bg-gold-500 px-3 py-1 text-xs font-bold uppercase tracking-wide text-navy-950">
-                Últimas unidades
-              </span>
-            )}
-          </div>
+          <ProductGallery
+            images={product.images ?? []}
+            gradient={product.gradient}
+            name={product.name}
+            lowStock={product.stock <= 8}
+          />
 
           <div>
             <Badge>
@@ -79,6 +77,9 @@ export default async function ProductPage({
             <p className="font-data mt-6 text-4xl font-semibold text-ink">
               {formatUSD(product.priceUSD)}
             </p>
+            {product.priceARS != null && (
+              <p className="font-data mt-1 text-sm text-body">{formatARS(product.priceARS)}</p>
+            )}
             <p className="mt-1 text-xs text-body">
               {product.stock > 0
                 ? `${product.stock} unidades disponibles`

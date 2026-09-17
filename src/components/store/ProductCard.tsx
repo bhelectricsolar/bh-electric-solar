@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { Product } from "@/lib/products";
 import { useCart } from "@/lib/cart-context";
-import { formatUSD } from "@/lib/currency";
+import { formatUSD, formatARS } from "@/lib/currency";
 
 export default function ProductCard({ product }: { product: Product }) {
   const { addItem } = useCart();
@@ -12,10 +12,20 @@ export default function ProductCard({ product }: { product: Product }) {
     <article className="group flex flex-col overflow-hidden rounded-2xl border border-ink/10 bg-white shadow-[0_15px_35px_-25px_rgba(12,24,48,0.4)] transition-all hover:-translate-y-1 hover:shadow-[0_30px_60px_-25px_rgba(245,154,31,0.3)]">
       <Link href={`/tienda/${product.slug}`} className="block">
         <div
-          className={`flex h-40 items-end justify-end overflow-hidden bg-gradient-to-br p-3 transition-transform duration-500 group-hover:scale-105 ${product.gradient}`}
+          className={`relative flex h-40 items-end justify-end overflow-hidden p-3 transition-transform duration-500 group-hover:scale-105 ${
+            product.images?.[0] ? "bg-white" : `bg-gradient-to-br ${product.gradient}`
+          }`}
         >
+          {product.images?.[0] && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={product.images[0]}
+              alt={product.name}
+              className="absolute inset-0 h-full w-full object-contain p-2"
+            />
+          )}
           {product.stock <= 8 && (
-            <span className="rounded-full bg-gold-500 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-navy-950">
+            <span className="relative rounded-full bg-gold-500 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-navy-950">
               Últimas unidades
             </span>
           )}
@@ -31,8 +41,15 @@ export default function ProductCard({ product }: { product: Product }) {
           {product.shortDescription}
         </p>
         <div className="mt-4 flex items-center justify-between gap-3">
-          <span className="font-data text-lg font-semibold text-ink">
-            {formatUSD(product.priceUSD)}
+          <span>
+            <span className="font-data block text-lg font-semibold text-ink">
+              {formatUSD(product.priceUSD)}
+            </span>
+            {product.priceARS != null && (
+              <span className="font-data block text-xs text-body">
+                {formatARS(product.priceARS)}
+              </span>
+            )}
           </span>
           <button
             type="button"
