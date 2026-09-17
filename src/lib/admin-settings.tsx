@@ -42,8 +42,9 @@ const DEFAULT_SETTINGS: StoreSettings = {
   lowStockThreshold: 8,
 };
 
-// Dólar oficial en tiempo real — API pública argentina, sin API key.
-const EXCHANGE_RATE_API = "https://dolarapi.com/v1/dolares/oficial";
+// Dólar blue (precio de venta) en tiempo real — API pública argentina, sin
+// API key. Es el que se usa acá, no el oficial.
+const EXCHANGE_RATE_API = "https://dolarapi.com/v1/dolares/blue";
 
 type DolarApiResponse = {
   venta: number;
