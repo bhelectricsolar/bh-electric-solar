@@ -1,0 +1,195 @@
+@import "tailwindcss";
+
+:root {
+  --background: #fdfbf7;
+  --foreground: #0c1830;
+
+  --color-navy-950: #081127;
+  --color-navy-900: #0c1a38;
+  --color-navy-800: #12274d;
+  --color-navy-700: #1a3568;
+  --color-gold-300: #ffd98a;
+  --color-gold-400: #ffb648;
+  --color-gold-500: #f59a1f;
+  --color-gold-600: #d97a0c;
+  --color-cream-100: #f6efe1;
+  --color-cream-200: #efe2c8;
+  --color-slate-ink: #0c1830;
+  --color-slate-body: #56617a;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-body);
+  --font-display: var(--font-display);
+  --font-data: var(--font-data);
+
+  --color-navy-950: var(--color-navy-950);
+  --color-navy-900: var(--color-navy-900);
+  --color-navy-800: var(--color-navy-800);
+  --color-navy-700: var(--color-navy-700);
+  --color-gold-300: var(--color-gold-300);
+  --color-gold-400: var(--color-gold-400);
+  --color-gold-500: var(--color-gold-500);
+  --color-gold-600: var(--color-gold-600);
+  --color-cream-100: var(--color-cream-100);
+  --color-cream-200: var(--color-cream-200);
+  --color-ink: var(--color-slate-ink);
+  --color-body: var(--color-slate-body);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-body), Arial, Helvetica, sans-serif;
+}
+
+h1,
+h2 {
+  font-family: var(--font-display), var(--font-body), sans-serif;
+  letter-spacing: -0.02em;
+}
+
+.font-data {
+  font-family: var(--font-data), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.balance {
+  text-wrap: balance;
+}
+
+@keyframes bh-cart-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+.animate-cart-in {
+  animation: bh-cart-in 0.25s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-cart-in {
+    animation: none;
+  }
+}
+
+@keyframes bh-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.animate-menu-in {
+  animation: bh-menu-in 0.22s ease-out;
+  transform-origin: top center;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-menu-in {
+    animation: none;
+  }
+}
+
+@keyframes bh-progress-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+.bh-progress-fill {
+  animation-name: bh-progress-fill;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bh-progress-fill {
+    animation: none;
+    transform: scaleX(1);
+  }
+}
+
+.prose-legal h2 {
+  font-family: var(--font-body);
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: var(--color-ink);
+  margin-bottom: 0.5rem;
+}
+
+.prose-legal p,
+.prose-legal li {
+  font-size: 0.9rem;
+  line-height: 1.7;
+  color: var(--color-body);
+}
+
+.prose-legal ul {
+  margin-top: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding-left: 1.1rem;
+  list-style: disc;
+}
+
+.bg-dot-grid {
+  background-image: radial-gradient(rgba(12, 24, 48, 0.14) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+.bg-blueprint {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.055) 1px, transparent 1px);
+  background-size: 44px 44px;
+}
+
+/* Technical corner-bracket frame: wrap content in .frame, four L-marks appear at the corners. */
+.frame {
+  position: relative;
+}
+.frame::before,
+.frame::after,
+.frame > .frame-tr,
+.frame > .frame-br {
+  content: "";
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-color: var(--color-gold-500);
+  z-index: 10;
+}
+.frame::before {
+  top: -1px;
+  left: -1px;
+  border-top: 2px solid var(--color-gold-500);
+  border-left: 2px solid var(--color-gold-500);
+}
+.frame::after {
+  bottom: -1px;
+  left: -1px;
+  border-bottom: 2px solid var(--color-gold-500);
+  border-left: 2px solid var(--color-gold-500);
+}
+.frame > .frame-tr {
+  top: -1px;
+  right: -1px;
+  border-top: 2px solid var(--color-gold-500);
+  border-right: 2px solid var(--color-gold-500);
+}
+.frame > .frame-br {
+  bottom: -1px;
+  right: -1px;
+  border-bottom: 2px solid var(--color-gold-500);
+  border-right: 2px solid var(--color-gold-500);
+}

@@ -1,0 +1,485 @@
+"use client";
+
+import { useState } from "react";
+import {
+  ORDERS,
+  ORDER_STATUS_LABELS,
+  ORDER_STATUS_TONE,
+  ORDER_ORIGIN_LABELS,
+  PAYMENT_METHOD_LABELS,
+  getOrderItemsWithProduct,
+  orderStatusMessage,
+  type Order,
+  type OrderOrigin,
+  type OrderStatus,
+  type PaymentMethod,
+} from "@/lib/orders";
+import { PRODUCTS } from "@/lib/products";
+import { SHIPPING_ZONES } from "@/lib/shipping";
+import { useAdminSettings } from "@/lib/admin-settings";
+import { downloadCSV } from "@/lib/csv-export";
+import { openWhatsApp } from "@/lib/whatsapp";
+import PrintDocument from "@/components/admin/PrintDocument";
+import SectorEyebrow from "@/components/admin/SectorEyebrow";
+import Chip from "@/components/admin/Chip";
+import StatusBadge from "@/components/admin/StatusBadge";
+
+type OriginFilter = "todos" | OrderOrigin;
+
+const EMPTY_MANUAL = {
+  customerName: "",
+  customerPhone: "",
+  customerCity: "",
+  shippingZoneId: SHIPPING_ZONES[0].id,
+  paymentMethod: "efectivo" as PaymentMethod,
+};
+
+export default function AdminPedidosPage() {
+  const { formatPrice, settings } = useAdminSettings();
+  const [orders, setOrders] = useState<Order[]>(ORDERS);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [reciboOrder, setReciboOrder] = useState<Order | null>(null);
+  const [originFilter, setOriginFilter] = useState<OriginFilter>("todos");
+
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualForm, setManualForm] = useState(EMPTY_MANUAL);
+  const [manualItems, setManualItems] = useState<{ productId: string; qty: number }[]>([]);
+  const [productQuery, setProductQuery] = useState("");
+
+  const visible = orders.filter((o) => originFilter === "todos" || o.origin === originFilter);
+
+  function updateStatus(id: string, status: OrderStatus) {
+    setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
+  }
+
+  function orderTotal(order: Order) {
+    const items = getOrderItemsWithProduct(order);
+    const zone = SHIPPING_ZONES.find((z) => z.id === order.shippingZoneId);
+    const itemsTotal = items.reduce(
+      (sum, i) => sum + (i.product?.priceUSD ?? 0) * i.qty,
+      0,
+    );
+    return itemsTotal + (zone?.priceUSD ?? 0);
+  }
+
+  function exportCSV() {
+    downloadCSV(
+      "pedidos.csv",
+      orders.map((o) => ({
+        pedido: o.id,
+        origen: ORDER_ORIGIN_LABELS[o.origin],
+        cliente: o.customerName,
+        ciudad: o.customerCity,
+        total_usd: orderTotal(o),
+        estado: ORDER_STATUS_LABELS[o.status],
+        fecha: o.createdAt,
+      })),
+    );
+  }
+
+  function addManualItem(productId: string) {
+    setManualItems((prev) => {
+      const existing = prev.find((i) => i.productId === productId);
+      if (existing) {
+        return prev.map((i) => (i.productId === productId ? { ...i, qty: i.qty + 1 } : i));
+      }
+      return [...prev, { productId, qty: 1 }];
+    });
+  }
+
+  function removeManualItem(productId: string) {
+    setManualItems((prev) => prev.filter((i) => i.productId !== productId));
+  }
+
+  function openManual() {
+    setManualForm(EMPTY_MANUAL);
+    setManualItems([]);
+    setProductQuery("");
+    setManualOpen(true);
+  }
+
+  function handleManualSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!manualForm.customerName.trim() || manualItems.length === 0) return;
+    const newOrder: Order = {
+      id: "P-" + Date.now().toString(36).toUpperCase(),
+      customerName: manualForm.customerName,
+      customerPhone: manualForm.customerPhone,
+      customerCity: manualForm.customerCity,
+      items: manualItems,
+      shippingZoneId: manualForm.shippingZoneId,
+      status: "nuevo",
+      paymentMethod: manualForm.paymentMethod,
+      origin: "manual",
+      createdAt: new Date().toISOString().slice(0, 10),
+    };
+    setOrders((prev) => [newOrder, ...prev]);
+    setManualOpen(false);
+  }
+
+  const matchingProducts = PRODUCTS.filter((p) =>
+    p.name.toLowerCase().includes(productQuery.toLowerCase()),
+  );
+
+  return (
+    <section className="px-4 py-6 sm:px-8 sm:py-10">
+      <div className="mx-auto max-w-4xl">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <SectorEyebrow />
+            <h1 className="mt-1 text-2xl font-extrabold text-ink sm:text-3xl">Pedidos</h1>
+            <p className="mt-1 text-sm text-body">
+              {orders.length} pedidos en total.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={exportCSV}
+              className="cursor-pointer touch-manipulation rounded-lg border border-ink/15 bg-surface px-4 py-2.5 text-sm font-semibold text-ink shadow-sm transition-all hover:shadow-md"
+            >
+              Exportar CSV
+            </button>
+            <button
+              type="button"
+              onClick={openManual}
+              className="cursor-pointer touch-manipulation rounded-lg bg-navy-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-navy-800 hover:shadow-md"
+            >
+              + Pedido interno
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-xl border border-dashed border-ink/20 bg-surface p-4 text-xs text-body">
+          Los pedidos de la tienda llegan solos por WhatsApp. Los pedidos
+          internos son ventas que cargás vos acá (en el local, por teléfono,
+          etc.) — ambos comparten el mismo seguimiento de estado.
+        </div>
+
+        <div className="mt-5 flex flex-wrap gap-2">
+          <Chip active={originFilter === "todos"} onClick={() => setOriginFilter("todos")}>
+            Todos ({orders.length})
+          </Chip>
+          <Chip active={originFilter === "tienda"} onClick={() => setOriginFilter("tienda")} tone="gold">
+            De la tienda ({orders.filter((o) => o.origin === "tienda").length})
+          </Chip>
+          <Chip active={originFilter === "manual"} onClick={() => setOriginFilter("manual")} tone="negocio">
+            Cargados en el admin ({orders.filter((o) => o.origin === "manual").length})
+          </Chip>
+        </div>
+
+        <div className="mt-5 flex flex-col gap-3">
+          {visible.map((order) => {
+            const items = getOrderItemsWithProduct(order);
+            const zone = SHIPPING_ZONES.find((z) => z.id === order.shippingZoneId);
+            const isOpen = expandedId === order.id;
+            return (
+              <div
+                key={order.id}
+                className="rounded-2xl border border-ink/10 bg-surface shadow-sm transition-shadow hover:shadow-md"
+              >
+                <button
+                  type="button"
+                  onClick={() => setExpandedId(isOpen ? null : order.id)}
+                  className="flex w-full cursor-pointer touch-manipulation flex-wrap items-center justify-between gap-3 p-5 text-left"
+                >
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-data text-sm font-bold text-ink">{order.id}</p>
+                      <StatusBadge tone={order.origin === "tienda" ? "gold" : "negocio"}>
+                        {ORDER_ORIGIN_LABELS[order.origin]}
+                      </StatusBadge>
+                    </div>
+                    <p className="mt-1 text-xs text-body">
+                      {order.customerName} · {order.customerCity}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="font-data text-sm font-semibold text-ink">
+                      {formatPrice(orderTotal(order))}
+                    </span>
+                    <StatusBadge tone={ORDER_STATUS_TONE[order.status]}>
+                      {ORDER_STATUS_LABELS[order.status]}
+                    </StatusBadge>
+                  </div>
+                </button>
+
+                {isOpen && (
+                  <div className="border-t border-ink/10 p-5">
+                    <ul className="flex flex-col gap-2 text-sm">
+                      {items.map((item) => (
+                        <li
+                          key={item.productId}
+                          className="flex justify-between text-body"
+                        >
+                          <span>
+                            {item.product?.name ?? "Producto"} x{item.qty}
+                          </span>
+                          <span className="font-data text-ink">
+                            {formatPrice((item.product?.priceUSD ?? 0) * item.qty)}
+                          </span>
+                        </li>
+                      ))}
+                      <li className="flex justify-between border-t border-ink/10 pt-2 text-body">
+                        <span>Envío ({zone?.region})</span>
+                        <span className="font-data text-ink">
+                          {formatPrice(zone?.priceUSD ?? 0)}
+                        </span>
+                      </li>
+                      <li className="flex justify-between text-body">
+                        <span>Método de pago</span>
+                        <span className="text-ink">{PAYMENT_METHOD_LABELS[order.paymentMethod]}</span>
+                      </li>
+                    </ul>
+
+                    <div className="mt-4 flex flex-wrap items-center gap-2">
+                      <span className="text-xs font-semibold text-body">
+                        Cambiar estado:
+                      </span>
+                      {(Object.keys(ORDER_STATUS_LABELS) as OrderStatus[]).map(
+                        (status) => (
+                          <Chip
+                            key={status}
+                            active={order.status === status}
+                            onClick={() => updateStatus(order.id, status)}
+                            tone={ORDER_STATUS_TONE[status]}
+                          >
+                            {ORDER_STATUS_LABELS[status]}
+                          </Chip>
+                        ),
+                      )}
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap gap-2 border-t border-ink/10 pt-4">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          openWhatsApp(order.customerPhone, orderStatusMessage(order, settings.storeName))
+                        }
+                        title={`Avisar por WhatsApp a ${order.customerPhone}`}
+                        className="flex cursor-pointer touch-manipulation items-center gap-2 rounded-lg border border-green-500/20 bg-green-500/10 px-3 py-2 text-xs font-semibold text-green-600 shadow-sm transition-all hover:shadow-md"
+                      >
+                        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor">
+                          <path d="M12.01 2C6.48 2 2 6.48 2 12c0 1.85.5 3.58 1.36 5.07L2 22l5.06-1.33A9.94 9.94 0 0 0 12.01 22C17.53 22 22 17.52 22 12S17.53 2 12.01 2Zm5.4 14.27c-.23.64-1.13 1.18-1.85 1.33-.49.1-1.13.18-3.29-.7-2.76-1.14-4.53-3.92-4.67-4.1-.14-.18-1.12-1.49-1.12-2.84 0-1.35.7-2.01.96-2.28.23-.24.5-.3.66-.3h.48c.16 0 .37-.06.58.44l.7 1.68c.06.14.1.3.02.48-.08.18-.12.3-.24.46-.12.16-.26.35-.37.47-.12.13-.25.27-.11.53.14.26.64 1.05 1.37 1.7.94.84 1.73 1.1 1.99 1.23.26.12.42.1.57-.06.16-.16.65-.75.83-1.01.18-.26.36-.22.6-.13.25.09 1.58.75 1.85.88.27.13.45.2.52.31.07.12.07.66-.16 1.31Z" />
+                        </svg>
+                        Avisar por WhatsApp
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setReciboOrder(order)}
+                        className="cursor-pointer touch-manipulation rounded-lg border border-ink/15 bg-background px-3 py-2 text-xs font-semibold text-ink shadow-sm transition-all hover:shadow-md"
+                      >
+                        Imprimir comprobante
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {visible.length === 0 && (
+            <p className="py-10 text-center text-sm text-body">No hay pedidos con ese filtro.</p>
+          )}
+        </div>
+      </div>
+
+      {manualOpen && (
+        <div className="fixed inset-0 z-[70]">
+          <button
+            type="button"
+            aria-label="Cerrar"
+            onClick={() => setManualOpen(false)}
+            className="absolute inset-0 cursor-pointer touch-manipulation bg-navy-950/60"
+          />
+          <form
+            onSubmit={handleManualSubmit}
+            className="animate-sheet-in absolute inset-x-0 bottom-0 flex max-h-[92dvh] flex-col overflow-y-auto rounded-t-3xl bg-surface p-6 shadow-[0_0_60px_-10px_rgba(12,24,48,0.5)] sm:animate-panel-in sm:inset-x-auto sm:inset-y-0 sm:right-0 sm:max-h-none sm:w-full sm:max-w-md sm:rounded-t-none"
+          >
+            <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-ink/15 sm:hidden" />
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-ink">Nuevo pedido interno</h2>
+              <button
+                type="button"
+                onClick={() => setManualOpen(false)}
+                aria-label="Cerrar"
+                className="grid h-8 w-8 cursor-pointer touch-manipulation place-items-center rounded-full text-body hover:bg-cream-200 hover:text-ink"
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" d="M6 6l12 12M18 6 6 18" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="mt-6 flex flex-col gap-4">
+              <Field label="Cliente">
+                <input
+                  required
+                  value={manualForm.customerName}
+                  onChange={(e) => setManualForm({ ...manualForm, customerName: e.target.value })}
+                  placeholder="Nombre del cliente"
+                  className="w-full rounded-lg border border-ink/10 bg-background px-3 py-2.5 text-sm text-ink"
+                />
+              </Field>
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Teléfono">
+                  <input
+                    value={manualForm.customerPhone}
+                    onChange={(e) => setManualForm({ ...manualForm, customerPhone: e.target.value })}
+                    className="w-full rounded-lg border border-ink/10 bg-background px-3 py-2.5 text-sm text-ink"
+                  />
+                </Field>
+                <Field label="Ciudad">
+                  <input
+                    value={manualForm.customerCity}
+                    onChange={(e) => setManualForm({ ...manualForm, customerCity: e.target.value })}
+                    className="w-full rounded-lg border border-ink/10 bg-background px-3 py-2.5 text-sm text-ink"
+                  />
+                </Field>
+              </div>
+
+              <Field label="Zona de envío">
+                <select
+                  value={manualForm.shippingZoneId}
+                  onChange={(e) => setManualForm({ ...manualForm, shippingZoneId: e.target.value })}
+                  className="w-full rounded-lg border border-ink/10 bg-background px-3 py-2.5 text-sm text-ink"
+                >
+                  {SHIPPING_ZONES.map((z) => (
+                    <option key={z.id} value={z.id}>
+                      {z.region}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+
+              <Field label="Método de pago">
+                <div className="flex gap-2">
+                  {(Object.keys(PAYMENT_METHOD_LABELS) as PaymentMethod[]).map((method) => (
+                    <Chip
+                      key={method}
+                      active={manualForm.paymentMethod === method}
+                      onClick={() => setManualForm({ ...manualForm, paymentMethod: method })}
+                    >
+                      {PAYMENT_METHOD_LABELS[method]}
+                    </Chip>
+                  ))}
+                </div>
+              </Field>
+
+              <Field label="Productos (del inventario interno)">
+                <input
+                  value={productQuery}
+                  onChange={(e) => setProductQuery(e.target.value)}
+                  placeholder="Buscar producto..."
+                  className="w-full rounded-lg border border-ink/10 bg-background px-3 py-2.5 text-sm text-ink"
+                />
+                <div className="mt-2 max-h-40 overflow-y-auto rounded-lg border border-ink/10">
+                  {matchingProducts.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => addManualItem(p.id)}
+                      className="flex w-full cursor-pointer touch-manipulation items-center justify-between border-b border-ink/10 px-3 py-2 text-left text-xs last:border-0 hover:bg-cream-200"
+                    >
+                      <span className="text-ink">{p.name}</span>
+                      <span className="font-data text-body">{formatPrice(p.priceUSD)}</span>
+                    </button>
+                  ))}
+                  {matchingProducts.length === 0 && (
+                    <p className="px-3 py-3 text-center text-xs text-body">Sin resultados.</p>
+                  )}
+                </div>
+              </Field>
+
+              {manualItems.length > 0 && (
+                <div className="rounded-lg border border-ink/10 bg-background p-3">
+                  <p className="text-xs font-semibold text-ink">Carrito del pedido</p>
+                  <ul className="mt-2 flex flex-col gap-1.5">
+                    {manualItems.map((item) => {
+                      const product = PRODUCTS.find((p) => p.id === item.productId);
+                      return (
+                        <li key={item.productId} className="flex items-center justify-between text-xs">
+                          <span className="text-ink">
+                            {item.qty}x {product?.name}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => removeManualItem(item.productId)}
+                            className="cursor-pointer touch-manipulation text-red-500 hover:underline"
+                          >
+                            Quitar
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            <button
+              type="submit"
+              disabled={manualItems.length === 0 || !manualForm.customerName.trim()}
+              className="sticky bottom-0 mt-6 rounded-lg bg-navy-900 px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-navy-800 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Crear pedido interno
+            </button>
+          </form>
+        </div>
+      )}
+
+      {reciboOrder && (
+        <PrintDocument title="Comprobante de pedido" onClose={() => setReciboOrder(null)}>
+          {(() => {
+            const items = getOrderItemsWithProduct(reciboOrder);
+            const zone = SHIPPING_ZONES.find((z) => z.id === reciboOrder.shippingZoneId);
+            const itemsTotal = items.reduce(
+              (sum, i) => sum + (i.product?.priceUSD ?? 0) * i.qty,
+              0,
+            );
+            const total = itemsTotal + (zone?.priceUSD ?? 0);
+            return (
+              <>
+                <div>
+                  Pedido: <b>{reciboOrder.id}</b>
+                </div>
+                <div>Fecha: {new Date(reciboOrder.createdAt).toLocaleDateString("es-AR")}</div>
+                <div>Cliente: {reciboOrder.customerName}</div>
+                <div>Ciudad: {reciboOrder.customerCity}</div>
+                <div className="bh-recibo-line" />
+                {items.map((item) => (
+                  <div key={item.productId} className="flex justify-between">
+                    <span>
+                      {item.qty}x {item.product?.name ?? "Producto"}
+                    </span>
+                    <span>{formatPrice((item.product?.priceUSD ?? 0) * item.qty)}</span>
+                  </div>
+                ))}
+                <div className="flex justify-between">
+                  <span>Envío ({zone?.region})</span>
+                  <span>{formatPrice(zone?.priceUSD ?? 0)}</span>
+                </div>
+                <div className="bh-recibo-line" />
+                <div className="flex justify-between text-base font-bold">
+                  <span>TOTAL</span>
+                  <span>{formatPrice(total)}</span>
+                </div>
+                <div className="mt-2">Método de pago: {PAYMENT_METHOD_LABELS[reciboOrder.paymentMethod]}</div>
+                <div className="bh-recibo-line" />
+                <p className="text-[11px] opacity-75">Conserve este comprobante como constancia de su compra.</p>
+              </>
+            );
+          })()}
+        </PrintDocument>
+      )}
+    </section>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="text-xs font-semibold text-ink">{label}</span>
+      <div className="mt-1.5">{children}</div>
+    </label>
+  );
+}

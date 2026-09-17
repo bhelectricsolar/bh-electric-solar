@@ -1,0 +1,72 @@
+"use client";
+
+import { useState } from "react";
+import { CATEGORIES, PRODUCTS, type ProductCategory } from "@/lib/products";
+import ProductCard from "./ProductCard";
+
+export default function StoreCatalog() {
+  const [category, setCategory] = useState<ProductCategory | "todos">("todos");
+
+  const visible =
+    category === "todos"
+      ? PRODUCTS
+      : PRODUCTS.filter((p) => p.category === category);
+
+  return (
+    <div>
+      <div className="flex flex-wrap justify-center gap-2 lg:justify-start">
+        <FilterPill
+          active={category === "todos"}
+          onClick={() => setCategory("todos")}
+        >
+          Todos
+        </FilterPill>
+        {CATEGORIES.map((cat) => (
+          <FilterPill
+            key={cat.value}
+            active={category === cat.value}
+            onClick={() => setCategory(cat.value)}
+          >
+            {cat.label}
+          </FilterPill>
+        ))}
+      </div>
+
+      <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        {visible.map((product) => (
+          <ProductCard key={product.id} product={product} />
+        ))}
+      </div>
+
+      {visible.length === 0 && (
+        <p className="mt-10 text-center text-sm text-body">
+          No hay productos en esta categoría todavía.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function FilterPill({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`cursor-pointer touch-manipulation rounded-full border px-4 py-2 text-xs font-semibold transition-colors ${
+        active
+          ? "border-navy-900 bg-navy-900 text-white"
+          : "border-ink/10 bg-white text-ink hover:border-navy-900/30"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}

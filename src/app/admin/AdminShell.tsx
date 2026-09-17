@@ -1,0 +1,383 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useState } from "react";
+import { useTheme } from "./ThemeProvider";
+import { ICONS, SECTORS, sectorForPath, type Sector } from "@/lib/admin-sectors";
+
+const ACCENT_TEXT: Record<Sector["accent"], string> = {
+  tienda: "text-tienda",
+  negocio: "text-negocio",
+  sitio: "text-sitio",
+};
+const ACCENT_BG_SOFT: Record<Sector["accent"], string> = {
+  tienda: "bg-tienda/15",
+  negocio: "bg-negocio/15",
+  sitio: "bg-sitio/15",
+};
+const ACCENT_BG_SOLID: Record<Sector["accent"], string> = {
+  tienda: "bg-tienda",
+  negocio: "bg-negocio",
+  sitio: "bg-sitio",
+};
+
+export default function AdminShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const { theme, toggle } = useTheme();
+  const [moreOpen, setMoreOpen] = useState(false);
+
+  const currentSector = sectorForPath(pathname);
+  const isActivePath = (href: string) =>
+    href === "/admin" ? pathname === "/admin" : pathname.startsWith(href);
+
+  const sheetSector = currentSector ?? null;
+
+  // Barra inferior dinámica: en Resumen funciona como selector de sistema
+  // (Inicio + los 3 sistemas). Una vez adentro de un sistema, la barra
+  // muestra SOLO los menús de ese sistema — "un sistema por pantalla" —
+  // en vez de mezclar los 3 a la vez.
+  const homeActive = pathname === "/admin";
+
+  const sectorItems = currentSector
+    ? currentSector.items.length > 4
+      ? currentSector.items.slice(0, 3)
+      : currentSector.items
+    : [];
+
+  const sectorTabs = currentSector
+    ? sectorItems.map((item) => ({
+        href: item.href,
+        label: item.label,
+        icon: ICONS[item.icon],
+        active: isActivePath(item.href),
+        accentText: ACCENT_TEXT[currentSector.accent],
+        accentBg: ACCENT_BG_SOFT[currentSector.accent],
+      }))
+    : SECTORS.map((sector) => ({
+        href: sector.items[0]?.href ?? "/admin",
+        label: sector.shortLabel,
+        icon: ICONS[sector.icon],
+        active: false,
+        accentText: ACCENT_TEXT[sector.accent],
+        accentBg: ACCENT_BG_SOFT[sector.accent],
+      }));
+
+  const needsMore = !!currentSector && currentSector.items.length > 4;
+  const bottomBarCols = 1 + sectorTabs.length + (needsMore ? 1 : 0);
+
+  return (
+    <div className="flex min-h-dvh flex-col bg-background lg:flex-row">
+      {/* Desktop sidebar */}
+      <aside className="hidden w-64 shrink-0 flex-col border-r border-ink/10 bg-surface p-5 lg:flex">
+        <Link href="/admin" className="flex items-center gap-2.5 px-1">
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-navy-900">
+            <svg viewBox="0 0 32 32" className="h-5 w-5">
+              <path d="M16 2 29 9v14L16 30 3 23V9Z" fill="none" stroke="#ffb648" strokeWidth="1.6" />
+              <circle cx="16" cy="16" r="3.4" fill="#ffb648" />
+            </svg>
+          </span>
+          <span className="text-sm font-bold text-ink">BH Electric Solar</span>
+        </Link>
+
+        <nav className="mt-6 flex flex-col gap-1">
+          <Link
+            href="/admin"
+            className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-bold transition-all ${
+              pathname === "/admin"
+                ? "bg-gold-500 text-navy-950 shadow-[0_4px_14px_-2px_rgba(245,154,31,0.5)]"
+                : "text-gold-600 hover:bg-gold-500/15"
+            }`}
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+              <path d={ICONS.home} />
+            </svg>
+            Inicio
+          </Link>
+
+          {SECTORS.map((sector) => (
+            <div key={sector.id} className="mt-5">
+              <div className="flex items-center gap-2 px-3 pb-1.5">
+                <span className={`h-1.5 w-1.5 rounded-full ${ACCENT_BG_SOLID[sector.accent]}`} />
+                <span className="text-[10px] font-bold uppercase tracking-wide text-body">
+                  {sector.label}
+                </span>
+              </div>
+              <div className="flex flex-col gap-1">
+                {sector.items.map((item) => {
+                  const active = isActivePath(item.href);
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                        active
+                          ? `${ACCENT_BG_SOFT[sector.accent]} ${ACCENT_TEXT[sector.accent]}`
+                          : "text-ink hover:bg-cream-200"
+                      }`}
+                    >
+                      <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+                        <path d={ICONS[item.icon]} />
+                      </svg>
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </nav>
+
+        <div className="mt-auto flex flex-col gap-1 pt-4">
+          <button
+            type="button"
+            onClick={toggle}
+            className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-ink hover:bg-cream-200"
+          >
+            <ThemeIcon theme={theme} />
+            {theme === "dark" ? "Tema claro" : "Tema oscuro"}
+          </button>
+          <Link
+            href="/"
+            className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-xs font-medium text-body hover:bg-cream-200"
+          >
+            ← Volver al sitio
+          </Link>
+        </div>
+      </aside>
+
+      {/* Mobile top bar */}
+      <header className="flex items-center justify-between border-b border-ink/10 bg-surface px-4 py-3 lg:hidden">
+        <Link href="/admin" className="flex items-center gap-2">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-navy-900">
+            <svg viewBox="0 0 32 32" className="h-4 w-4">
+              <path d="M16 2 29 9v14L16 30 3 23V9Z" fill="none" stroke="#ffb648" strokeWidth="1.8" />
+              <circle cx="16" cy="16" r="3.6" fill="#ffb648" />
+            </svg>
+          </span>
+          <div className="flex flex-col leading-none">
+            <span className="text-sm font-bold text-ink">BH Admin</span>
+            {currentSector && (
+              <span className={`mt-0.5 text-[10px] font-bold uppercase tracking-wide ${ACCENT_TEXT[currentSector.accent]}`}>
+                {currentSector.label}
+              </span>
+            )}
+          </div>
+        </Link>
+        <button
+          type="button"
+          onClick={toggle}
+          aria-label="Cambiar tema"
+          className="grid h-9 w-9 cursor-pointer touch-manipulation place-items-center rounded-lg border border-ink/10 text-ink"
+        >
+          <ThemeIcon theme={theme} />
+        </button>
+      </header>
+
+      {/* Content */}
+      <main className="flex-1 pb-20 lg:pb-0">{children}</main>
+
+      {/* Mobile bottom tab bar: en Resumen es el selector de sistema; adentro
+          de un sistema muestra solo los menús de ESE sistema. */}
+      <nav
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-ink/10 bg-surface lg:hidden"
+        style={{ display: "grid", gridTemplateColumns: `repeat(${bottomBarCols}, minmax(0, 1fr))` }}
+      >
+        <HomeTab active={homeActive} />
+        {sectorTabs.map((tab) => (
+          <BottomTab key={tab.href} {...tab} />
+        ))}
+        {needsMore && (
+          <button
+            type="button"
+            onClick={() => setMoreOpen(true)}
+            className={`flex cursor-pointer touch-manipulation flex-col items-center justify-center gap-1 py-2 text-[10px] font-semibold ${
+              moreOpen ? "text-gold-600" : "text-body"
+            }`}
+          >
+            <span
+              className={`grid h-8 w-11 place-items-center rounded-full transition-colors ${
+                moreOpen ? "bg-gold-500/25" : "bg-transparent"
+              }`}
+            >
+              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="5" cy="12" r="1.4" fill="currentColor" stroke="none" />
+                <circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none" />
+                <circle cx="19" cy="12" r="1.4" fill="currentColor" stroke="none" />
+              </svg>
+            </span>
+            Más
+          </button>
+        )}
+      </nav>
+
+      {/* "Más" — menú de tarjetas del sistema actual (o los 3 sistemas si estás en Resumen) */}
+      {moreOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <button
+            type="button"
+            aria-label="Cerrar"
+            onClick={() => setMoreOpen(false)}
+            className="absolute inset-0 cursor-pointer touch-manipulation bg-navy-950/60"
+          />
+          <div className="animate-sheet-in absolute inset-x-0 bottom-0 max-h-[80dvh] overflow-y-auto rounded-t-3xl border-t border-ink/10 bg-surface p-5 pb-8">
+            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-ink/15" />
+
+            {sheetSector ? (
+              <>
+                <div className="mb-4 flex items-center gap-2">
+                  <span className={`h-2 w-2 rounded-full ${ACCENT_BG_SOLID[sheetSector.accent]}`} />
+                  <h2 className="text-sm font-bold text-ink">{sheetSector.label}</h2>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {sheetSector.items.map((item) => (
+                    <MenuCard
+                      key={item.href}
+                      href={item.href}
+                      label={item.label}
+                      description={item.description}
+                      icon={ICONS[item.icon]}
+                      accentText={ACCENT_TEXT[sheetSector.accent]}
+                      accentBg={ACCENT_BG_SOFT[sheetSector.accent]}
+                      onClick={() => setMoreOpen(false)}
+                    />
+                  ))}
+                </div>
+              </>
+            ) : (
+              <>
+                <h2 className="mb-4 text-sm font-bold text-ink">Los 3 sistemas del admin</h2>
+                <div className="grid grid-cols-2 gap-3">
+                  {SECTORS.map((sector) => (
+                    <MenuCard
+                      key={sector.id}
+                      href={sector.items[0]?.href ?? "/admin"}
+                      label={sector.label}
+                      description={sector.tagline}
+                      icon={ICONS[sector.icon]}
+                      accentText={ACCENT_TEXT[sector.accent]}
+                      accentBg={ACCENT_BG_SOFT[sector.accent]}
+                      onClick={() => setMoreOpen(false)}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+
+            <Link
+              href="/"
+              onClick={() => setMoreOpen(false)}
+              className="mt-5 flex cursor-pointer touch-manipulation items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium text-body hover:bg-cream-200"
+            >
+              ← Volver al sitio
+            </Link>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function HomeTab({ active }: { active: boolean }) {
+  return (
+    <Link
+      href="/admin"
+      className={`flex cursor-pointer touch-manipulation flex-col items-center justify-center gap-1 py-2 text-[10px] font-bold text-gold-600 ${
+        active ? "" : "opacity-90"
+      }`}
+    >
+      <span
+        className={`grid h-9 w-9 place-items-center rounded-full bg-gold-500 text-navy-950 shadow-[0_4px_14px_-2px_rgba(245,154,31,0.55)] transition-transform ${
+          active ? "scale-110" : ""
+        }`}
+      >
+        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+          <path d={ICONS.home} />
+        </svg>
+      </span>
+      Inicio
+    </Link>
+  );
+}
+
+function BottomTab({
+  href,
+  label,
+  icon,
+  active,
+  accentText,
+  accentBg,
+}: {
+  href: string;
+  label: string;
+  icon: string;
+  active: boolean;
+  accentText: string;
+  accentBg: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`flex cursor-pointer touch-manipulation flex-col items-center justify-center gap-1 py-2 text-[10px] font-semibold ${
+        active ? accentText : "text-body"
+      }`}
+    >
+      <span className={`grid h-8 w-11 place-items-center rounded-full transition-colors ${active ? accentBg : "bg-transparent"}`}>
+        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={active ? 2.2 : 1.8} strokeLinecap="round" strokeLinejoin="round">
+          <path d={icon} />
+        </svg>
+      </span>
+      {label}
+    </Link>
+  );
+}
+
+function MenuCard({
+  href,
+  label,
+  description,
+  icon,
+  accentText,
+  accentBg,
+  onClick,
+}: {
+  href: string;
+  label: string;
+  description: string;
+  icon: string;
+  accentText: string;
+  accentBg: string;
+  onClick: () => void;
+}) {
+  return (
+    <Link
+      href={href}
+      onClick={onClick}
+      className="flex cursor-pointer touch-manipulation flex-col gap-2 rounded-2xl border border-ink/10 bg-background p-4 shadow-sm transition-all active:scale-[0.97]"
+    >
+      <span className={`grid h-10 w-10 place-items-center rounded-xl ${accentBg} ${accentText}`}>
+        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+          <path d={icon} />
+        </svg>
+      </span>
+      <span className="text-sm font-bold text-ink">{label}</span>
+      <span className="text-[11px] leading-snug text-body">{description}</span>
+    </Link>
+  );
+}
+
+function ThemeIcon({ theme }: { theme: "light" | "dark" }) {
+  if (theme === "dark") {
+    return (
+      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+    </svg>
+  );
+}
