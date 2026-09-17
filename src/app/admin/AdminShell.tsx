@@ -160,9 +160,12 @@ function FullAdminShell({
 
   return (
     <div className="flex min-h-dvh flex-col bg-background lg:flex-row">
-      {/* Desktop sidebar */}
-      <aside className="hidden w-64 shrink-0 flex-col overflow-y-auto border-r border-ink/10 bg-surface p-5 lg:flex">
-        <Link href="/admin" className="flex items-center gap-2.5 px-1">
+      {/* Desktop sidebar — el nav del medio scrollea solo; el logo arriba y
+          los botones de abajo (Cerrar sesión incluido) quedan siempre fijos
+          y visibles, sin importar cuántos items tenga el menú ni el alto
+          de la ventana. */}
+      <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-ink/10 bg-surface lg:flex">
+        <Link href="/admin" className="flex shrink-0 items-center gap-2.5 px-5 pt-5">
           <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-navy-900">
             <svg viewBox="0 0 32 32" className="h-5 w-5">
               <path d="M16 2 29 9v14L16 30 3 23V9Z" fill="none" stroke="#ffb648" strokeWidth="1.6" />
@@ -172,7 +175,7 @@ function FullAdminShell({
           <span className="text-sm font-bold text-ink">BH Electric Solar</span>
         </Link>
 
-        <nav className="mt-6 flex flex-col gap-1">
+        <nav className="mt-6 min-h-0 flex-1 overflow-y-auto px-5 flex flex-col gap-1">
           <Link
             href="/admin"
             className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-bold transition-all ${
@@ -244,7 +247,7 @@ function FullAdminShell({
           </div>
         )}
 
-        <div className="mt-auto flex flex-col gap-1 pt-4">
+        <div className="flex shrink-0 flex-col gap-1 border-t border-ink/10 p-5">
           <button
             type="button"
             onClick={toggle}
@@ -303,8 +306,8 @@ function FullAdminShell({
       {/* Mobile bottom tab bar: en Resumen es el selector de sistema; adentro
           de un sistema muestra solo los menús de ESE sistema. */}
       <nav
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-ink/10 bg-surface lg:hidden"
-        style={{ display: "grid", gridTemplateColumns: `repeat(${bottomBarCols}, minmax(0, 1fr))` }}
+        className="fixed inset-x-0 bottom-0 z-40 grid border-t border-ink/10 bg-surface lg:hidden"
+        style={{ gridTemplateColumns: `repeat(${bottomBarCols}, minmax(0, 1fr))` }}
       >
         <HomeTab active={homeActive} />
         {sectorTabs.map((tab) => (
