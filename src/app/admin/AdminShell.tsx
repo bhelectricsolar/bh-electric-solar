@@ -24,11 +24,18 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   const isRestricted = !isDeveloper && !!member && member.role !== "admin";
 
   useEffect(() => {
-    if (!isRestricted) return;
-    if (!RESTRICTED_ALLOWED_PATHS.some((p) => pathname.startsWith(p))) {
-      router.replace(RESTRICTED_HOME);
+    if (isRestricted) {
+      if (!RESTRICTED_ALLOWED_PATHS.some((p) => pathname.startsWith(p))) {
+        router.replace(RESTRICTED_HOME);
+      }
+      return;
     }
-  }, [isRestricted, pathname, router]);
+    // El panel de desarrollador es exclusivo del desarrollador — un admin
+    // (el dueño) no debe poder entrar aunque escriba la URL a mano.
+    if (!isDeveloper && pathname.startsWith("/admin/developer")) {
+      router.replace("/admin");
+    }
+  }, [isRestricted, isDeveloper, pathname, router]);
 
   if (loading) {
     return (
@@ -154,7 +161,7 @@ function FullAdminShell({
   return (
     <div className="flex min-h-dvh flex-col bg-background lg:flex-row">
       {/* Desktop sidebar */}
-      <aside className="hidden w-64 shrink-0 flex-col border-r border-ink/10 bg-surface p-5 lg:flex">
+      <aside className="hidden w-64 shrink-0 flex-col overflow-y-auto border-r border-ink/10 bg-surface p-5 lg:flex">
         <Link href="/admin" className="flex items-center gap-2.5 px-1">
           <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-navy-900">
             <svg viewBox="0 0 32 32" className="h-5 w-5">
