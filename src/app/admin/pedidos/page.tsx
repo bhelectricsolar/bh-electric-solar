@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  ORDERS,
+  getOrders,
+  createOrder,
+  updateOrderStatus,
   ORDER_STATUS_LABELS,
   ORDER_STATUS_TONE,
   ORDER_ORIGIN_LABELS,
@@ -14,8 +16,8 @@ import {
   type OrderStatus,
   type PaymentMethod,
 } from "@/lib/orders";
-import { PRODUCTS } from "@/lib/products";
-import { SHIPPING_ZONES } from "@/lib/shipping";
+import { getProducts, type Product } from "@/lib/products";
+import { getShippingZones, type ShippingZone } from "@/lib/shipping";
 import { useAdminSettings } from "@/lib/admin-settings";
 import { downloadCSV } from "@/lib/csv-export";
 import { openWhatsApp } from "@/lib/whatsapp";
@@ -30,13 +32,16 @@ const EMPTY_MANUAL = {
   customerName: "",
   customerPhone: "",
   customerCity: "",
-  shippingZoneId: SHIPPING_ZONES[0].id,
+  shippingZoneId: "",
   paymentMethod: "efectivo" as PaymentMethod,
 };
 
 export default function AdminPedidosPage() {
   const { formatPrice, settings } = useAdminSettings();
-  const [orders, setOrders] = useState<Order[]>(ORDERS);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [zones, setZones] = useState<ShippingZone[]>([]);
+  const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [reciboOrder, setReciboOrder] = useState<Order | null>(null);
   const [originFilter, setOriginFilter] = useState<OriginFilter>("todos");
@@ -46,15 +51,26 @@ export default function AdminPedidosPage() {
   const [manualItems, setManualItems] = useState<{ productId: string; qty: number }[]>([]);
   const [productQuery, setProductQuery] = useState("");
 
+  useEffect(() => {
+    Promise.all([getOrders(), getProducts(), getShippingZones()])
+      .then(([o, p, z]) => {
+        setOrders(o);
+        setProducts(p);
+        setZones(z);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
   const visible = orders.filter((o) => originFilter === "todos" || o.origin === originFilter);
 
-  function updateStatus(id: string, status: OrderStatus) {
+  async function updateStatus(id: string, status: OrderStatus) {
     setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
+    await updateOrderStatus(id, status);
   }
 
   function orderTotal(order: Order) {
-    const items = getOrderItemsWithProduct(order);
-    const zone = SHIPPING_ZONES.find((z) => z.id === order.shippingZoneId);
+    const items = getOrderItemsWithProduct(order, products);
+    const zone = zones.find((z) => z.id === order.shippingZoneId);
     const itemsTotal = items.reduce(
       (sum, i) => sum + (i.product?.priceUSD ?? 0) * i.qty,
       0,
@@ -92,13 +108,13 @@ export default function AdminPedidosPage() {
   }
 
   function openManual() {
-    setManualForm(EMPTY_MANUAL);
+    setManualForm({ ...EMPTY_MANUAL, shippingZoneId: zones[0]?.id ?? "" });
     setManualItems([]);
     setProductQuery("");
     setManualOpen(true);
   }
 
-  function handleManualSubmit(event: React.FormEvent) {
+  async function handleManualSubmit(event: React.FormEvent) {
     event.preventDefault();
     if (!manualForm.customerName.trim() || manualItems.length === 0) return;
     const newOrder: Order = {
@@ -113,11 +129,12 @@ export default function AdminPedidosPage() {
       origin: "manual",
       createdAt: new Date().toISOString().slice(0, 10),
     };
+    await createOrder(newOrder);
     setOrders((prev) => [newOrder, ...prev]);
     setManualOpen(false);
   }
 
-  const matchingProducts = PRODUCTS.filter((p) =>
+  const matchingProducts = products.filter((p) =>
     p.name.toLowerCase().includes(productQuery.toLowerCase()),
   );
 
@@ -151,10 +168,13 @@ export default function AdminPedidosPage() {
         </div>
 
         <div className="mt-4 rounded-xl border border-dashed border-ink/20 bg-surface p-4 text-xs text-body">
-          Los pedidos de la tienda llegan solos por WhatsApp. Los pedidos
-          internos son ventas que cargás vos acá (en el local, por teléfono,
-          etc.) — ambos comparten el mismo seguimiento de estado.
+          Conectado a Supabase. Los pedidos de la tienda llegan solos por
+          WhatsApp. Los pedidos internos son ventas que cargás vos acá (en
+          el local, por teléfono, etc.) — ambos comparten el mismo
+          seguimiento de estado.
         </div>
+
+        {loading && <p className="mt-5 text-sm text-body">Cargando pedidos…</p>}
 
         <div className="mt-5 flex flex-wrap gap-2">
           <Chip active={originFilter === "todos"} onClick={() => setOriginFilter("todos")}>
@@ -170,8 +190,8 @@ export default function AdminPedidosPage() {
 
         <div className="mt-5 flex flex-col gap-3">
           {visible.map((order) => {
-            const items = getOrderItemsWithProduct(order);
-            const zone = SHIPPING_ZONES.find((z) => z.id === order.shippingZoneId);
+            const items = getOrderItemsWithProduct(order, products);
+            const zone = zones.find((z) => z.id === order.shippingZoneId);
             const isOpen = expandedId === order.id;
             return (
               <div
@@ -343,7 +363,7 @@ export default function AdminPedidosPage() {
                   onChange={(e) => setManualForm({ ...manualForm, shippingZoneId: e.target.value })}
                   className="w-full rounded-lg border border-ink/10 bg-background px-3 py-2.5 text-sm text-ink"
                 >
-                  {SHIPPING_ZONES.map((z) => (
+                  {zones.map((z) => (
                     <option key={z.id} value={z.id}>
                       {z.region}
                     </option>
@@ -395,7 +415,7 @@ export default function AdminPedidosPage() {
                   <p className="text-xs font-semibold text-ink">Carrito del pedido</p>
                   <ul className="mt-2 flex flex-col gap-1.5">
                     {manualItems.map((item) => {
-                      const product = PRODUCTS.find((p) => p.id === item.productId);
+                      const product = products.find((p) => p.id === item.productId);
                       return (
                         <li key={item.productId} className="flex items-center justify-between text-xs">
                           <span className="text-ink">
@@ -430,8 +450,8 @@ export default function AdminPedidosPage() {
       {reciboOrder && (
         <PrintDocument title="Comprobante de pedido" onClose={() => setReciboOrder(null)}>
           {(() => {
-            const items = getOrderItemsWithProduct(reciboOrder);
-            const zone = SHIPPING_ZONES.find((z) => z.id === reciboOrder.shippingZoneId);
+            const items = getOrderItemsWithProduct(reciboOrder, products);
+            const zone = zones.find((z) => z.id === reciboOrder.shippingZoneId);
             const itemsTotal = items.reduce(
               (sum, i) => sum + (i.product?.priceUSD ?? 0) * i.qty,
               0,

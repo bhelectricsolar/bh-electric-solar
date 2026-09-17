@@ -1,7 +1,16 @@
 "use client";
 
-import { useState } from "react";
-import { CATEGORIES, PRODUCTS, type Product, type ProductCategory } from "@/lib/products";
+import { useEffect, useState } from "react";
+import {
+  getProducts,
+  getCategories,
+  createProduct,
+  updateProduct,
+  deleteProduct,
+  type Product,
+  type Category,
+  type ProductCategory,
+} from "@/lib/products";
 import { useAdminSettings } from "@/lib/admin-settings";
 import { downloadCSV } from "@/lib/csv-export";
 import { pickField } from "@/lib/csv-import";
@@ -46,20 +55,12 @@ const EMPTY_DRAFT: DraftProduct = {
   description: "",
 };
 
-const CATEGORY_BY_LABEL = new Map(
-  CATEGORIES.map((c) => [c.label.toLowerCase(), c.value]),
-);
-
-function matchCategory(value: string): ProductCategory {
-  const normalized = value.trim().toLowerCase();
-  const byValue = CATEGORIES.find((c) => c.value === normalized);
-  if (byValue) return byValue.value;
-  return CATEGORY_BY_LABEL.get(normalized) ?? "accesorios";
-}
-
 export default function AdminProductosPage() {
   const { formatPrice } = useAdminSettings();
-  const [products, setProducts] = useState<Product[]>(PRODUCTS);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<DraftProduct>(EMPTY_DRAFT);
   const [images, setImages] = useState<UploadedImage[]>([]);
@@ -67,6 +68,23 @@ export default function AdminProductosPage() {
   const [choiceOpen, setChoiceOpen] = useState(false);
   const [fromInventoryOpen, setFromInventoryOpen] = useState(false);
   const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    Promise.all([getProducts(), getCategories()])
+      .then(([p, c]) => {
+        setProducts(p);
+        setCategories(c);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  const categoryByLabel = new Map(categories.map((c) => [c.label.toLowerCase(), c.value]));
+  function matchCategory(value: string): ProductCategory {
+    const normalized = value.trim().toLowerCase();
+    const byValue = categories.find((c) => c.value === normalized);
+    if (byValue) return byValue.value;
+    return categoryByLabel.get(normalized) ?? "accesorios";
+  }
 
   const published = products.filter((p) => p.publishedOnline !== false);
   const internalOnly = products.filter((p) => p.publishedOnline === false);
@@ -91,10 +109,9 @@ export default function AdminProductosPage() {
     setFromInventoryOpen(true);
   }
 
-  function publishFromInventory(id: string) {
-    setProducts((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, publishedOnline: true } : p)),
-    );
+  async function publishFromInventory(id: string) {
+    await updateProduct(id, { publishedOnline: true });
+    setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, publishedOnline: true } : p)));
     setFromInventoryOpen(false);
   }
 
@@ -113,50 +130,53 @@ export default function AdminProductosPage() {
     setPanelOpen(true);
   }
 
-  function handleDelete(id: string) {
+  async function handleDelete(id: string) {
     if (!confirm("¿Eliminar este producto?")) return;
+    await deleteProduct(id);
     setProducts((prev) => prev.filter((p) => p.id !== id));
   }
 
-  function handleSave(event: React.FormEvent) {
+  async function handleSave(event: React.FormEvent) {
     event.preventDefault();
     if (!draft.name.trim()) return;
-
-    if (editingId) {
-      setProducts((prev) =>
-        prev.map((p) =>
-          p.id === editingId
-            ? {
-                ...p,
-                name: draft.name,
-                category: draft.category,
-                priceUSD: Number(draft.priceUSD) || 0,
-                costUSD: draft.costUSD ? Number(draft.costUSD) : undefined,
-                stock: Number(draft.stock) || 0,
-                shortDescription: draft.shortDescription,
-                description: draft.description,
-              }
-            : p,
-        ),
-      );
-    } else {
-      const newProduct: Product = {
-        id: slugify(draft.name) + "-" + Date.now().toString(36),
-        slug: slugify(draft.name),
-        name: draft.name,
-        category: draft.category,
-        priceUSD: Number(draft.priceUSD) || 0,
-        costUSD: draft.costUSD ? Number(draft.costUSD) : undefined,
-        stock: Number(draft.stock) || 0,
-        shortDescription: draft.shortDescription,
-        description: draft.description || draft.shortDescription,
-        specs: [],
-        gradient: GRADIENTS[products.length % GRADIENTS.length],
-        publishedOnline: true,
-      };
-      setProducts((prev) => [newProduct, ...prev]);
+    setSaving(true);
+    try {
+      if (editingId) {
+        const patch = {
+          name: draft.name,
+          category: draft.category,
+          priceUSD: Number(draft.priceUSD) || 0,
+          costUSD: draft.costUSD ? Number(draft.costUSD) : undefined,
+          stock: Number(draft.stock) || 0,
+          shortDescription: draft.shortDescription,
+          description: draft.description,
+        };
+        await updateProduct(editingId, patch);
+        setProducts((prev) =>
+          prev.map((p) => (p.id === editingId ? { ...p, ...patch } : p)),
+        );
+      } else {
+        const newProduct: Product = {
+          id: slugify(draft.name) + "-" + Date.now().toString(36),
+          slug: slugify(draft.name),
+          name: draft.name,
+          category: draft.category,
+          priceUSD: Number(draft.priceUSD) || 0,
+          costUSD: draft.costUSD ? Number(draft.costUSD) : undefined,
+          stock: Number(draft.stock) || 0,
+          shortDescription: draft.shortDescription,
+          description: draft.description || draft.shortDescription,
+          specs: [],
+          gradient: GRADIENTS[products.length % GRADIENTS.length],
+          publishedOnline: true,
+        };
+        await createProduct(newProduct);
+        setProducts((prev) => [newProduct, ...prev]);
+      }
+      setPanelOpen(false);
+    } finally {
+      setSaving(false);
     }
-    setPanelOpen(false);
   }
 
   function exportCSV() {
@@ -164,7 +184,7 @@ export default function AdminProductosPage() {
       "productos.csv",
       products.map((p) => ({
         nombre: p.name,
-        categoria: CATEGORIES.find((c) => c.value === p.category)?.label ?? p.category,
+        categoria: categories.find((c) => c.value === p.category)?.label ?? p.category,
         precio_usd: p.priceUSD,
         costo_usd: p.costUSD ?? "",
         stock: p.stock,
@@ -194,12 +214,26 @@ export default function AdminProductosPage() {
         description: "",
         specs: [],
         gradient: GRADIENTS[(products.length + idx) % GRADIENTS.length],
+        publishedOnline: true,
       });
     });
     if (imported.length > 0) {
-      setProducts((prev) => [...imported, ...prev]);
+      Promise.all(imported.map((p) => createProduct(p))).then(() => {
+        setProducts((prev) => [...imported, ...prev]);
+      });
     }
     return imported.length;
+  }
+
+  if (loading) {
+    return (
+      <section className="px-4 py-6 sm:px-8 sm:py-10">
+        <div className="mx-auto max-w-5xl">
+          <SectorEyebrow />
+          <p className="mt-4 text-sm text-body">Cargando productos…</p>
+        </div>
+      </section>
+    );
   }
 
   return (
@@ -234,9 +268,8 @@ export default function AdminProductosPage() {
         </div>
 
         <div className="mt-4 rounded-xl border border-dashed border-ink/20 bg-surface p-4 text-xs text-body">
-          Vista previa — estos cambios solo existen en esta pestaña (se
-          pierden al recargar). Cuando conectemos Supabase, se van a guardar
-          de verdad y reflejar en <b className="text-ink">/tienda</b>.
+          Conectado a Supabase — los cambios que hagas acá se guardan de
+          verdad y se reflejan en <b className="text-ink">/tienda</b>.
         </div>
 
         <input
@@ -254,7 +287,7 @@ export default function AdminProductosPage() {
             >
               <div className={`flex h-24 items-end justify-between bg-gradient-to-br p-3 ${product.gradient}`}>
                 <span className="rounded bg-white/20 px-2 py-0.5 text-[10px] font-semibold text-white">
-                  {CATEGORIES.find((c) => c.value === product.category)?.label}
+                  {categories.find((c) => c.value === product.category)?.label}
                 </span>
                 {product.stock <= 8 && (
                   <span className="rounded bg-gold-500 px-2 py-0.5 text-[10px] font-bold text-navy-950">
@@ -419,7 +452,7 @@ export default function AdminProductosPage() {
                   }
                   className="w-full rounded-lg border border-ink/10 bg-background px-3 py-2.5 text-sm text-ink"
                 >
-                  {CATEGORIES.map((cat) => (
+                  {categories.map((cat) => (
                     <option key={cat.value} value={cat.value}>
                       {cat.label}
                     </option>
@@ -486,9 +519,10 @@ export default function AdminProductosPage() {
 
             <button
               type="submit"
-              className="sticky bottom-0 mt-6 rounded-lg bg-navy-900 px-5 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-navy-800"
+              disabled={saving}
+              className="sticky bottom-0 mt-6 rounded-lg bg-navy-900 px-5 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-navy-800 disabled:opacity-60"
             >
-              {editingId ? "Guardar cambios" : "Crear producto"}
+              {saving ? "Guardando…" : editingId ? "Guardar cambios" : "Crear producto"}
             </button>
           </form>
         </div>

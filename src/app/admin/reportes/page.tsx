@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { ORDERS, getOrderItemsWithProduct } from "@/lib/orders";
-import { PRODUCTS } from "@/lib/products";
-import { PROJECTS, PROJECT_STAGES, PROJECT_STAGE_TONE } from "@/lib/projects";
+import { useEffect, useMemo, useState } from "react";
+import { getOrders, getOrderItemsWithProduct, type Order } from "@/lib/orders";
+import { getProducts, type Product } from "@/lib/products";
+import { getProjects, PROJECT_STAGES, PROJECT_STAGE_TONE, type Project } from "@/lib/projects";
 import { useAdminSettings } from "@/lib/admin-settings";
 import SectorEyebrow from "@/components/admin/SectorEyebrow";
 import Chip from "@/components/admin/Chip";
@@ -38,20 +38,34 @@ function rangeStart(range: Range): Date | null {
 export default function AdminReportesPage() {
   const { formatPrice } = useAdminSettings();
   const [range, setRange] = useState<Range>("mes");
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([getOrders(), getProducts(), getProjects()])
+      .then(([o, p, pr]) => {
+        setOrders(o);
+        setProducts(p);
+        setProjects(pr);
+      })
+      .finally(() => setLoading(false));
+  }, []);
 
   const desde = rangeStart(range);
   const ordersInRange = useMemo(
-    () => ORDERS.filter((o) => !desde || new Date(o.createdAt) >= desde),
-    [desde],
+    () => orders.filter((o) => !desde || new Date(o.createdAt) >= desde),
+    [orders, desde],
   );
 
   const totalVentas = ordersInRange.reduce((sum, o) => {
-    const items = getOrderItemsWithProduct(o);
+    const items = getOrderItemsWithProduct(o, products);
     return sum + items.reduce((s, i) => s + (i.product?.priceUSD ?? 0) * i.qty, 0);
   }, 0);
 
   const totalCosto = ordersInRange.reduce((sum, o) => {
-    const items = getOrderItemsWithProduct(o);
+    const items = getOrderItemsWithProduct(o, products);
     return sum + items.reduce((s, i) => s + (i.product?.costUSD ?? 0) * i.qty, 0);
   }, 0);
 
@@ -65,7 +79,7 @@ export default function AdminReportesPage() {
   });
   const topProducts = [...unitsByProduct.entries()]
     .map(([productId, qty]) => ({
-      product: PRODUCTS.find((p) => p.id === productId),
+      product: products.find((p) => p.id === productId),
       qty,
     }))
     .filter((r) => r.product)
@@ -75,7 +89,7 @@ export default function AdminReportesPage() {
 
   const projectsByStage = PROJECT_STAGES.map((stage) => ({
     ...stage,
-    count: PROJECTS.filter((p) => p.status === stage.value).length,
+    count: projects.filter((p) => p.status === stage.value).length,
   }));
 
   return (
@@ -86,9 +100,10 @@ export default function AdminReportesPage() {
         <p className="mt-1 text-sm text-body">Ventas, margen y estado del negocio.</p>
 
         <div className="mt-4 rounded-xl border border-dashed border-ink/20 bg-surface p-4 text-xs text-body">
-          Calculado sobre los pedidos y proyectos de ejemplo. Con Supabase
-          conectado, va a reflejar las ventas y proyectos reales.
+          Conectado a Supabase — calculado sobre tus pedidos y proyectos reales.
         </div>
+
+        {loading && <p className="mt-5 text-sm text-body">Calculando…</p>}
 
         <div className="mt-5 flex flex-wrap gap-2">
           {RANGE_OPTIONS.map((opt) => (

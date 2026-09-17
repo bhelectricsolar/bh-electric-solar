@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Badge from "@/components/Badge";
 import GlowOrb from "@/components/GlowOrb";
 import StoreCatalog from "@/components/store/StoreCatalog";
+import { getPublishedProducts, getCategories } from "@/lib/products";
 
 export const metadata: Metadata = {
   title: "Tienda de Equipos Solares | BH Electric Solar",
@@ -9,7 +10,13 @@ export const metadata: Metadata = {
     "Paneles solares, inversores, baterías, estructuras de montaje y accesorios. Consultá disponibilidad y coordiná tu pedido por WhatsApp.",
 };
 
-export default function TiendaPage() {
+export const revalidate = 0;
+
+export default async function TiendaPage() {
+  const [products, categories] = await Promise.all([
+    getPublishedProducts(),
+    getCategories(),
+  ]);
   return (
     <section className="relative isolate overflow-hidden bg-white px-4 py-16 sm:py-20">
       <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] bg-dot-grid [mask-image:radial-gradient(ellipse_60%_60%_at_50%_0%,black,transparent)]" />
@@ -27,7 +34,7 @@ export default function TiendaPage() {
         </p>
 
         <div className="mt-10 text-left">
-          <StoreCatalog />
+          <StoreCatalog products={products} categories={categories} />
         </div>
       </div>
     </section>

@@ -1,16 +1,23 @@
 "use client";
 
-import { useState } from "react";
-import { SHIPPING_ZONES, type ShippingZone } from "@/lib/shipping";
+import { useEffect, useState } from "react";
+import { getShippingZones, updateShippingZone, type ShippingZone } from "@/lib/shipping";
 import { useAdminSettings } from "@/lib/admin-settings";
 import SectorEyebrow from "@/components/admin/SectorEyebrow";
 
 export default function AdminEnviosPage() {
   const { formatPrice } = useAdminSettings();
-  const [zones, setZones] = useState<ShippingZone[]>(SHIPPING_ZONES);
+  const [zones, setZones] = useState<ShippingZone[]>([]);
+  const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftPrice, setDraftPrice] = useState("");
   const [draftEta, setDraftEta] = useState("");
+
+  useEffect(() => {
+    getShippingZones()
+      .then(setZones)
+      .finally(() => setLoading(false));
+  }, []);
 
   function startEdit(zone: ShippingZone) {
     setEditingId(zone.id);
@@ -18,13 +25,13 @@ export default function AdminEnviosPage() {
     setDraftEta(zone.etaDays);
   }
 
-  function saveEdit() {
+  async function saveEdit() {
+    if (!editingId) return;
+    const priceUSD = Number(draftPrice) || 0;
+    const etaDays = draftEta;
+    await updateShippingZone(editingId, { priceUSD, etaDays });
     setZones((prev) =>
-      prev.map((z) =>
-        z.id === editingId
-          ? { ...z, priceUSD: Number(draftPrice) || 0, etaDays: draftEta }
-          : z,
-      ),
+      prev.map((z) => (z.id === editingId ? { ...z, priceUSD, etaDays } : z)),
     );
     setEditingId(null);
   }
@@ -41,9 +48,12 @@ export default function AdminEnviosPage() {
         </p>
 
         <div className="mt-4 rounded-xl border border-dashed border-ink/20 bg-surface p-4 text-xs text-body">
-          Vista previa — estos valores todavía no se usan en el checkout de
-          la tienda (que hoy cierra por WhatsApp sin cobrar envío aparte).
+          Conectado a Supabase — estos valores todavía no se usan en el
+          checkout de la tienda (que hoy cierra por WhatsApp sin cobrar
+          envío aparte), pero ya quedan guardados de verdad.
         </div>
+
+        {loading && <p className="mt-5 text-sm text-body">Cargando zonas de envío…</p>}
 
         <div className="mt-5 flex flex-col gap-3">
           {zones.map((zone) => (

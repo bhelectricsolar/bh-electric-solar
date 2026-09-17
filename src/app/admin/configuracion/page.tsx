@@ -5,9 +5,9 @@ import { useAdminSettings, type Currency, type ExchangeRateMode } from "@/lib/ad
 import SectorEyebrow from "@/components/admin/SectorEyebrow";
 import Chip from "@/components/admin/Chip";
 import { useTheme } from "../ThemeProvider";
-import { PRODUCTS, CATEGORIES } from "@/lib/products";
-import { CUSTOMERS } from "@/lib/customers";
-import { ORDERS } from "@/lib/orders";
+import { getProducts, getCategories } from "@/lib/products";
+import { getCustomers } from "@/lib/customers";
+import { getOrders } from "@/lib/orders";
 import { downloadCSV } from "@/lib/csv-export";
 
 export default function AdminConfiguracionPage() {
@@ -217,47 +217,50 @@ export default function AdminConfiguracionPage() {
           <div className="mt-3 flex flex-wrap gap-2">
             <ExportButton
               label="Productos"
-              onClick={() =>
+              onClick={async () => {
+                const [products, categories] = await Promise.all([getProducts(), getCategories()]);
                 downloadCSV(
                   "productos.csv",
-                  PRODUCTS.map((p) => ({
+                  products.map((p) => ({
                     nombre: p.name,
                     categoria:
-                      CATEGORIES.find((c) => c.value === p.category)?.label ??
+                      categories.find((c) => c.value === p.category)?.label ??
                       p.category,
                     precio_usd: p.priceUSD,
                     stock: p.stock,
                   })),
-                )
-              }
+                );
+              }}
             />
             <ExportButton
               label="Clientes"
-              onClick={() =>
+              onClick={async () => {
+                const customers = await getCustomers();
                 downloadCSV(
                   "clientes.csv",
-                  CUSTOMERS.map((c) => ({
+                  customers.map((c) => ({
                     nombre: c.name,
                     email: c.email,
                     telefono: c.phone,
                     ciudad: c.city,
                   })),
-                )
-              }
+                );
+              }}
             />
             <ExportButton
               label="Pedidos"
-              onClick={() =>
+              onClick={async () => {
+                const orders = await getOrders();
                 downloadCSV(
                   "pedidos.csv",
-                  ORDERS.map((o) => ({
+                  orders.map((o) => ({
                     pedido: o.id,
                     cliente: o.customerName,
                     estado: o.status,
                     fecha: o.createdAt,
                   })),
-                )
-              }
+                );
+              }}
             />
           </div>
         </SettingsCard>

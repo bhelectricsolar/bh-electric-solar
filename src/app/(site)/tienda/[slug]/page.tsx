@@ -1,14 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { PRODUCTS, getProductBySlug, getRelatedProducts } from "@/lib/products";
+import { getAllSlugs, getProductBySlug, getRelatedProducts } from "@/lib/products";
 import { formatUSD } from "@/lib/currency";
 import Badge from "@/components/Badge";
 import AddToCartButton from "@/components/store/AddToCartButton";
 import ProductCard from "@/components/store/ProductCard";
 
-export function generateStaticParams() {
-  return PRODUCTS.map((p) => ({ slug: p.slug }));
+export const revalidate = 0;
+
+export async function generateStaticParams() {
+  const slugs = await getAllSlugs();
+  return slugs.map((slug) => ({ slug }));
 }
 
 export async function generateMetadata({
@@ -17,7 +20,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const product = getProductBySlug(slug);
+  const product = await getProductBySlug(slug);
   if (!product) return {};
   return {
     title: `${product.name} | BH Electric Solar`,
@@ -31,10 +34,10 @@ export default async function ProductPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const product = getProductBySlug(slug);
+  const product = await getProductBySlug(slug);
   if (!product) notFound();
 
-  const related = getRelatedProducts(product);
+  const related = await getRelatedProducts(product);
 
   return (
     <section className="bg-white px-4 py-16 sm:py-20">

@@ -1,12 +1,17 @@
 "use client";
 
-import { useState } from "react";
-import { ORDERS, getOrderItemsWithProduct } from "@/lib/orders";
-import { SHIPPING_ZONES } from "@/lib/shipping";
+import { useEffect, useState } from "react";
+import { getOrders, getOrderItemsWithProduct, type Order } from "@/lib/orders";
+import { getShippingZones, type ShippingZone } from "@/lib/shipping";
+import { getProducts, type Product } from "@/lib/products";
 import { useAdminSettings } from "@/lib/admin-settings";
 import {
   sessionMovementsTotal,
-  type CashMovement,
+  getOpenSession,
+  getCashHistory,
+  openCashSession,
+  addCashMovement,
+  closeCashSession,
   type CashMovementType,
   type CashSession,
 } from "@/lib/caja";
@@ -19,19 +24,14 @@ const fmtARS = new Intl.NumberFormat("es-AR", {
   maximumFractionDigits: 0,
 });
 
-function orderTotalUSD(orderId: string) {
-  const order = ORDERS.find((o) => o.id === orderId);
-  if (!order) return 0;
-  const items = getOrderItemsWithProduct(order);
-  const zone = SHIPPING_ZONES.find((z) => z.id === order.shippingZoneId);
-  const itemsTotal = items.reduce((s, i) => s + (i.product?.priceUSD ?? 0) * i.qty, 0);
-  return itemsTotal + (zone?.priceUSD ?? 0);
-}
-
 export default function AdminCajaPage() {
   const { settings } = useAdminSettings();
   const [session, setSession] = useState<CashSession | null>(null);
   const [history, setHistory] = useState<CashSession[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [zones, setZones] = useState<ShippingZone[]>([]);
+  const [loading, setLoading] = useState(true);
   const [openingAmount, setOpeningAmount] = useState("");
   const [movementOpen, setMovementOpen] = useState(false);
   const [movementDraft, setMovementDraft] = useState<{ type: CashMovementType; amount: string; reason: string }>({
@@ -42,8 +42,29 @@ export default function AdminCajaPage() {
   const [closeOpen, setCloseOpen] = useState(false);
   const [countedAmount, setCountedAmount] = useState("");
 
+  useEffect(() => {
+    Promise.all([getOpenSession(), getCashHistory(), getOrders(), getProducts(), getShippingZones()])
+      .then(([openSession, hist, o, p, z]) => {
+        setSession(openSession);
+        setHistory(hist);
+        setOrders(o);
+        setProducts(p);
+        setZones(z);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  function orderTotalUSD(orderId: string) {
+    const order = orders.find((o) => o.id === orderId);
+    if (!order) return 0;
+    const items = getOrderItemsWithProduct(order, products);
+    const zone = zones.find((z) => z.id === order.shippingZoneId);
+    const itemsTotal = items.reduce((s, i) => s + (i.product?.priceUSD ?? 0) * i.qty, 0);
+    return itemsTotal + (zone?.priceUSD ?? 0);
+  }
+
   const today = new Date().toDateString();
-  const cashOrdersToday = ORDERS.filter(
+  const cashOrdersToday = orders.filter(
     (o) => o.paymentMethod === "efectivo" && new Date(o.createdAt).toDateString() === today,
   );
   const cashSalesARS = cashOrdersToday.reduce(
@@ -55,42 +76,31 @@ export default function AdminCajaPage() {
   const egresos = session ? sessionMovementsTotal(session, "egreso") : 0;
   const expected = session ? session.openingAmount + cashSalesARS + ingresos - egresos : 0;
 
-  function abrirCaja(e: React.FormEvent) {
+  async function abrirCaja(e: React.FormEvent) {
     e.preventDefault();
     const amount = Number(openingAmount) || 0;
-    setSession({
-      id: "caja-" + Date.now().toString(36),
-      openedAt: new Date().toISOString(),
-      openingAmount: amount,
-      movements: [],
-      closedAt: null,
-      countedAmount: null,
-      expectedAmount: null,
-    });
+    const created = await openCashSession(amount);
+    setSession(created);
     setOpeningAmount("");
   }
 
-  function agregarMovimiento(e: React.FormEvent) {
+  async function agregarMovimiento(e: React.FormEvent) {
     e.preventDefault();
     if (!session) return;
     const amount = Number(movementDraft.amount) || 0;
     if (amount <= 0) return;
-    const movement: CashMovement = {
-      id: "mov-" + Date.now().toString(36),
-      type: movementDraft.type,
-      amount,
-      reason: movementDraft.reason || (movementDraft.type === "ingreso" ? "Ingreso" : "Egreso"),
-      at: new Date().toISOString(),
-    };
+    const reason = movementDraft.reason || (movementDraft.type === "ingreso" ? "Ingreso" : "Egreso");
+    const movement = await addCashMovement(session.id, { type: movementDraft.type, amount, reason });
     setSession((prev) => (prev ? { ...prev, movements: [movement, ...prev.movements] } : prev));
     setMovementDraft({ type: "ingreso", amount: "", reason: "" });
     setMovementOpen(false);
   }
 
-  function cerrarCaja(e: React.FormEvent) {
+  async function cerrarCaja(e: React.FormEvent) {
     e.preventDefault();
     if (!session) return;
     const counted = Number(countedAmount) || 0;
+    await closeCashSession(session.id, { countedAmount: counted, expectedAmount: expected });
     const closed: CashSession = {
       ...session,
       closedAt: new Date().toISOString(),
@@ -113,11 +123,12 @@ export default function AdminCajaPage() {
         </p>
 
         <div className="mt-4 rounded-xl border border-dashed border-ink/20 bg-surface p-4 text-xs text-body">
-          Vista previa — se reinicia si recargás la página. Cuando conectemos
-          Supabase, la caja queda guardada de verdad.
+          Conectado a Supabase — la caja queda guardada de verdad.
         </div>
 
-        {!session ? (
+        {loading ? (
+          <p className="mt-5 text-sm text-body">Cargando caja…</p>
+        ) : !session ? (
           <form
             onSubmit={abrirCaja}
             className="mt-6 rounded-2xl border border-ink/10 bg-surface p-6 shadow-sm"

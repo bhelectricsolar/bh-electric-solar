@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { supabase } from "./supabase";
 
 export type Currency = "USD" | "ARS";
 export type ExchangeRateMode = "auto" | "manual";
@@ -39,8 +40,6 @@ const DEFAULT_SETTINGS: StoreSettings = {
   lowStockThreshold: 8,
 };
 
-const STORAGE_KEY = "bh-admin-settings";
-
 // Dólar oficial en tiempo real — API pública argentina, sin API key.
 const EXCHANGE_RATE_API = "https://dolarapi.com/v1/dolares/oficial";
 
@@ -48,6 +47,50 @@ type DolarApiResponse = {
   venta: number;
   fechaActualizacion: string;
 };
+
+type SettingsRow = {
+  store_name: string;
+  whatsapp: string | null;
+  email: string | null;
+  instagram: string | null;
+  facebook: string | null;
+  linkedin: string | null;
+  currency: Currency;
+  exchange_rate: number;
+  exchange_rate_mode: ExchangeRateMode;
+  low_stock_threshold: number;
+};
+
+function fromRow(row: SettingsRow): StoreSettings {
+  return {
+    storeName: row.store_name,
+    whatsapp: row.whatsapp ?? "",
+    email: row.email ?? "",
+    instagram: row.instagram ?? "",
+    facebook: row.facebook ?? "",
+    linkedin: row.linkedin ?? "",
+    currency: row.currency,
+    exchangeRate: Number(row.exchange_rate),
+    exchangeRateMode: row.exchange_rate_mode,
+    exchangeRateUpdatedAt: null,
+    lowStockThreshold: row.low_stock_threshold,
+  };
+}
+
+function toRow(patch: Partial<StoreSettings>) {
+  const row: Record<string, unknown> = {};
+  if (patch.storeName !== undefined) row.store_name = patch.storeName;
+  if (patch.whatsapp !== undefined) row.whatsapp = patch.whatsapp;
+  if (patch.email !== undefined) row.email = patch.email;
+  if (patch.instagram !== undefined) row.instagram = patch.instagram;
+  if (patch.facebook !== undefined) row.facebook = patch.facebook;
+  if (patch.linkedin !== undefined) row.linkedin = patch.linkedin;
+  if (patch.currency !== undefined) row.currency = patch.currency;
+  if (patch.exchangeRate !== undefined) row.exchange_rate = patch.exchangeRate;
+  if (patch.exchangeRateMode !== undefined) row.exchange_rate_mode = patch.exchangeRateMode;
+  if (patch.lowStockThreshold !== undefined) row.low_stock_threshold = patch.lowStockThreshold;
+  return row;
+}
 
 type SettingsContextValue = {
   settings: StoreSettings;
@@ -61,29 +104,22 @@ const SettingsContext = createContext<SettingsContextValue | null>(null);
 
 export function AdminSettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<StoreSettings>(DEFAULT_SETTINGS);
-  const [hydrated, setHydrated] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const [exchangeRateStatus, setExchangeRateStatus] = useState<
     "idle" | "loading" | "error"
   >("idle");
 
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (raw) setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(raw) });
-    } catch {
-      // localStorage no disponible — se usan los valores por defecto.
-    }
-    setHydrated(true);
+    supabase
+      .from("store_settings")
+      .select("*")
+      .eq("id", 1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) setSettings(fromRow(data as SettingsRow));
+        setLoaded(true);
+      });
   }, []);
-
-  useEffect(() => {
-    if (!hydrated) return;
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-    } catch {
-      // ignore write failures
-    }
-  }, [settings, hydrated]);
 
   async function refreshExchangeRate() {
     setExchangeRateStatus("loading");
@@ -97,6 +133,7 @@ export function AdminSettingsProvider({ children }: { children: ReactNode }) {
         exchangeRate: data.venta,
         exchangeRateUpdatedAt: data.fechaActualizacion ?? new Date().toISOString(),
       }));
+      await supabase.from("store_settings").update({ exchange_rate: data.venta }).eq("id", 1);
       setExchangeRateStatus("idle");
     } catch {
       setExchangeRateStatus("error");
@@ -106,14 +143,15 @@ export function AdminSettingsProvider({ children }: { children: ReactNode }) {
   // Al entrar en modo automático (o al cargar por primera vez en ese modo),
   // trae la cotización sin que el usuario tenga que hacer nada.
   useEffect(() => {
-    if (!hydrated) return;
+    if (!loaded) return;
     if (settings.exchangeRateMode !== "auto") return;
     refreshExchangeRate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hydrated, settings.exchangeRateMode]);
+  }, [loaded, settings.exchangeRateMode]);
 
   function updateSettings(patch: Partial<StoreSettings>) {
     setSettings((prev) => ({ ...prev, ...patch }));
+    supabase.from("store_settings").update(toRow(patch)).eq("id", 1);
   }
 
   function formatPrice(usdValue: number) {

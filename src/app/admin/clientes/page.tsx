@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { CUSTOMERS, CUSTOMER_STATUS_TONE, type Customer } from "@/lib/customers";
+import { useEffect, useState } from "react";
+import { getCustomers, createCustomer, CUSTOMER_STATUS_TONE, type Customer } from "@/lib/customers";
 import { downloadCSV } from "@/lib/csv-export";
 import { pickField } from "@/lib/csv-import";
 import ImportButton from "@/components/admin/ImportButton";
@@ -14,8 +14,15 @@ const STATUS_LABELS = {
 };
 
 export default function AdminClientesPage() {
-  const [customers, setCustomers] = useState<Customer[]>(CUSTOMERS);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    getCustomers()
+      .then(setCustomers)
+      .finally(() => setLoading(false));
+  }, []);
 
   const visible = customers.filter(
     (c) =>
@@ -39,23 +46,23 @@ export default function AdminClientesPage() {
   }
 
   function importRows(rows: Record<string, string>[]) {
-    const imported: Customer[] = [];
-    rows.forEach((row, idx) => {
+    const imported: Omit<Customer, "id" | "createdAt">[] = [];
+    rows.forEach((row) => {
       const name = pickField(row, ["nombre", "name", "cliente"]);
       if (!name.trim()) return;
       imported.push({
-        id: "c-" + Date.now().toString(36) + "-" + idx,
         name,
         email: pickField(row, ["email", "correo"]),
         phone: pickField(row, ["telefono", "phone", "teléfono"]),
         city: pickField(row, ["ciudad", "city"]),
         status: "lead",
         source: "Formulario",
-        createdAt: new Date().toISOString().slice(0, 10),
       });
     });
     if (imported.length > 0) {
-      setCustomers((prev) => [...imported, ...prev]);
+      Promise.all(imported.map((c) => createCustomer(c))).then(() => {
+        getCustomers().then(setCustomers);
+      });
     }
     return imported.length;
   }
@@ -84,10 +91,12 @@ export default function AdminClientesPage() {
         </div>
 
         <div className="mt-4 rounded-xl border border-dashed border-ink/20 bg-surface p-4 text-xs text-body">
-          Datos de ejemplo. Cuando conectemos el formulario de contacto y la
-          calculadora a Supabase, cada consulta real va a aparecer acá
-          automáticamente.
+          Conectado a Supabase. Cuando conectemos el formulario de contacto
+          y la calculadora a esta misma base, cada consulta real va a
+          aparecer acá automáticamente.
         </div>
+
+        {loading && <p className="mt-5 text-sm text-body">Cargando clientes…</p>}
 
         <input
           value={query}
@@ -124,7 +133,9 @@ export default function AdminClientesPage() {
                 </div>
                 <div>
                   <p className="text-body">Fecha</p>
-                  <p className="font-data mt-0.5 text-ink">{customer.createdAt}</p>
+                  <p className="font-data mt-0.5 text-ink">
+                    {new Date(customer.createdAt).toLocaleDateString("es-AR")}
+                  </p>
                 </div>
               </div>
             </div>

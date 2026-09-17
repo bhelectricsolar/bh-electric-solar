@@ -1,24 +1,35 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { SECTORS, ICONS } from "@/lib/admin-sectors";
-import { PRODUCTS } from "@/lib/products";
-import { ORDERS } from "@/lib/orders";
+import { getProducts, type Product } from "@/lib/products";
+import { getOrders, type Order } from "@/lib/orders";
 import { useAdminSettings } from "@/lib/admin-settings";
 
 const sector = SECTORS.find((s) => s.id === "tienda")!;
 
 export default function AdminTiendaHubPage() {
   const { settings, formatPrice } = useAdminSettings();
-  const lowStock = PRODUCTS.filter((p) => p.stock <= settings.lowStockThreshold).length;
-  const newOrders = ORDERS.filter((o) => o.status === "nuevo").length;
+  const [products, setProducts] = useState<Product[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+
+  useEffect(() => {
+    Promise.all([getProducts(), getOrders()]).then(([p, o]) => {
+      setProducts(p);
+      setOrders(o);
+    });
+  }, []);
+
+  const lowStock = products.filter((p) => p.stock <= settings.lowStockThreshold).length;
+  const newOrders = orders.filter((o) => o.status === "nuevo").length;
 
   const today = new Date().toDateString();
-  const salesTodayUSD = ORDERS.filter((o) => new Date(o.createdAt).toDateString() === today).reduce(
+  const salesTodayUSD = orders.filter((o) => new Date(o.createdAt).toDateString() === today).reduce(
     (sum, o) =>
       sum +
       o.items.reduce((s, item) => {
-        const product = PRODUCTS.find((p) => p.id === item.productId);
+        const product = products.find((p) => p.id === item.productId);
         return s + (product?.priceUSD ?? 0) * item.qty;
       }, 0),
     0,

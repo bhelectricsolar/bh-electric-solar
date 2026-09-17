@@ -1,3 +1,5 @@
+import { supabase } from "./supabase";
+
 export type TeamRole = "admin" | "vendedor" | "tecnico";
 
 export const ROLE_LABELS: Record<TeamRole, string> = {
@@ -23,43 +25,68 @@ export type TeamMember = {
   zone?: string; // zona de cobertura, principalmente para vendedores/técnicos
 };
 
-// Equipo de ejemplo — se reemplaza por datos reales al conectar Supabase Auth.
-export const TEAM: TeamMember[] = [
-  {
-    id: "team-1",
-    name: "Bruno Herrera",
-    email: "bruno@bhelectricsolar.com",
-    phone: "+54 9 3754 419198",
-    role: "admin",
-    active: true,
-  },
-  {
-    id: "team-2",
-    name: "Camila Fretes",
-    email: "camila@bhelectricsolar.com",
-    phone: "+54 9 3754 555111",
-    role: "vendedor",
-    active: true,
-    commissionPct: 5,
-    zone: "AMBA",
-  },
-  {
-    id: "team-3",
-    name: "Lautaro Ibáñez",
-    email: "lautaro@bhelectricsolar.com",
-    phone: "+54 9 3755 444222",
-    role: "vendedor",
-    active: true,
-    commissionPct: 4,
-    zone: "NEA / Litoral",
-  },
-  {
-    id: "team-4",
-    name: "Rodrigo Acosta",
-    email: "rodrigo@bhelectricsolar.com",
-    phone: "+54 9 3754 333999",
-    role: "tecnico",
-    active: true,
-    zone: "NEA / Litoral",
-  },
-];
+type TeamMemberRow = {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  role: TeamRole;
+  active: boolean;
+  commission_pct: number | null;
+  zone: string | null;
+};
+
+function fromRow(row: TeamMemberRow): TeamMember {
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email ?? "",
+    phone: row.phone ?? "",
+    role: row.role,
+    active: row.active,
+    commissionPct: row.commission_pct != null ? Number(row.commission_pct) : undefined,
+    zone: row.zone ?? undefined,
+  };
+}
+
+export async function getTeam(): Promise<TeamMember[]> {
+  const { data, error } = await supabase.from("team_members").select("*").order("name");
+  if (error) throw error;
+  return (data ?? []).map(fromRow);
+}
+
+export async function createTeamMember(member: Omit<TeamMember, "id">) {
+  const { data, error } = await supabase
+    .from("team_members")
+    .insert({
+      name: member.name,
+      email: member.email,
+      phone: member.phone,
+      role: member.role,
+      active: member.active,
+      commission_pct: member.commissionPct ?? null,
+      zone: member.zone ?? null,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return fromRow(data);
+}
+
+export async function updateTeamMember(id: string, patch: Partial<TeamMember>) {
+  const row: Record<string, unknown> = {};
+  if (patch.name !== undefined) row.name = patch.name;
+  if (patch.email !== undefined) row.email = patch.email;
+  if (patch.phone !== undefined) row.phone = patch.phone;
+  if (patch.role !== undefined) row.role = patch.role;
+  if (patch.active !== undefined) row.active = patch.active;
+  if (patch.commissionPct !== undefined) row.commission_pct = patch.commissionPct;
+  if (patch.zone !== undefined) row.zone = patch.zone;
+  const { error } = await supabase.from("team_members").update(row).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteTeamMember(id: string) {
+  const { error } = await supabase.from("team_members").delete().eq("id", id);
+  if (error) throw error;
+}

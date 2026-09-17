@@ -1,22 +1,44 @@
 "use client";
 
-import { useState } from "react";
-import { CATEGORIES, PRODUCTS, type ProductCategory } from "@/lib/products";
+import { useEffect, useState } from "react";
+import {
+  getCategories,
+  getProducts,
+  createCategory,
+  updateCategoryLabel,
+  deleteCategory,
+  type ProductCategory,
+} from "@/lib/products";
 import SectorEyebrow from "@/components/admin/SectorEyebrow";
 
 type CategoryRow = { value: string; label: string };
 
 export default function AdminCategoriasPage() {
-  const [categories, setCategories] = useState<CategoryRow[]>(CATEGORIES);
+  const [categories, setCategories] = useState<CategoryRow[]>([]);
+  const [productCounts, setProductCounts] = useState<Record<string, number>>({});
+  const [loading, setLoading] = useState(true);
   const [newLabel, setNewLabel] = useState("");
   const [editingValue, setEditingValue] = useState<string | null>(null);
   const [editingLabel, setEditingLabel] = useState("");
 
+  useEffect(() => {
+    Promise.all([getCategories(), getProducts()])
+      .then(([cats, products]) => {
+        setCategories(cats);
+        const counts: Record<string, number> = {};
+        products.forEach((p) => {
+          counts[p.category] = (counts[p.category] ?? 0) + 1;
+        });
+        setProductCounts(counts);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
   function countProducts(value: string) {
-    return PRODUCTS.filter((p) => p.category === (value as ProductCategory)).length;
+    return productCounts[value as ProductCategory] ?? 0;
   }
 
-  function handleAdd(event: React.FormEvent) {
+  async function handleAdd(event: React.FormEvent) {
     event.preventDefault();
     if (!newLabel.trim()) return;
     const value = newLabel
@@ -25,6 +47,7 @@ export default function AdminCategoriasPage() {
       .replace(/[̀-ͯ]/g, "")
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/(^-|-$)/g, "");
+    await createCategory(value, newLabel.trim());
     setCategories((prev) => [...prev, { value, label: newLabel.trim() }]);
     setNewLabel("");
   }
@@ -34,14 +57,16 @@ export default function AdminCategoriasPage() {
     setEditingLabel(cat.label);
   }
 
-  function saveEdit() {
+  async function saveEdit() {
+    if (!editingValue) return;
+    await updateCategoryLabel(editingValue, editingLabel);
     setCategories((prev) =>
       prev.map((c) => (c.value === editingValue ? { ...c, label: editingLabel } : c)),
     );
     setEditingValue(null);
   }
 
-  function handleDelete(value: string) {
+  async function handleDelete(value: string) {
     const inUse = countProducts(value);
     if (inUse > 0) {
       alert(
@@ -49,6 +74,7 @@ export default function AdminCategoriasPage() {
       );
       return;
     }
+    await deleteCategory(value);
     setCategories((prev) => prev.filter((c) => c.value !== value));
   }
 
@@ -62,10 +88,11 @@ export default function AdminCategoriasPage() {
         </p>
 
         <div className="mt-4 rounded-xl border border-dashed border-ink/20 bg-surface p-4 text-xs text-body">
-          Vista previa — los cambios acá no afectan todavía el catálogo real
-          de <b className="text-ink">/tienda</b>. Se conecta a Supabase en el
-          próximo paso.
+          Conectado a Supabase — los cambios acá se guardan de verdad y
+          afectan el catálogo real de <b className="text-ink">/tienda</b>.
         </div>
+
+        {loading && <p className="mt-5 text-sm text-body">Cargando categorías…</p>}
 
         <form
           onSubmit={handleAdd}

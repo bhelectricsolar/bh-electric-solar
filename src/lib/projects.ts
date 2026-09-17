@@ -1,3 +1,5 @@
+import { supabase } from "./supabase";
+
 export type ProjectStatus =
   | "cotizacion"
   | "visita_tecnica"
@@ -43,6 +45,40 @@ export type Project = {
   notes?: string;
 };
 
+type ProjectRow = {
+  id: string;
+  customer_name: string;
+  customer_phone: string | null;
+  city: string | null;
+  zone: string | null;
+  type: ProjectType;
+  system_kwp: number;
+  panels_count: number;
+  status: ProjectStatus;
+  salesperson_id: string | null;
+  technician_id: string | null;
+  scheduled_date: string | null;
+  created_at: string;
+};
+
+function fromRow(row: ProjectRow): Project {
+  return {
+    id: row.id,
+    customerName: row.customer_name,
+    customerPhone: row.customer_phone ?? "",
+    city: row.city ?? "",
+    zone: row.zone ?? "",
+    type: row.type,
+    systemKwp: Number(row.system_kwp),
+    panelsCount: row.panels_count,
+    status: row.status,
+    salespersonId: row.salesperson_id,
+    technicianId: row.technician_id,
+    scheduledDate: row.scheduled_date,
+    createdAt: row.created_at,
+  };
+}
+
 export function projectStatusMessage(project: Project, storeName: string) {
   const firstName = project.customerName.split(" ")[0];
   switch (project.status) {
@@ -63,82 +99,21 @@ export function projectStatusMessage(project: Project, storeName: string) {
   }
 }
 
-// Proyectos de ejemplo — el pipeline real se completa a medida que entran
-// cotizaciones desde la calculadora solar y el formulario de contacto.
-export const PROJECTS: Project[] = [
-  {
-    id: "p1",
-    customerName: "Cliente de ejemplo 1",
-    customerPhone: "+54 9 3754 000001",
-    city: "Posadas, Misiones",
-    zone: "NEA / Litoral",
-    type: "residencial",
-    systemKwp: 3.2,
-    panelsCount: 6,
-    status: "mantenimiento",
-    salespersonId: "team-3",
-    technicianId: "team-4",
-    scheduledDate: "2026-08-20",
-    createdAt: "2026-07-30",
-  },
-  {
-    id: "p2",
-    customerName: "Cliente de ejemplo 4",
-    customerPhone: "+54 9 3754 000004",
-    city: "Puerto Iguazú, Misiones",
-    zone: "NEA / Litoral",
-    type: "residencial",
-    systemKwp: 4.8,
-    panelsCount: 9,
-    status: "instalacion",
-    salespersonId: "team-3",
-    technicianId: "team-4",
-    scheduledDate: "2026-09-22",
-    createdAt: "2026-09-10",
-  },
-  {
-    id: "p3",
-    customerName: "Cliente de ejemplo 2",
-    customerPhone: "+54 9 3754 000002",
-    city: "Eldorado, Misiones",
-    zone: "NEA / Litoral",
-    type: "residencial",
-    systemKwp: 2.4,
-    panelsCount: 4,
-    status: "contrato",
-    salespersonId: "team-3",
-    technicianId: null,
-    scheduledDate: null,
-    createdAt: "2026-09-05",
-  },
-  {
-    id: "p4",
-    customerName: "Cliente de ejemplo 3",
-    customerPhone: "+54 9 3755 000003",
-    city: "Oberá, Misiones",
-    zone: "NEA / Litoral",
-    type: "comercial",
-    systemKwp: 12.5,
-    panelsCount: 23,
-    status: "visita_tecnica",
-    salespersonId: "team-2",
-    technicianId: null,
-    scheduledDate: "2026-09-25",
-    createdAt: "2026-09-14",
-  },
-  {
-    id: "p5",
-    customerName: "Panadería La Espiga (ejemplo)",
-    customerPhone: "+54 9 11 5555 0005",
-    city: "CABA",
-    zone: "AMBA",
-    type: "comercial",
-    systemKwp: 8.1,
-    panelsCount: 15,
-    status: "cotizacion",
-    salespersonId: "team-2",
-    technicianId: null,
-    scheduledDate: null,
-    createdAt: "2026-09-15",
-  },
-];
+export async function getProjects(): Promise<Project[]> {
+  const { data, error } = await supabase
+    .from("projects")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map(fromRow);
+}
+
+export async function updateProject(id: string, patch: Partial<Project>) {
+  const row: Record<string, unknown> = {};
+  if (patch.status !== undefined) row.status = patch.status;
+  if (patch.scheduledDate !== undefined) row.scheduled_date = patch.scheduledDate;
+  if (patch.salespersonId !== undefined) row.salesperson_id = patch.salespersonId;
+  if (patch.technicianId !== undefined) row.technician_id = patch.technicianId;
+  const { error } = await supabase.from("projects").update(row).eq("id", id);
+  if (error) throw error;
+}

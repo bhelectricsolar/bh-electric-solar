@@ -1,16 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { CATEGORIES, PRODUCTS, type ProductCategory } from "@/lib/products";
+import type { Category, Product, ProductCategory } from "@/lib/products";
 import ProductCard from "./ProductCard";
 
-export default function StoreCatalog() {
+export default function StoreCatalog({
+  products,
+  categories,
+}: {
+  products: Product[];
+  categories: Category[];
+}) {
   const [category, setCategory] = useState<ProductCategory | "todos">("todos");
 
   const visible =
     category === "todos"
-      ? PRODUCTS
-      : PRODUCTS.filter((p) => p.category === category);
+      ? products
+      : products.filter((p) => p.category === category);
 
   return (
     <div>
@@ -21,7 +27,7 @@ export default function StoreCatalog() {
         >
           Todos
         </FilterPill>
-        {CATEGORIES.map((cat) => (
+        {categories.map((cat) => (
           <FilterPill
             key={cat.value}
             active={category === cat.value}

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { CATEGORIES, PRODUCTS, type Product } from "@/lib/products";
+import { useEffect, useState } from "react";
+import { getProducts, getCategories, updateProduct, type Product, type Category } from "@/lib/products";
 import { useAdminSettings } from "@/lib/admin-settings";
 import Chip from "@/components/admin/Chip";
 import StatusBadge from "@/components/admin/StatusBadge";
@@ -11,9 +11,20 @@ type Filter = "todos" | "publicados" | "internos" | "poco_stock";
 
 export default function AdminStockPage() {
   const { settings } = useAdminSettings();
-  const [products, setProducts] = useState<Product[]>(PRODUCTS);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<Filter>("todos");
   const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    Promise.all([getProducts(), getCategories()])
+      .then(([p, c]) => {
+        setProducts(p);
+        setCategories(c);
+      })
+      .finally(() => setLoading(false));
+  }, []);
 
   const lowStock = (p: Product) => p.stock <= settings.lowStockThreshold;
 
@@ -25,18 +36,22 @@ export default function AdminStockPage() {
     return true;
   });
 
-  function adjustStock(id: string, delta: number) {
-    setProducts((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, stock: Math.max(0, p.stock + delta) } : p)),
-    );
+  async function adjustStock(id: string, delta: number) {
+    const product = products.find((p) => p.id === id);
+    if (!product) return;
+    const newStock = Math.max(0, product.stock + delta);
+    setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, stock: newStock } : p)));
+    await updateProduct(id, { stock: newStock });
   }
 
-  function togglePublished(id: string) {
+  async function togglePublished(id: string) {
+    const product = products.find((p) => p.id === id);
+    if (!product) return;
+    const next = product.publishedOnline === false;
     setProducts((prev) =>
-      prev.map((p) =>
-        p.id === id ? { ...p, publishedOnline: p.publishedOnline === false } : p,
-      ),
+      prev.map((p) => (p.id === id ? { ...p, publishedOnline: next } : p)),
     );
+    await updateProduct(id, { publishedOnline: next });
   }
 
   return (
@@ -50,10 +65,11 @@ export default function AdminStockPage() {
         </p>
 
         <div className="mt-4 rounded-xl border border-dashed border-ink/20 bg-surface p-4 text-xs text-body">
-          Vista previa — los ajustes de stock acá son independientes de los que
-          hagas en Productos hasta que conectemos Supabase (una sola base de
-          datos real para ambos).
+          Conectado a Supabase — es la misma base de datos que usa Productos,
+          así que un ajuste acá se refleja ahí también.
         </div>
+
+        {loading && <p className="mt-5 text-sm text-body">Cargando inventario…</p>}
 
         <input
           value={query}
@@ -94,7 +110,7 @@ export default function AdminStockPage() {
                   {lowStock(product) && <StatusBadge tone="danger">Poco stock</StatusBadge>}
                 </div>
                 <p className="mt-0.5 text-xs text-body">
-                  {CATEGORIES.find((c) => c.value === product.category)?.label}
+                  {categories.find((c) => c.value === product.category)?.label}
                 </p>
               </div>
 

@@ -1,14 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ROLE_LABELS,
   ROLE_DESCRIPTIONS,
-  TEAM,
+  getTeam,
+  createTeamMember,
+  updateTeamMember,
+  deleteTeamMember,
   type TeamMember,
   type TeamRole,
 } from "@/lib/team";
-import { SHIPPING_ZONES } from "@/lib/shipping";
+import { getShippingZones, type ShippingZone } from "@/lib/shipping";
 import SectorEyebrow from "@/components/admin/SectorEyebrow";
 import Chip from "@/components/admin/Chip";
 import StatusBadge, { type StatusTone } from "@/components/admin/StatusBadge";
@@ -22,15 +25,6 @@ type DraftMember = {
   zone: string;
 };
 
-const EMPTY_DRAFT: DraftMember = {
-  name: "",
-  email: "",
-  phone: "",
-  role: "vendedor",
-  commissionPct: "5",
-  zone: SHIPPING_ZONES[0].region,
-};
-
 const ROLE_TONE: Record<TeamRole, StatusTone> = {
   admin: "negocio",
   vendedor: "gold",
@@ -40,11 +34,29 @@ const ROLE_TONE: Record<TeamRole, StatusTone> = {
 const ROLE_ORDER: TeamRole[] = ["admin", "vendedor", "tecnico"];
 
 export default function AdminEquipoPage() {
-  const [members, setMembers] = useState<TeamMember[]>(TEAM);
+  const [members, setMembers] = useState<TeamMember[]>([]);
+  const [zones, setZones] = useState<ShippingZone[]>([]);
+  const [loading, setLoading] = useState(true);
   const [roleFilter, setRoleFilter] = useState<TeamRole | "todos">("todos");
   const [panelOpen, setPanelOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [draft, setDraft] = useState<DraftMember>(EMPTY_DRAFT);
+  const [draft, setDraft] = useState<DraftMember>({
+    name: "",
+    email: "",
+    phone: "",
+    role: "vendedor",
+    commissionPct: "5",
+    zone: "",
+  });
+
+  useEffect(() => {
+    Promise.all([getTeam(), getShippingZones()])
+      .then(([team, shippingZones]) => {
+        setMembers(team);
+        setZones(shippingZones);
+      })
+      .finally(() => setLoading(false));
+  }, []);
 
   const visible = members.filter(
     (m) => roleFilter === "todos" || m.role === roleFilter,
@@ -52,7 +64,14 @@ export default function AdminEquipoPage() {
 
   function openNew() {
     setEditingId(null);
-    setDraft(EMPTY_DRAFT);
+    setDraft({
+      name: "",
+      email: "",
+      phone: "",
+      role: "vendedor",
+      commissionPct: "5",
+      zone: zones[0]?.region ?? "",
+    });
     setPanelOpen(true);
   }
 
@@ -64,23 +83,26 @@ export default function AdminEquipoPage() {
       phone: member.phone,
       role: member.role,
       commissionPct: String(member.commissionPct ?? ""),
-      zone: member.zone ?? SHIPPING_ZONES[0].region,
+      zone: member.zone ?? zones[0]?.region ?? "",
     });
     setPanelOpen(true);
   }
 
-  function toggleActive(id: string) {
-    setMembers((prev) =>
-      prev.map((m) => (m.id === id ? { ...m, active: !m.active } : m)),
-    );
+  async function toggleActive(id: string) {
+    const member = members.find((m) => m.id === id);
+    if (!member) return;
+    const active = !member.active;
+    setMembers((prev) => prev.map((m) => (m.id === id ? { ...m, active } : m)));
+    await updateTeamMember(id, { active });
   }
 
-  function handleDelete(id: string) {
+  async function handleDelete(id: string) {
     if (!confirm("¿Quitar esta persona del equipo?")) return;
+    await deleteTeamMember(id);
     setMembers((prev) => prev.filter((m) => m.id !== id));
   }
 
-  function handleSave(event: React.FormEvent) {
+  async function handleSave(event: React.FormEvent) {
     event.preventDefault();
     if (!draft.name.trim()) return;
 
@@ -97,14 +119,13 @@ export default function AdminEquipoPage() {
     };
 
     if (editingId) {
+      await updateTeamMember(editingId, patch);
       setMembers((prev) =>
         prev.map((m) => (m.id === editingId ? { ...m, ...patch } : m)),
       );
     } else {
-      setMembers((prev) => [
-        { id: "team-" + Date.now().toString(36), active: true, ...patch },
-        ...prev,
-      ]);
+      const created = await createTeamMember({ active: true, ...patch });
+      setMembers((prev) => [created, ...prev]);
     }
     setPanelOpen(false);
   }
@@ -130,10 +151,12 @@ export default function AdminEquipoPage() {
         </div>
 
         <div className="mt-4 rounded-xl border border-dashed border-ink/20 bg-surface p-4 text-xs text-body">
-          Vista previa — todavía no hay inicio de sesión real. Cuando
-          conectemos Supabase Auth, cada persona va a entrar con su propia
+          Conectado a Supabase — todavía no hay inicio de sesión real. Cuando
+          agreguemos autenticación, cada persona va a entrar con su propia
           cuenta y va a ver solo lo que le corresponde según su rol.
         </div>
+
+        {loading && <p className="mt-5 text-sm text-body">Cargando equipo…</p>}
 
         <div className="mt-5 flex flex-wrap gap-2">
           <Chip active={roleFilter === "todos"} onClick={() => setRoleFilter("todos")}>
@@ -299,7 +322,7 @@ export default function AdminEquipoPage() {
                     onChange={(e) => setDraft({ ...draft, zone: e.target.value })}
                     className="w-full rounded-lg border border-ink/10 bg-background px-3 py-2.5 text-sm text-ink"
                   >
-                    {SHIPPING_ZONES.map((z) => (
+                    {zones.map((z) => (
                       <option key={z.id} value={z.region}>
                         {z.region}
                       </option>

@@ -1,25 +1,38 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { SECTORS, ICONS } from "@/lib/admin-sectors";
-import { ORDERS, ORDER_STATUS_LABELS } from "@/lib/orders";
-import { PROJECTS, PROJECT_STAGES } from "@/lib/projects";
-import { TEAM } from "@/lib/team";
+import { getOrders, ORDER_STATUS_LABELS, type Order } from "@/lib/orders";
+import { getProjects, PROJECT_STAGES, type Project } from "@/lib/projects";
+import { getTeam, type TeamMember } from "@/lib/team";
 
 const sector = SECTORS.find((s) => s.id === "negocio")!;
 
 type ActivityItem = { key: string; date: string; text: string };
 
 export default function AdminNegocioHubPage() {
-  const activeProjects = PROJECTS.filter((p) => p.status !== "mantenimiento").length;
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [team, setTeam] = useState<TeamMember[]>([]);
+
+  useEffect(() => {
+    Promise.all([getOrders(), getProjects(), getTeam()]).then(([o, p, t]) => {
+      setOrders(o);
+      setProjects(p);
+      setTeam(t);
+    });
+  }, []);
+
+  const activeProjects = projects.filter((p) => p.status !== "mantenimiento").length;
 
   const activity: ActivityItem[] = [
-    ...ORDERS.map((o) => ({
+    ...orders.map((o) => ({
       key: `order-${o.id}`,
       date: o.createdAt,
       text: `Pedido ${o.id} · ${o.customerName} — ${ORDER_STATUS_LABELS[o.status]}`,
     })),
-    ...PROJECTS.map((p) => ({
+    ...projects.map((p) => ({
       key: `project-${p.id}`,
       date: p.createdAt,
       text: `Proyecto ${p.id} · ${p.customerName} — ${PROJECT_STAGES.find((s) => s.value === p.status)?.label}`,
@@ -40,7 +53,7 @@ export default function AdminNegocioHubPage() {
 
         <div className="mt-6 grid grid-cols-2 gap-3">
           <StatCard label="Proyectos activos" value={activeProjects} />
-          <StatCard label="Personas en el equipo" value={TEAM.length} />
+          <StatCard label="Personas en el equipo" value={team.length} />
         </div>
 
         <div className="mt-6 grid gap-3 sm:grid-cols-2">

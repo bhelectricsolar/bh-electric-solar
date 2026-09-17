@@ -1,15 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  PROJECTS,
+  getProjects,
+  updateProject,
   PROJECT_STAGES,
   PROJECT_STAGE_TONE,
   projectStatusMessage,
   type Project,
   type ProjectStatus,
 } from "@/lib/projects";
-import { TEAM } from "@/lib/team";
+import { getTeam, type TeamMember } from "@/lib/team";
 import { downloadCSV } from "@/lib/csv-export";
 import { openWhatsApp } from "@/lib/whatsapp";
 import { useAdminSettings } from "@/lib/admin-settings";
@@ -18,18 +19,29 @@ import SectorEyebrow from "@/components/admin/SectorEyebrow";
 import Chip from "@/components/admin/Chip";
 import StatusBadge from "@/components/admin/StatusBadge";
 
-function personName(id: string | null) {
-  if (!id) return "Sin asignar";
-  return TEAM.find((m) => m.id === id)?.name ?? "Sin asignar";
-}
-
 export default function AdminProyectosPage() {
   const { settings } = useAdminSettings();
-  const [projects, setProjects] = useState<Project[]>(PROJECTS);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [team, setTeam] = useState<TeamMember[]>([]);
+  const [loading, setLoading] = useState(true);
   const [stageFilter, setStageFilter] = useState<ProjectStatus | "todos">("todos");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [reciboProject, setReciboProject] = useState<Project | null>(null);
   const [conformidadProject, setConformidadProject] = useState<Project | null>(null);
+
+  useEffect(() => {
+    Promise.all([getProjects(), getTeam()])
+      .then(([p, t]) => {
+        setProjects(p);
+        setTeam(t);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  function personName(id: string | null) {
+    if (!id) return "Sin asignar";
+    return team.find((m) => m.id === id)?.name ?? "Sin asignar";
+  }
 
   const visible = projects.filter(
     (p) => stageFilter === "todos" || p.status === stageFilter,
@@ -38,12 +50,14 @@ export default function AdminProyectosPage() {
   const totalKwp = projects.reduce((sum, p) => sum + p.systemKwp, 0);
   const activeCount = projects.filter((p) => p.status !== "mantenimiento").length;
 
-  function updateStatus(id: string, status: ProjectStatus) {
+  async function updateStatus(id: string, status: ProjectStatus) {
     setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, status } : p)));
+    await updateProject(id, { status });
   }
 
-  function updateField(id: string, patch: Partial<Project>) {
+  async function updateField(id: string, patch: Partial<Project>) {
     setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+    await updateProject(id, patch);
   }
 
   function exportCSV() {
@@ -84,11 +98,12 @@ export default function AdminProyectosPage() {
         </div>
 
         <div className="mt-4 rounded-xl border border-dashed border-ink/20 bg-surface p-4 text-xs text-body">
-          Vista previa — cuando conectemos la calculadora solar y el
-          formulario a Supabase, cada cotización nueva va a crear un
-          proyecto acá automáticamente en la etapa &ldquo;Cotización
-          enviada&rdquo;.
+          Conectado a Supabase — cuando conectemos la calculadora solar y el
+          formulario, cada cotización nueva va a crear un proyecto acá
+          automáticamente en la etapa &ldquo;Cotización enviada&rdquo;.
         </div>
+
+        {loading && <p className="mt-5 text-sm text-body">Cargando proyectos…</p>}
 
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
           <StatCard label="Proyectos activos" value={activeCount} />

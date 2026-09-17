@@ -1,4 +1,5 @@
-import { PRODUCTS } from "./products";
+import { supabase } from "./supabase";
+import type { Product } from "./products";
 import type { StatusTone } from "@/components/admin/StatusBadge";
 
 export type OrderStatus = "nuevo" | "en_proceso" | "enviado" | "completado";
@@ -59,68 +60,77 @@ export function orderStatusMessage(order: Order, storeName: string) {
   }
 }
 
-// Datos de ejemplo — se reemplazan por los pedidos reales que lleguen
-// desde la tienda (WhatsApp) una vez conectada a Supabase.
-export const ORDERS: Order[] = [
-  {
-    id: "P-1001",
-    customerName: "Cliente de ejemplo 4",
-    customerPhone: "+54 9 3754 000004",
-    customerCity: "Puerto Iguazú, Misiones",
-    items: [
-      { productId: "panel-550w", qty: 6 },
-      { productId: "inversor-hibrido-5kw", qty: 1 },
-    ],
-    shippingZoneId: "nea",
-    status: "en_proceso",
-    paymentMethod: "transferencia",
-    origin: "tienda",
-    createdAt: "2026-09-10",
-  },
-  {
-    id: "P-1002",
-    customerName: "Cliente de ejemplo 1",
-    customerPhone: "+54 9 3754 000001",
-    customerCity: "Posadas, Misiones",
-    items: [{ productId: "bateria-litio-5kwh", qty: 1 }],
-    shippingZoneId: "nea",
-    status: "completado",
-    paymentMethod: "efectivo",
-    origin: "tienda",
-    createdAt: "2026-08-20",
-  },
-  {
-    id: "P-1003",
-    customerName: "Cliente de ejemplo 3",
-    customerPhone: "+54 9 3755 000003",
-    customerCity: "Oberá, Misiones",
-    items: [
-      { productId: "conectores-mc4", qty: 4 },
-      { productId: "cable-solar-6mm", qty: 1 },
-    ],
-    shippingZoneId: "nea",
-    status: "nuevo",
-    paymentMethod: "efectivo",
-    origin: "tienda",
-    createdAt: "2026-09-11",
-  },
-  {
-    id: "P-1004",
-    customerName: "Cliente de ejemplo 2",
-    customerPhone: "+54 9 3754 000002",
-    customerCity: "Eldorado, Misiones",
-    items: [{ productId: "panel-450w", qty: 4 }],
-    shippingZoneId: "nea",
-    status: "completado",
-    paymentMethod: "efectivo",
-    origin: "manual",
-    createdAt: "2026-09-14",
-  },
-];
+type OrderRow = {
+  id: string;
+  customer_name: string;
+  customer_phone: string | null;
+  customer_city: string | null;
+  shipping_zone_id: string | null;
+  status: OrderStatus;
+  payment_method: PaymentMethod;
+  origin: OrderOrigin;
+  created_at: string;
+};
 
-export function getOrderItemsWithProduct(order: Order) {
+type OrderItemRow = { order_id: string; product_id: string; qty: number };
+
+function fromRows(order: OrderRow, items: OrderItemRow[]): Order {
+  return {
+    id: order.id,
+    customerName: order.customer_name,
+    customerPhone: order.customer_phone ?? "",
+    customerCity: order.customer_city ?? "",
+    items: items
+      .filter((i) => i.order_id === order.id)
+      .map((i) => ({ productId: i.product_id, qty: i.qty })),
+    shippingZoneId: order.shipping_zone_id ?? "",
+    status: order.status,
+    paymentMethod: order.payment_method,
+    origin: order.origin,
+    createdAt: order.created_at,
+  };
+}
+
+export async function getOrders(): Promise<Order[]> {
+  const [{ data: orders, error }, { data: items, error: itemsError }] = await Promise.all([
+    supabase.from("orders").select("*").order("created_at", { ascending: false }),
+    supabase.from("order_items").select("*"),
+  ]);
+  if (error) throw error;
+  if (itemsError) throw itemsError;
+  return (orders ?? []).map((o) => fromRows(o, items ?? []));
+}
+
+export async function createOrder(order: Order) {
+  const { error } = await supabase.from("orders").insert({
+    id: order.id,
+    customer_name: order.customerName,
+    customer_phone: order.customerPhone,
+    customer_city: order.customerCity,
+    shipping_zone_id: order.shippingZoneId,
+    status: order.status,
+    payment_method: order.paymentMethod,
+    origin: order.origin,
+    created_at: order.createdAt,
+  });
+  if (error) throw error;
+
+  if (order.items.length > 0) {
+    const { error: itemsError } = await supabase.from("order_items").insert(
+      order.items.map((i) => ({ order_id: order.id, product_id: i.productId, qty: i.qty })),
+    );
+    if (itemsError) throw itemsError;
+  }
+}
+
+export async function updateOrderStatus(id: string, status: OrderStatus) {
+  const { error } = await supabase.from("orders").update({ status }).eq("id", id);
+  if (error) throw error;
+}
+
+export function getOrderItemsWithProduct(order: Order, products: Product[]) {
   return order.items.map((item) => ({
     ...item,
-    product: PRODUCTS.find((p) => p.id === item.productId),
+    product: products.find((p) => p.id === item.productId),
   }));
 }
