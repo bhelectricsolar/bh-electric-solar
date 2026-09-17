@@ -84,6 +84,27 @@
   border-color: var(--color-border-token);
 }
 
+/* Scrollbar fina y acorde al tema, en vez de la gris gruesa por defecto. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-slate-body) transparent;
+}
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-slate-body);
+  border-radius: 8px;
+  opacity: 0.5;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-gold-600);
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

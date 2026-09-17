@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 export default function AdminLoginLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es" className={`${displayFont.variable} ${bodyFont.variable} antialiased`}>
-      <body className="min-h-dvh bg-navy-950 text-white">{children}</body>
+      <body className="min-h-dvh bg-[#081127] text-white">{children}</body>
     </html>
   );
 }
