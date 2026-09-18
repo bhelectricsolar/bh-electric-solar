@@ -18,6 +18,7 @@ import {
 } from "@/lib/orders";
 import { getProducts, type Product } from "@/lib/products";
 import { getShippingZones, type ShippingZone } from "@/lib/shipping";
+import { getDevTeamMemberIds } from "@/lib/team";
 import { useAdminSettings } from "@/lib/admin-settings";
 import { useCurrentTeamMember } from "@/lib/current-user";
 import { downloadCSV } from "@/lib/csv-export";
@@ -54,9 +55,11 @@ export default function AdminPedidosPage() {
   const [productQuery, setProductQuery] = useState("");
 
   useEffect(() => {
-    Promise.all([getOrders(), getProducts(), getShippingZones()])
-      .then(([o, p, z]) => {
-        setOrders(o);
+    Promise.all([getOrders(), getProducts(), getShippingZones(), getDevTeamMemberIds()])
+      .then(([o, p, z, devIds]) => {
+        // Las ventas de prueba del desarrollador no son pedidos reales del
+        // negocio — no deben aparecer acá.
+        setOrders(o.filter((ord) => !devIds.includes(ord.soldBy ?? "")));
         setProducts(p);
         setZones(z);
       })

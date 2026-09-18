@@ -55,9 +55,21 @@ function fromRow(row: TeamMemberRow): TeamMember {
 }
 
 export async function getTeam(): Promise<TeamMember[]> {
-  const { data, error } = await supabase.from("team_members").select("*").order("name");
+  // Las cuentas de desarrollador (sandbox de prueba) no son parte del
+  // equipo real del dueño — nunca deben aparecer acá.
+  const { data, error } = await supabase
+    .from("team_members")
+    .select("*")
+    .eq("is_dev_account", false)
+    .order("name");
   if (error) throw error;
   return (data ?? []).map(fromRow);
+}
+
+export async function getDevTeamMemberIds(): Promise<string[]> {
+  const { data, error } = await supabase.from("team_members").select("id").eq("is_dev_account", true);
+  if (error) throw error;
+  return (data ?? []).map((r) => r.id as string);
 }
 
 export async function createTeamMember(member: Omit<TeamMember, "id">) {

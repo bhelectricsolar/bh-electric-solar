@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { getOrders, getOrderItemsWithProduct, type Order } from "@/lib/orders";
 import { getProducts, type Product } from "@/lib/products";
 import { getProjects, PROJECT_STAGES, PROJECT_STAGE_TONE, type Project } from "@/lib/projects";
+import { getDevTeamMemberIds } from "@/lib/team";
 import { useAdminSettings } from "@/lib/admin-settings";
 import SectorEyebrow from "@/components/admin/SectorEyebrow";
 import Chip from "@/components/admin/Chip";
@@ -44,9 +45,11 @@ export default function AdminReportesPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([getOrders(), getProducts(), getProjects()])
-      .then(([o, p, pr]) => {
-        setOrders(o);
+    Promise.all([getOrders(), getProducts(), getProjects(), getDevTeamMemberIds()])
+      .then(([o, p, pr, devIds]) => {
+        // Las ventas de prueba del desarrollador no cuentan en los reportes
+        // reales del negocio.
+        setOrders(o.filter((ord) => !devIds.includes(ord.soldBy ?? "")));
         setProducts(p);
         setProjects(pr);
       })

@@ -7,7 +7,7 @@ import { SECTORS, ICONS, ACCENT_TEXT, ACCENT_BG_SOFT } from "@/lib/admin-sectors
 import { getOrders, ORDER_STATUS_LABELS, type Order } from "@/lib/orders";
 import { getProducts, type Product } from "@/lib/products";
 import { getProjects, PROJECT_STAGES, type Project } from "@/lib/projects";
-import { getTeam, type TeamMember } from "@/lib/team";
+import { getTeam, getDevTeamMemberIds, type TeamMember } from "@/lib/team";
 import { getCustomers, type Customer } from "@/lib/customers";
 import { getAllOpenSessions, type CashSession } from "@/lib/caja";
 
@@ -26,9 +26,19 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([getOrders(), getProducts(), getProjects(), getTeam(), getCustomers(), getAllOpenSessions()])
-      .then(([o, p, pr, t, c, s]) => {
-        setOrders(o);
+    Promise.all([
+      getOrders(),
+      getProducts(),
+      getProjects(),
+      getTeam(),
+      getCustomers(),
+      getAllOpenSessions(),
+      getDevTeamMemberIds(),
+    ])
+      .then(([o, p, pr, t, c, s, devIds]) => {
+        // Las ventas de prueba del desarrollador no cuentan como ventas
+        // reales del negocio — no deben mezclarse en este panel.
+        setOrders(o.filter((ord) => !devIds.includes(ord.soldBy ?? "")));
         setProducts(p);
         setProjects(pr);
         setTeam(t);
