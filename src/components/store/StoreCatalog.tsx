@@ -7,9 +7,11 @@ import ProductCard from "./ProductCard";
 export default function StoreCatalog({
   products,
   categories,
+  exchangeRate,
 }: {
   products: Product[];
   categories: Category[];
+  exchangeRate: number;
 }) {
   const [category, setCategory] = useState<ProductCategory | "todos">("todos");
 
@@ -40,7 +42,7 @@ export default function StoreCatalog({
 
       <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {visible.map((product) => (
-          <ProductCard key={product.id} product={product} />
+          <ProductCard key={product.id} product={product} exchangeRate={exchangeRate} />
         ))}
       </div>
 

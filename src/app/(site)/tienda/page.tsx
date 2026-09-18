@@ -3,6 +3,7 @@ import Badge from "@/components/Badge";
 import GlowOrb from "@/components/GlowOrb";
 import StoreCatalog from "@/components/store/StoreCatalog";
 import { getPublishedProducts, getCategories } from "@/lib/products";
+import { getExchangeRate } from "@/lib/exchange-rate";
 
 export const metadata: Metadata = {
   title: "Tienda de Equipos Solares | BH Electric Solar",
@@ -13,9 +14,10 @@ export const metadata: Metadata = {
 export const revalidate = 0;
 
 export default async function TiendaPage() {
-  const [products, categories] = await Promise.all([
+  const [products, categories, exchangeRate] = await Promise.all([
     getPublishedProducts(),
     getCategories(),
+    getExchangeRate(),
   ]);
   return (
     <section className="relative isolate overflow-hidden bg-white px-4 py-16 sm:py-20">
@@ -34,7 +36,7 @@ export default async function TiendaPage() {
         </p>
 
         <div className="mt-10 text-left">
-          <StoreCatalog products={products} categories={categories} />
+          <StoreCatalog products={products} categories={categories} exchangeRate={exchangeRate} />
         </div>
       </div>
     </section>

@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useCart } from "@/lib/cart-context";
-import { formatUSD } from "@/lib/currency";
+import { formatUSD, formatARS } from "@/lib/currency";
 
-export default function CartDrawer() {
+export default function CartDrawer({ exchangeRate }: { exchangeRate: number }) {
   const { items, isOpen, closeCart, updateQty, removeItem, totalUSD, whatsappCheckoutUrl } =
     useCart();
 
@@ -73,7 +73,7 @@ export default function CartDrawer() {
                         {product.name}
                       </p>
                       <p className="font-data mt-0.5 text-xs text-body">
-                        {formatUSD(product.priceUSD)} c/u
+                        {formatUSD(product.priceUSD)} · {formatARS(product.priceARS ?? product.priceUSD * exchangeRate)} c/u
                       </p>
                       <div className="mt-2 flex items-center gap-2">
                         <div className="flex items-center rounded-lg border border-ink/10">
@@ -112,13 +112,23 @@ export default function CartDrawer() {
             </div>
 
             <div className="border-t border-ink/10 p-5">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-body">Total estimado</span>
-                <span className="font-data text-xl font-semibold text-ink">
-                  {formatUSD(totalUSD)}
-                </span>
+              <div className="rounded-xl bg-cream-100 px-4 py-3">
+                <div className="flex items-baseline justify-between">
+                  <span className="text-sm font-semibold text-body">Total estimado</span>
+                  <span className="font-data text-xl font-extrabold text-ink">
+                    {formatUSD(totalUSD)}
+                  </span>
+                </div>
+                <div className="mt-0.5 flex items-baseline justify-between">
+                  <span className="text-[10px] uppercase tracking-wide text-body/70">
+                    Al dólar blue
+                  </span>
+                  <span className="font-data text-sm text-body">
+                    {formatARS(totalUSD * exchangeRate)}
+                  </span>
+                </div>
               </div>
-              <p className="mt-1 text-xs text-body">
+              <p className="mt-2 text-xs text-body">
                 El pago y el envío se coordinan directamente con nuestro equipo.
               </p>
               <a

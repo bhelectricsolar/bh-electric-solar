@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getAllSlugs, getProductBySlug, getRelatedProducts } from "@/lib/products";
+import { getExchangeRate } from "@/lib/exchange-rate";
 import { formatUSD, formatARS } from "@/lib/currency";
 import Badge from "@/components/Badge";
 import AddToCartButton from "@/components/store/AddToCartButton";
@@ -38,7 +39,11 @@ export default async function ProductPage({
   const product = await getProductBySlug(slug);
   if (!product) notFound();
 
-  const related = await getRelatedProducts(product);
+  const [related, exchangeRate] = await Promise.all([
+    getRelatedProducts(product),
+    getExchangeRate(),
+  ]);
+  const arsPrice = product.priceARS ?? product.priceUSD * exchangeRate;
 
   return (
     <section className="bg-white px-4 py-16 sm:py-20">
@@ -74,20 +79,45 @@ export default async function ProductPage({
               {product.description}
             </p>
 
-            <p className="font-data mt-6 text-4xl font-semibold text-ink">
-              {formatUSD(product.priceUSD)}
-            </p>
-            {product.priceARS != null && (
-              <p className="font-data mt-1 text-sm text-body">{formatARS(product.priceARS)}</p>
-            )}
-            <p className="mt-1 text-xs text-body">
-              {product.stock > 0
-                ? `${product.stock} unidades disponibles`
-                : "Sin stock — consultanos por próximo ingreso"}
-            </p>
+            <div className="mt-6 rounded-2xl border border-ink/10 bg-cream-100 p-5">
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <span className="font-data text-4xl font-extrabold text-ink">
+                  {formatUSD(product.priceUSD)}
+                </span>
+                <span className="font-data text-base font-medium text-body">
+                  {formatARS(arsPrice)}
+                </span>
+              </div>
+              <p className="mt-1 text-[11px] uppercase tracking-wide text-body/70">
+                Precio de contado · pesos estimado al dólar blue
+              </p>
+              <p className="mt-3 text-xs font-semibold text-ink">
+                {product.stock > 0
+                  ? `${product.stock} unidades disponibles`
+                  : "Sin stock — consultanos por próximo ingreso"}
+              </p>
+            </div>
 
             <div className="mt-6">
               <AddToCartButton product={product} />
+            </div>
+
+            <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <TrustItem
+                icon="M3 12l2-6h14l2 6M5 12v7a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-2h6v2a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-7M5 12h14"
+                title="Envío a todo el país"
+                detail="Coordinado por zona"
+              />
+              <TrustItem
+                icon="M9 12l2 2 4-4M12 3l7 4v5c0 4.5-3 8-7 9-4-1-7-4.5-7-9V7l7-4Z"
+                title="Garantía de fábrica"
+                detail="Según especificación"
+              />
+              <TrustItem
+                icon="M2.5 12a9.5 9.5 0 1 1 3.6 7.4L2 20l.6-4a9.4 9.4 0 0 1-.1-4Z"
+                title="Pago coordinado"
+                detail="Directo por WhatsApp"
+              />
             </div>
 
             <div className="mt-10 border-t border-ink/10 pt-6">
@@ -118,12 +148,28 @@ export default async function ProductPage({
             </h2>
             <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {related.map((p) => (
-                <ProductCard key={p.id} product={p} />
+                <ProductCard key={p.id} product={p} exchangeRate={exchangeRate} />
               ))}
             </div>
           </div>
         )}
       </div>
     </section>
+  );
+}
+
+function TrustItem({ icon, title, detail }: { icon: string; title: string; detail: string }) {
+  return (
+    <div className="flex items-center gap-2.5 rounded-xl border border-ink/10 bg-white px-3 py-2.5">
+      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-navy-900/5 text-navy-900">
+        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+          <path d={icon} />
+        </svg>
+      </span>
+      <div className="min-w-0">
+        <p className="text-xs font-bold leading-tight text-ink">{title}</p>
+        <p className="text-[11px] leading-tight text-body">{detail}</p>
+      </div>
+    </div>
   );
 }

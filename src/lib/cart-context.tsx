@@ -112,6 +112,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
   );
 }
 
+export function buildSingleItemWhatsappUrl(product: Product, qty: number) {
+  const message =
+    `Hola BH Electric Solar, quiero comprar:\n\n` +
+    `• ${product.name} x${qty} — ${formatUSD(product.priceUSD * qty)}\n\n` +
+    "¿Podrían confirmarme disponibilidad y coordinar el pago y el envío?";
+  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+}
+
 function buildWhatsappCheckoutUrl(items: CartItem[], totalUSD: number) {
   if (items.length === 0) {
     return `https://wa.me/${WHATSAPP_NUMBER}`;

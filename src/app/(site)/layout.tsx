@@ -6,6 +6,7 @@ import Footer from "@/components/Footer";
 import WhatsAppFloat from "@/components/WhatsAppFloat";
 import { CartProvider } from "@/lib/cart-context";
 import CartDrawer from "@/components/store/CartDrawer";
+import { getExchangeRate } from "@/lib/exchange-rate";
 
 const displayFont = Outfit({
   variable: "--font-display",
@@ -30,7 +31,8 @@ export const metadata: Metadata = {
     "Diseñamos e instalamos sistemas de energía solar fotovoltaica para hogares, empresas e industrias en Misiones, Argentina.",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const exchangeRate = await getExchangeRate();
   return (
     <html
       lang="es"
@@ -42,7 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <main className="flex-1">{children}</main>
           <Footer />
           <WhatsAppFloat />
-          <CartDrawer />
+          <CartDrawer exchangeRate={exchangeRate} />
         </CartProvider>
       </body>
     </html>
