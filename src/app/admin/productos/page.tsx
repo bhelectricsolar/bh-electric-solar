@@ -66,6 +66,8 @@ export default function AdminProductosPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<DraftProduct>(EMPTY_DRAFT);
   const [images, setImages] = useState<UploadedImage[]>([]);
+  const [specs, setSpecs] = useState<{ label: string; value: string }[]>([]);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
   const [choiceOpen, setChoiceOpen] = useState(false);
   const [fromInventoryOpen, setFromInventoryOpen] = useState(false);
@@ -103,6 +105,7 @@ export default function AdminProductosPage() {
     setEditingId(null);
     setDraft(EMPTY_DRAFT);
     setImages([]);
+    setSpecs([]);
     setPanelOpen(true);
   }
 
@@ -132,13 +135,14 @@ export default function AdminProductosPage() {
     setImages(
       (product.images ?? []).map((url, i) => ({ id: `${product.id}-${i}`, url, name: url })),
     );
+    setSpecs(product.specs ?? []);
     setPanelOpen(true);
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("¿Eliminar este producto?")) return;
     await deleteProduct(id);
     setProducts((prev) => prev.filter((p) => p.id !== id));
+    setConfirmDeleteId(null);
   }
 
   async function handleSave(event: React.FormEvent) {
@@ -147,6 +151,7 @@ export default function AdminProductosPage() {
     setSaving(true);
     try {
       const imageUrls = images.map((i) => i.url);
+      const cleanSpecs = specs.filter((s) => s.label.trim());
       if (editingId) {
         const patch = {
           name: draft.name,
@@ -158,6 +163,7 @@ export default function AdminProductosPage() {
           shortDescription: draft.shortDescription,
           description: draft.description,
           images: imageUrls,
+          specs: cleanSpecs,
         };
         await updateProduct(editingId, patch);
         setProducts((prev) =>
@@ -175,7 +181,7 @@ export default function AdminProductosPage() {
           stock: Number(draft.stock) || 0,
           shortDescription: draft.shortDescription,
           description: draft.description || draft.shortDescription,
-          specs: [],
+          specs: cleanSpecs,
           gradient: GRADIENTS[products.length % GRADIENTS.length],
           images: imageUrls,
           publishedOnline: true,
@@ -296,12 +302,24 @@ export default function AdminProductosPage() {
               key={product.id}
               className="flex flex-col overflow-hidden rounded-xl border border-ink/10 bg-surface shadow-sm transition-shadow hover:shadow-md"
             >
-              <div className={`flex h-24 items-end justify-between bg-gradient-to-br p-3 ${product.gradient}`}>
-                <span className="rounded bg-white/20 px-2 py-0.5 text-[10px] font-semibold text-white">
+              <div
+                className={`relative flex h-24 items-end justify-between overflow-hidden p-3 ${
+                  product.images?.[0] ? "bg-white" : `bg-gradient-to-br ${product.gradient}`
+                }`}
+              >
+                {product.images?.[0] && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={product.images[0]}
+                    alt={product.name}
+                    className="absolute inset-0 h-full w-full object-contain p-1.5"
+                  />
+                )}
+                <span className="relative rounded bg-navy-950/70 px-2 py-0.5 text-[10px] font-semibold text-white">
                   {categories.find((c) => c.value === product.category)?.label}
                 </span>
                 {product.stock <= 8 && (
-                  <span className="rounded bg-gold-500 px-2 py-0.5 text-[10px] font-bold text-navy-950">
+                  <span className="relative rounded bg-gold-500 px-2 py-0.5 text-[10px] font-bold text-navy-950">
                     Stock: {product.stock}
                   </span>
                 )}
@@ -316,22 +334,42 @@ export default function AdminProductosPage() {
                     Stock {product.stock}
                   </span>
                 </div>
-                <div className="mt-3 flex gap-2 border-t border-ink/10 pt-3">
-                  <button
-                    type="button"
-                    onClick={() => openEdit(product)}
-                    className="flex-1 cursor-pointer touch-manipulation rounded-lg bg-cream-200 py-2 text-xs font-semibold text-ink"
-                  >
-                    Editar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(product.id)}
-                    className="flex-1 cursor-pointer touch-manipulation rounded-lg bg-red-500/10 py-2 text-xs font-semibold text-red-500"
-                  >
-                    Eliminar
-                  </button>
-                </div>
+                {confirmDeleteId === product.id ? (
+                  <div className="mt-3 flex items-center gap-2 rounded-lg border-t border-ink/10 pt-3">
+                    <p className="flex-1 text-[11px] font-semibold text-red-500">¿Eliminar?</p>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(product.id)}
+                      className="cursor-pointer touch-manipulation rounded-lg bg-red-500 px-3 py-2 text-xs font-bold text-white"
+                    >
+                      Sí
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDeleteId(null)}
+                      className="cursor-pointer touch-manipulation rounded-lg bg-cream-200 px-3 py-2 text-xs font-semibold text-ink"
+                    >
+                      No
+                    </button>
+                  </div>
+                ) : (
+                  <div className="mt-3 flex gap-2 border-t border-ink/10 pt-3">
+                    <button
+                      type="button"
+                      onClick={() => openEdit(product)}
+                      className="flex-1 cursor-pointer touch-manipulation rounded-lg bg-cream-200 py-2 text-xs font-semibold text-ink"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDeleteId(product.id)}
+                      className="flex-1 cursor-pointer touch-manipulation rounded-lg bg-red-500/10 py-2 text-xs font-semibold text-red-500"
+                    >
+                      Eliminar
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           ))}
@@ -537,6 +575,53 @@ export default function AdminProductosPage() {
                   className="w-full resize-none rounded-lg border border-ink/10 bg-background px-3 py-2.5 text-sm text-ink"
                 />
               </Field>
+
+              <div>
+                <span className="text-xs font-semibold text-ink">
+                  Especificaciones técnicas (aparecen en la ficha del producto)
+                </span>
+                <div className="mt-1.5 flex flex-col gap-2">
+                  {specs.map((spec, i) => (
+                    <div key={i} className="flex gap-2">
+                      <input
+                        value={spec.label}
+                        onChange={(e) => {
+                          const next = [...specs];
+                          next[i] = { ...next[i], label: e.target.value };
+                          setSpecs(next);
+                        }}
+                        placeholder="Ej: Potencia"
+                        className="w-2/5 rounded-lg border border-ink/10 bg-background px-3 py-2 text-sm text-ink"
+                      />
+                      <input
+                        value={spec.value}
+                        onChange={(e) => {
+                          const next = [...specs];
+                          next[i] = { ...next[i], value: e.target.value };
+                          setSpecs(next);
+                        }}
+                        placeholder="Ej: 450 W"
+                        className="flex-1 rounded-lg border border-ink/10 bg-background px-3 py-2 text-sm text-ink"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setSpecs(specs.filter((_, idx) => idx !== i))}
+                        aria-label="Quitar especificación"
+                        className="cursor-pointer touch-manipulation rounded-lg border border-ink/10 px-2.5 text-body hover:border-red-500/40 hover:text-red-500"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setSpecs([...specs, { label: "", value: "" }])}
+                    className="cursor-pointer touch-manipulation self-start rounded-lg border border-dashed border-ink/20 px-3 py-1.5 text-xs font-semibold text-body hover:border-ink/40 hover:text-ink"
+                  >
+                    + Agregar especificación
+                  </button>
+                </div>
+              </div>
             </div>
 
             <button

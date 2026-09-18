@@ -61,6 +61,7 @@ export default function AdminEquipoPage() {
   const [credentials, setCredentials] = useState<CredentialsDraft>({ username: "", password: "" });
   const [credentialsSaving, setCredentialsSaving] = useState(false);
   const [credentialsMessage, setCredentialsMessage] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   function loadAll() {
     return Promise.all([
@@ -169,9 +170,9 @@ export default function AdminEquipoPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("¿Quitar esta persona del equipo?")) return;
     await deleteTeamMember(id);
     setMembers((prev) => prev.filter((m) => m.id !== id));
+    setConfirmDeleteId(null);
   }
 
   async function handleSave(event: React.FormEvent) {
@@ -304,22 +305,42 @@ export default function AdminEquipoPage() {
                 </div>
               )}
 
-              <div className="mt-3 flex gap-2 border-t border-ink/10 pt-3">
-                <button
-                  type="button"
-                  onClick={() => openEdit(member)}
-                  className="flex-1 cursor-pointer touch-manipulation rounded-lg border border-ink/10 bg-cream-200 py-2 text-xs font-semibold text-ink shadow-sm hover:shadow-md"
-                >
-                  Editar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDelete(member.id)}
-                  className="flex-1 cursor-pointer touch-manipulation rounded-lg border border-red-500/20 bg-red-500/10 py-2 text-xs font-semibold text-red-500 shadow-sm hover:shadow-md"
-                >
-                  Quitar
-                </button>
-              </div>
+              {confirmDeleteId === member.id ? (
+                <div className="mt-3 flex items-center gap-2 border-t border-ink/10 pt-3">
+                  <p className="flex-1 text-[11px] font-semibold text-red-500">¿Quitar del equipo?</p>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(member.id)}
+                    className="cursor-pointer touch-manipulation rounded-lg bg-red-500 px-3 py-2 text-xs font-bold text-white"
+                  >
+                    Sí
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDeleteId(null)}
+                    className="cursor-pointer touch-manipulation rounded-lg bg-cream-200 px-3 py-2 text-xs font-semibold text-ink"
+                  >
+                    No
+                  </button>
+                </div>
+              ) : (
+                <div className="mt-3 flex gap-2 border-t border-ink/10 pt-3">
+                  <button
+                    type="button"
+                    onClick={() => openEdit(member)}
+                    className="flex-1 cursor-pointer touch-manipulation rounded-lg border border-ink/10 bg-cream-200 py-2 text-xs font-semibold text-ink shadow-sm hover:shadow-md"
+                  >
+                    Editar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDeleteId(member.id)}
+                    className="flex-1 cursor-pointer touch-manipulation rounded-lg border border-red-500/20 bg-red-500/10 py-2 text-xs font-semibold text-red-500 shadow-sm hover:shadow-md"
+                  >
+                    Quitar
+                  </button>
+                </div>
+              )}
             </div>
           ))}
           {visible.length === 0 && (

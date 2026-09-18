@@ -24,6 +24,7 @@ export default function AdminEnviosPage() {
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [creating, setCreating] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
     getShippingZones()
@@ -51,6 +52,7 @@ export default function AdminEnviosPage() {
   function cancelEdit() {
     setEditingId(null);
     setCreating(false);
+    setConfirmingDeleteId(null);
   }
 
   function toggleProvince(name: string) {
@@ -100,10 +102,10 @@ export default function AdminEnviosPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("¿Eliminar esta zona de envío?")) return;
     await deleteShippingZone(id);
     setZones((prev) => prev.filter((z) => z.id !== id));
     if (editingId === id) setEditingId(null);
+    setConfirmingDeleteId(null);
   }
 
   function ProvincePicker() {
@@ -265,30 +267,52 @@ export default function AdminEnviosPage() {
                       <ProvincePicker />
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={saveEdit}
-                      disabled={saving}
-                      className="flex-1 cursor-pointer touch-manipulation rounded-lg bg-navy-900 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-navy-800 hover:shadow-md disabled:opacity-50"
-                    >
-                      {saving ? "Guardando…" : "Guardar"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(zone.id)}
-                      className="cursor-pointer touch-manipulation rounded-lg border border-red-500/30 px-4 py-2.5 text-sm font-semibold text-red-500 hover:bg-red-500/10"
-                    >
-                      Eliminar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={cancelEdit}
-                      className="cursor-pointer touch-manipulation rounded-lg border border-ink/15 px-4 py-2.5 text-sm font-semibold text-body"
-                    >
-                      Cancelar
-                    </button>
-                  </div>
+                  {confirmingDeleteId === zone.id ? (
+                    <div className="flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3">
+                      <p className="flex-1 text-xs font-semibold text-red-500">
+                        ¿Seguro que querés eliminar &ldquo;{zone.region}&rdquo;?
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(zone.id)}
+                        className="cursor-pointer touch-manipulation rounded-lg bg-red-500 px-3 py-2 text-xs font-bold text-white"
+                      >
+                        Sí, eliminar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmingDeleteId(null)}
+                        className="cursor-pointer touch-manipulation rounded-lg border border-ink/15 px-3 py-2 text-xs font-semibold text-body"
+                      >
+                        No
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={saveEdit}
+                        disabled={saving}
+                        className="flex-1 cursor-pointer touch-manipulation rounded-lg bg-navy-900 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-navy-800 hover:shadow-md disabled:opacity-50"
+                      >
+                        {saving ? "Guardando…" : "Guardar"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmingDeleteId(zone.id)}
+                        className="cursor-pointer touch-manipulation rounded-lg border border-red-500/30 px-4 py-2.5 text-sm font-semibold text-red-500 hover:bg-red-500/10"
+                      >
+                        Eliminar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={cancelEdit}
+                        className="cursor-pointer touch-manipulation rounded-lg border border-ink/15 px-4 py-2.5 text-sm font-semibold text-body"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="mt-3 flex items-center justify-between border-t border-ink/10 pt-3">
