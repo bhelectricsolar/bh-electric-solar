@@ -67,9 +67,13 @@ export default function AdminCajaPage() {
   const [salePaymentNotes, setSalePaymentNotes] = useState("");
   const [saleSaving, setSaleSaving] = useState(false);
   const [saleReceipt, setSaleReceipt] = useState<Order | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (memberLoading || !member) return;
+    setLoading(true);
+    setLoadError(null);
     Promise.all([
       getOpenSessionFor(member.id),
       getCashHistory(member.id),
@@ -86,8 +90,12 @@ export default function AdminCajaPage() {
         setZones(z);
         setCustomers(c);
       })
+      .catch((err) => {
+        console.error("Caja:", err);
+        setLoadError("No pudimos cargar tu caja. Puede ser algo momentáneo de la conexión.");
+      })
       .finally(() => setLoading(false));
-  }, [member, memberLoading]);
+  }, [member, memberLoading, reloadKey]);
 
   function orderTotalUSD(orderId: string) {
     const order = orders.find((o) => o.id === orderId);
@@ -267,7 +275,29 @@ export default function AdminCajaPage() {
           Conectado a Supabase — la caja queda guardada de verdad.
         </div>
 
-        {loading ? (
+        {memberLoading ? (
+          <p className="mt-5 text-sm text-body">Cargando…</p>
+        ) : !member ? (
+          <div className="mt-6 rounded-2xl border border-ink/10 bg-surface p-6 shadow-sm">
+            <p className="text-sm text-ink">
+              Esta sección es la caja individual de cada persona del equipo. Tu
+              cuenta no tiene una fila de equipo asignada (por ejemplo, si
+              entraste con la cuenta de desarrollador), así que no hay una
+              caja propia para mostrar acá.
+            </p>
+          </div>
+        ) : loadError ? (
+          <div className="mt-6 rounded-2xl border border-red-500/30 bg-red-500/10 p-6 shadow-sm">
+            <p className="text-sm text-red-600">{loadError}</p>
+            <button
+              type="button"
+              onClick={() => setReloadKey((k) => k + 1)}
+              className="mt-4 cursor-pointer touch-manipulation rounded-lg bg-navy-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-navy-800"
+            >
+              Reintentar
+            </button>
+          </div>
+        ) : loading ? (
           <p className="mt-5 text-sm text-body">Cargando caja…</p>
         ) : !session ? (
           <form

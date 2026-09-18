@@ -9,31 +9,45 @@ export function useCurrentTeamMember() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
     const supabase = createClient();
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
-      if (!user) {
-        setLoading(false);
-        return;
+
+    async function load() {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) return;
+        const { data } = await supabase
+          .from("team_members")
+          .select("*")
+          .eq("auth_user_id", user.id)
+          .maybeSingle();
+        if (data && !cancelled) {
+          setMember({
+            id: data.id,
+            name: data.name,
+            email: data.email ?? "",
+            phone: data.phone ?? "",
+            role: data.role,
+            active: data.active,
+            commissionPct: data.commission_pct != null ? Number(data.commission_pct) : undefined,
+            zone: data.zone ?? undefined,
+          });
+        }
+      } catch (err) {
+        // Si falla la consulta (red, hipo de la base), no dejamos la
+        // pantalla trabada en "Cargando…" para siempre.
+        console.error("useCurrentTeamMember:", err);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-      const { data } = await supabase
-        .from("team_members")
-        .select("*")
-        .eq("auth_user_id", user.id)
-        .maybeSingle();
-      if (data) {
-        setMember({
-          id: data.id,
-          name: data.name,
-          email: data.email ?? "",
-          phone: data.phone ?? "",
-          role: data.role,
-          active: data.active,
-          commissionPct: data.commission_pct != null ? Number(data.commission_pct) : undefined,
-          zone: data.zone ?? undefined,
-        });
-      }
-      setLoading(false);
-    });
+    }
+
+    load();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return { member, loading };
@@ -46,22 +60,34 @@ export function useCurrentDeveloper() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
     const supabase = createClient();
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
-      if (!user) {
-        setLoading(false);
-        return;
+
+    async function load() {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) return;
+        const { data } = await supabase
+          .from("developers")
+          .select("*")
+          .eq("auth_user_id", user.id)
+          .maybeSingle();
+        if (data && !cancelled) {
+          setDeveloper({ id: data.id, name: data.name, username: data.username ?? undefined });
+        }
+      } catch (err) {
+        console.error("useCurrentDeveloper:", err);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-      const { data } = await supabase
-        .from("developers")
-        .select("*")
-        .eq("auth_user_id", user.id)
-        .maybeSingle();
-      if (data) {
-        setDeveloper({ id: data.id, name: data.name, username: data.username ?? undefined });
-      }
-      setLoading(false);
-    });
+    }
+
+    load();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return { developer, loading };
