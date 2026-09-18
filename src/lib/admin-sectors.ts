@@ -23,7 +23,7 @@ export const ICONS: Record<string, string> = {
     "M3 7 12 3l9 4-9 4-9-4Zm0 5 9 4 9-4M3 12v5l9 4 9-4v-5",
 };
 
-export type SectorId = "tienda" | "negocio" | "sitio";
+export type SectorId = "tienda" | "negocio";
 
 export type SectorNavItem = {
   href: string;
@@ -42,6 +42,9 @@ export type Sector = {
   items: SectorNavItem[];
 };
 
+// Dos mundos nada más: lo que ve y compra el cliente online, y todo lo
+// que pasa puertas adentro del negocio (incluida la configuración del
+// sitio — sigue siendo "interno", no algo que ve el cliente).
 export const SECTORS: Sector[] = [
   {
     id: "tienda",
@@ -59,9 +62,9 @@ export const SECTORS: Sector[] = [
   },
   {
     id: "negocio",
-    label: "Gestión del Negocio",
+    label: "Mi Negocio",
     shortLabel: "Negocio",
-    tagline: "Instalaciones, equipo y números",
+    tagline: "Todo lo interno de BH",
     accent: "negocio",
     icon: "briefcase",
     items: [
@@ -71,16 +74,6 @@ export const SECTORS: Sector[] = [
       { href: "/admin/equipo", label: "Equipo", description: "Vendedores, técnicos y roles.", icon: "badge" },
       { href: "/admin/reportes", label: "Reportes", description: "Ventas, margen y estado.", icon: "chart" },
       { href: "/admin/caja", label: "Caja diaria", description: "Apertura, movimientos y cierre.", icon: "cash" },
-    ],
-  },
-  {
-    id: "sitio",
-    label: "Configuración del Sitio",
-    shortLabel: "Sitio",
-    tagline: "Datos, moneda y apariencia",
-    accent: "sitio",
-    icon: "settings",
-    items: [
       { href: "/admin/configuracion", label: "Configuración", description: "Nombre, moneda, redes y tema.", icon: "settings" },
     ],
   },
@@ -89,27 +82,22 @@ export const SECTORS: Sector[] = [
 export const ACCENT_TEXT: Record<SectorId, string> = {
   tienda: "text-tienda",
   negocio: "text-negocio",
-  sitio: "text-sitio",
 };
 export const ACCENT_BG_SOFT: Record<SectorId, string> = {
   tienda: "bg-tienda/15",
   negocio: "bg-negocio/15",
-  sitio: "bg-sitio/15",
 };
 export const ACCENT_BG_SOLID: Record<SectorId, string> = {
   tienda: "bg-tienda",
   negocio: "bg-negocio",
-  sitio: "bg-sitio",
 };
 export const ACCENT_SHADOW: Record<SectorId, string> = {
   tienda: "hover:shadow-[0_30px_70px_-25px_rgba(179,105,10,0.45)]",
   negocio: "hover:shadow-[0_30px_70px_-25px_rgba(29,84,201,0.45)]",
-  sitio: "hover:shadow-[0_30px_70px_-25px_rgba(124,58,237,0.45)]",
 };
 export const ACCENT_GLOW: Record<SectorId, string> = {
   tienda: "bg-[radial-gradient(circle,rgba(179,105,10,0.35),transparent_70%)]",
   negocio: "bg-[radial-gradient(circle,rgba(29,84,201,0.35),transparent_70%)]",
-  sitio: "bg-[radial-gradient(circle,rgba(124,58,237,0.35),transparent_70%)]",
 };
 
 export function sectorForPath(pathname: string): Sector | null {

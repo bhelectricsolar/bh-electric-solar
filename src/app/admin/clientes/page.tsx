@@ -13,16 +13,28 @@ import { pickField } from "@/lib/csv-import";
 import ImportButton from "@/components/admin/ImportButton";
 import SectorEyebrow from "@/components/admin/SectorEyebrow";
 import StatusBadge from "@/components/admin/StatusBadge";
+import Chip from "@/components/admin/Chip";
 
 const STATUS_LABELS = {
   lead: "Lead",
   cliente: "Cliente",
 };
 
+const LEAD_STALE_DAYS = 3;
+
+function daysSince(dateStr: string) {
+  return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
+}
+
+function isStaleLead(c: Customer) {
+  return c.status === "lead" && daysSince(c.createdAt) >= LEAD_STALE_DAYS;
+}
+
 export default function AdminClientesPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
+  const [onlyStale, setOnlyStale] = useState(false);
 
   useEffect(() => {
     getCustomers()
@@ -30,10 +42,13 @@ export default function AdminClientesPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  const staleCount = customers.filter(isStaleLead).length;
+
   const visible = customers.filter(
     (c) =>
-      c.name.toLowerCase().includes(query.toLowerCase()) ||
-      c.city.toLowerCase().includes(query.toLowerCase()),
+      (!onlyStale || isStaleLead(c)) &&
+      (c.name.toLowerCase().includes(query.toLowerCase()) ||
+        c.city.toLowerCase().includes(query.toLowerCase())),
   );
 
   function exportCSV() {
@@ -111,6 +126,14 @@ export default function AdminClientesPage() {
           className="mt-5 w-full rounded-lg border border-ink/10 bg-surface px-4 py-2.5 text-sm text-ink"
         />
 
+        {staleCount > 0 && (
+          <div className="mt-3">
+            <Chip active={onlyStale} onClick={() => setOnlyStale((v) => !v)} tone="danger">
+              Sin atender ({staleCount})
+            </Chip>
+          </div>
+        )}
+
         <div className="mt-4 flex flex-col gap-3">
           {visible.map((customer) => (
             <div
@@ -119,9 +142,16 @@ export default function AdminClientesPage() {
             >
               <div className="flex items-start justify-between gap-3">
                 <p className="font-semibold text-ink">{customer.name}</p>
-                <StatusBadge tone={CUSTOMER_STATUS_TONE[customer.status]}>
-                  {STATUS_LABELS[customer.status]}
-                </StatusBadge>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  {isStaleLead(customer) && (
+                    <StatusBadge tone="danger">
+                      {daysSince(customer.createdAt)}d sin atender
+                    </StatusBadge>
+                  )}
+                  <StatusBadge tone={CUSTOMER_STATUS_TONE[customer.status]}>
+                    {STATUS_LABELS[customer.status]}
+                  </StatusBadge>
+                </div>
               </div>
               <p className="mt-1 text-xs text-body">{customer.city}</p>
               <div className="mt-3 grid grid-cols-2 gap-2 border-t border-ink/10 pt-3 text-xs">

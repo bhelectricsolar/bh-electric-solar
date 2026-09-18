@@ -93,17 +93,14 @@ function RestrictedShell({
 const ACCENT_TEXT: Record<Sector["accent"], string> = {
   tienda: "text-tienda",
   negocio: "text-negocio",
-  sitio: "text-sitio",
 };
 const ACCENT_BG_SOFT: Record<Sector["accent"], string> = {
   tienda: "bg-tienda/15",
   negocio: "bg-negocio/15",
-  sitio: "bg-sitio/15",
 };
 const ACCENT_BG_SOLID: Record<Sector["accent"], string> = {
   tienda: "bg-tienda",
   negocio: "bg-negocio",
-  sitio: "bg-sitio",
 };
 
 function FullAdminShell({
