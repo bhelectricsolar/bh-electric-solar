@@ -193,3 +193,13 @@ h2 {
   border-bottom: 2px solid var(--color-gold-500);
   border-right: 2px solid var(--color-gold-500);
 }
+
+/* En iPhone/Android, un campo con letra menor a 16px hace que el navegador
+   haga zoom al enfocarlo y no vuelva solo. Con 16px en celular no hay zoom. */
+@media (max-width: 1023px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}

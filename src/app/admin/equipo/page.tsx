@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import NumberField from "@/components/NumberField";
 import {
   ROLE_LABELS,
   ROLE_DESCRIPTIONS,
@@ -444,12 +445,11 @@ export default function AdminEquipoPage() {
 
               {draft.role === "vendedor" && (
                 <Field label="Comisión por venta (%)">
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
+                  <NumberField
+                    decimals
+                    suffix=" %"
                     value={draft.commissionPct}
-                    onChange={(e) => setDraft({ ...draft, commissionPct: e.target.value })}
+                    onValueChange={(v) => setDraft({ ...draft, commissionPct: v })}
                     className="w-full rounded-lg border border-ink/10 bg-background px-3 py-2.5 text-sm text-ink"
                   />
                 </Field>

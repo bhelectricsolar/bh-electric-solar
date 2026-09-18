@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import NumberField from "@/components/NumberField";
 import {
   getProducts,
   getCategories,
@@ -511,46 +512,44 @@ export default function AdminProductosPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <Field label="Precio (USD)">
-                  <input
+                  <NumberField
                     required
-                    type="number"
-                    min={0}
+                    decimals
+                    prefix="US$ "
                     value={draft.priceUSD}
-                    onChange={(e) => setDraft({ ...draft, priceUSD: e.target.value })}
-                    placeholder="145"
+                    onValueChange={(v) => setDraft({ ...draft, priceUSD: v })}
+                    placeholder="US$ 145"
                     className="w-full rounded-lg border border-ink/10 bg-background px-3 py-2.5 text-sm text-ink"
                   />
                 </Field>
                 <Field label="Costo (USD)">
-                  <input
-                    type="number"
-                    min={0}
+                  <NumberField
+                    decimals
+                    prefix="US$ "
                     value={draft.costUSD}
-                    onChange={(e) => setDraft({ ...draft, costUSD: e.target.value })}
-                    placeholder="92"
+                    onValueChange={(v) => setDraft({ ...draft, costUSD: v })}
+                    placeholder="US$ 92"
                     className="w-full rounded-lg border border-ink/10 bg-background px-3 py-2.5 text-sm text-ink"
                   />
                 </Field>
               </div>
 
               <Field label="Precio fijo en pesos (opcional)">
-                <input
-                  type="number"
-                  min={0}
+                <NumberField
+                  decimals
+                  prefix="$ "
                   value={draft.priceARS}
-                  onChange={(e) => setDraft({ ...draft, priceARS: e.target.value })}
+                  onValueChange={(v) => setDraft({ ...draft, priceARS: v })}
                   placeholder="Dejalo vacío para usar el dólar convertido"
                   className="w-full rounded-lg border border-ink/10 bg-background px-3 py-2.5 text-sm text-ink"
                 />
               </Field>
 
               <Field label="Stock">
-                <input
+                <NumberField
                   required
-                  type="number"
-                  min={0}
                   value={draft.stock}
-                  onChange={(e) => setDraft({ ...draft, stock: e.target.value })}
+                  onValueChange={(v) => setDraft({ ...draft, stock: v })}
                   placeholder="20"
                   className="w-full rounded-lg border border-ink/10 bg-background px-3 py-2.5 text-sm text-ink"
                 />

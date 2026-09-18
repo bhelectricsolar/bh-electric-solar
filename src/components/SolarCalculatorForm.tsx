@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import NumberField from "@/components/NumberField";
 import Link from "next/link";
 import {
   REGION_OPTIONS,
@@ -85,12 +86,11 @@ export default function SolarCalculatorForm() {
             <label className="text-sm font-semibold text-ink">
               Monto mensual de factura
             </label>
-            <input
-              type="number"
-              inputMode="numeric"
-              placeholder="Ej: 85000"
+            <NumberField
+              prefix="$ "
+              placeholder="Ej: $ 85.000"
               value={bill}
-              onChange={(e) => setBill(e.target.value)}
+              onValueChange={setBill}
               className="mt-2 w-full rounded-xl border border-black/10 px-4 py-3 text-sm text-ink"
             />
           </div>
@@ -98,12 +98,11 @@ export default function SolarCalculatorForm() {
             <label className="text-sm font-semibold text-ink">
               kWh mensuales
             </label>
-            <input
-              type="number"
-              inputMode="numeric"
-              placeholder="Ej: 420"
+            <NumberField
+              suffix=" kWh"
+              placeholder="Ej: 420 kWh"
               value={kwh}
-              onChange={(e) => setKwh(e.target.value)}
+              onValueChange={setKwh}
               className="mt-2 w-full rounded-xl border border-black/10 px-4 py-3 text-sm text-ink"
             />
             <p className="mt-1.5 text-xs text-body">

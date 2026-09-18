@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import NumberField from "@/components/NumberField";
 import {
   useAdminSettings,
   CARD_TYPES,
@@ -154,6 +155,8 @@ export default function AdminConfiguracionPage() {
                     label="Monto manual (ARS por 1 USD)"
                     value={settings.exchangeRate}
                     type="number"
+                    prefix="$ "
+                    decimals
                     onSave={(v) => updateSettings({ exchangeRate: Number(v) || 0 })}
                   />
                 </div>
@@ -285,21 +288,20 @@ export default function AdminConfiguracionPage() {
             </label>
             <label className="block">
               <span className="text-xs font-semibold text-ink">Cuotas</span>
-              <input
-                type="number"
-                min={1}
+              <NumberField
+                suffix=" cuotas"
                 value={planDraft.installments}
-                onChange={(e) => setPlanDraft({ ...planDraft, installments: e.target.value })}
+                onValueChange={(v) => setPlanDraft({ ...planDraft, installments: v })}
                 className="mt-1.5 w-full rounded-lg border border-ink/10 bg-background px-2.5 py-2 text-sm text-ink"
               />
             </label>
             <label className="block">
               <span className="text-xs font-semibold text-ink">Recargo %</span>
-              <input
-                type="number"
-                min={0}
+              <NumberField
+                decimals
+                suffix=" %"
                 value={planDraft.surchargePct}
-                onChange={(e) => setPlanDraft({ ...planDraft, surchargePct: e.target.value })}
+                onValueChange={(v) => setPlanDraft({ ...planDraft, surchargePct: v })}
                 className="mt-1.5 w-full rounded-lg border border-ink/10 bg-background px-2.5 py-2 text-sm text-ink"
               />
             </label>
@@ -401,12 +403,18 @@ function SavableField({
   onSave,
   placeholder,
   type = "text",
+  prefix,
+  suffix,
+  decimals,
 }: {
   label: string;
   value: string | number;
   onSave: (value: string) => void | Promise<void>;
   placeholder?: string;
   type?: "text" | "number" | "email";
+  prefix?: string;
+  suffix?: string;
+  decimals?: boolean;
 }) {
   const [draft, setDraft] = useState(String(value));
   const [saving, setSaving] = useState(false);
@@ -430,13 +438,25 @@ function SavableField({
     <label className="block">
       <span className="text-xs font-semibold text-ink">{label}</span>
       <div className="mt-1.5 flex gap-2">
-        <input
-          type={type}
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          placeholder={placeholder}
-          className="w-full rounded-lg border border-ink/10 bg-background px-3 py-2.5 text-sm text-ink"
-        />
+        {type === "number" ? (
+          <NumberField
+            prefix={prefix}
+            suffix={suffix}
+            decimals={decimals}
+            value={draft}
+            onValueChange={setDraft}
+            placeholder={placeholder}
+            className="w-full rounded-lg border border-ink/10 bg-background px-3 py-2.5 text-sm text-ink"
+          />
+        ) : (
+          <input
+            type={type}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder={placeholder}
+            className="w-full rounded-lg border border-ink/10 bg-background px-3 py-2.5 text-sm text-ink"
+          />
+        )}
         {dirty && (
           <button
             type="button"

@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
+import NumberField from "@/components/NumberField";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   getOrders,
@@ -407,13 +408,12 @@ function AdminCajaPageInner() {
             </p>
             <label className="mt-4 block">
               <span className="text-xs font-semibold text-ink">Monto inicial (ARS)</span>
-              <input
+              <NumberField
                 required
-                type="number"
-                min={0}
+                prefix="$ "
                 value={openingAmount}
-                onChange={(e) => setOpeningAmount(e.target.value)}
-                placeholder="50000"
+                onValueChange={setOpeningAmount}
+                placeholder="$ 50.000"
                 className="mt-1.5 w-full rounded-lg border border-ink/10 bg-background px-3 py-2.5 text-sm text-ink"
               />
             </label>
@@ -742,11 +742,11 @@ function AdminCajaPageInner() {
                       )}
                     </div>
                     <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        min={0}
+                      <NumberField
+                        decimals={line.currency === "USD"}
+                        prefix={line.currency === "USD" ? "US$ " : "$ "}
                         value={line.amount}
-                        onChange={(e) => updatePaymentLine(idx, { amount: e.target.value })}
+                        onValueChange={(v) => updatePaymentLine(idx, { amount: v })}
                         placeholder={`Monto (${line.currency === "USD" ? "US$" : "ARS"})`}
                         className="w-full rounded-lg border border-ink/10 bg-background px-2.5 py-2 text-xs text-ink"
                       />
@@ -1002,12 +1002,11 @@ function AdminCajaPageInner() {
 
             <label className="mt-4 block">
               <span className="text-xs font-semibold text-ink">Monto (ARS)</span>
-              <input
+              <NumberField
                 required
-                type="number"
-                min={0}
+                prefix="$ "
                 value={movementDraft.amount}
-                onChange={(e) => setMovementDraft({ ...movementDraft, amount: e.target.value })}
+                onValueChange={(v) => setMovementDraft({ ...movementDraft, amount: v })}
                 className="mt-1.5 w-full rounded-lg border border-ink/10 bg-background px-3 py-2.5 text-sm text-ink"
               />
             </label>
@@ -1052,12 +1051,11 @@ function AdminCajaPageInner() {
 
             <label className="mt-4 block">
               <span className="text-xs font-semibold text-ink">Monto contado (ARS)</span>
-              <input
+              <NumberField
                 required
-                type="number"
-                min={0}
+                prefix="$ "
                 value={countedAmount}
-                onChange={(e) => setCountedAmount(e.target.value)}
+                onValueChange={setCountedAmount}
                 className="mt-1.5 w-full rounded-lg border border-ink/10 bg-background px-3 py-2.5 text-sm text-ink"
               />
             </label>

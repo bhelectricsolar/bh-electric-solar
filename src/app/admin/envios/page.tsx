@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import NumberField from "@/components/NumberField";
 import {
   getShippingZones,
   updateShippingZone,
@@ -170,11 +171,11 @@ export default function AdminEnviosPage() {
               </label>
               <label className="block">
                 <span className="text-xs font-semibold text-ink">Costo (USD)</span>
-                <input
-                  type="number"
-                  min={0}
+                <NumberField
+                  decimals
+                  prefix="US$ "
                   value={draft.priceUSD}
-                  onChange={(e) => setDraft({ ...draft, priceUSD: e.target.value })}
+                  onValueChange={(v) => setDraft({ ...draft, priceUSD: v })}
                   className="mt-1.5 w-full rounded-lg border border-ink/10 bg-background px-3 py-2 text-sm text-ink"
                 />
               </label>
@@ -244,11 +245,11 @@ export default function AdminEnviosPage() {
                     </label>
                     <label className="block">
                       <span className="text-xs font-semibold text-ink">Costo (USD)</span>
-                      <input
-                        type="number"
-                        min={0}
+                      <NumberField
+                        decimals
+                        prefix="US$ "
                         value={draft.priceUSD}
-                        onChange={(e) => setDraft({ ...draft, priceUSD: e.target.value })}
+                        onValueChange={(v) => setDraft({ ...draft, priceUSD: v })}
                         className="mt-1.5 w-full rounded-lg border border-ink/10 bg-background px-3 py-2 text-sm text-ink"
                       />
                     </label>

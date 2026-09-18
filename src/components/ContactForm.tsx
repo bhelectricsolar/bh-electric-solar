@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import NumberField from "@/components/NumberField";
 import { submitContactForm } from "@/lib/customers";
 
 const PROPERTY_TYPES = [
@@ -149,11 +150,11 @@ export default function ContactForm() {
           <label className="text-sm font-semibold text-ink">
             Monto aproximado de factura
           </label>
-          <input
-            type="number"
+          <NumberField
+            prefix="$ "
             value={form.billAmount}
-            onChange={(e) => set("billAmount", e.target.value)}
-            placeholder="Ej: 85000"
+            onValueChange={(v) => set("billAmount", v)}
+            placeholder="Ej: $ 85.000"
             className="mt-2 w-full rounded-xl border border-black/10 px-4 py-3 text-sm text-ink"
           />
         </div>
@@ -161,11 +162,11 @@ export default function ContactForm() {
           <label className="text-sm font-semibold text-ink">
             Consumo mensual en kWh
           </label>
-          <input
-            type="number"
+          <NumberField
+            suffix=" kWh"
             value={form.kwhMonthly}
-            onChange={(e) => set("kwhMonthly", e.target.value)}
-            placeholder="Ej: 420"
+            onValueChange={(v) => set("kwhMonthly", v)}
+            placeholder="Ej: 420 kWh"
             className="mt-2 w-full rounded-xl border border-black/10 px-4 py-3 text-sm text-ink"
           />
         </div>
