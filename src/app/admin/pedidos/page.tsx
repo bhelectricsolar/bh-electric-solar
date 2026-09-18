@@ -128,6 +128,7 @@ export default function AdminPedidosPage() {
       shippingZoneId: manualForm.shippingZoneId,
       status: "nuevo",
       paymentMethod: manualForm.paymentMethod,
+      paymentCurrency: "ARS",
       origin: "manual",
       soldBy: member?.id ?? null,
       createdAt: new Date().toISOString().slice(0, 10),
@@ -251,8 +252,25 @@ export default function AdminPedidosPage() {
                       </li>
                       <li className="flex justify-between text-body">
                         <span>Método de pago</span>
-                        <span className="text-ink">{PAYMENT_METHOD_LABELS[order.paymentMethod]}</span>
+                        <span className="text-ink">
+                          {PAYMENT_METHOD_LABELS[order.paymentMethod]}
+                          {order.paymentCurrency === "USD" ? " (dólares)" : ""}
+                        </span>
                       </li>
+                      {order.changeGiven != null && order.changeGiven > 0 && (
+                        <li className="flex justify-between text-body">
+                          <span>Vuelto</span>
+                          <span className="font-data text-ink">
+                            {order.paymentCurrency === "USD" ? "US$" : "$"} {order.changeGiven.toFixed(2)}
+                          </span>
+                        </li>
+                      )}
+                      {order.paymentNotes && (
+                        <li className="flex justify-between text-body">
+                          <span>Nota de pago</span>
+                          <span className="text-ink">{order.paymentNotes}</span>
+                        </li>
+                      )}
                     </ul>
 
                     <div className="mt-4 flex flex-wrap items-center gap-2">

@@ -5,7 +5,8 @@ import type { Product } from "./products";
 import type { StatusTone } from "@/components/admin/StatusBadge";
 
 export type OrderStatus = "nuevo" | "en_proceso" | "enviado" | "completado";
-export type PaymentMethod = "efectivo" | "transferencia" | "tarjeta";
+export type PaymentMethod = "efectivo" | "transferencia" | "tarjeta" | "cheque" | "cuotas";
+export type PaymentCurrency = "ARS" | "USD";
 export type OrderOrigin = "tienda" | "manual";
 
 export type Order = {
@@ -17,6 +18,10 @@ export type Order = {
   shippingZoneId: string;
   status: OrderStatus;
   paymentMethod: PaymentMethod;
+  paymentCurrency: PaymentCurrency;
+  amountReceived?: number;
+  changeGiven?: number;
+  paymentNotes?: string;
   origin: OrderOrigin;
   soldBy: string | null;
   createdAt: string;
@@ -45,6 +50,8 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   efectivo: "Efectivo",
   transferencia: "Transferencia",
   tarjeta: "Tarjeta",
+  cheque: "Cheque",
+  cuotas: "Cuotas",
 };
 
 export function orderStatusMessage(order: Order, storeName: string) {
@@ -71,6 +78,10 @@ type OrderRow = {
   shipping_zone_id: string | null;
   status: OrderStatus;
   payment_method: PaymentMethod;
+  payment_currency: PaymentCurrency | null;
+  amount_received: number | null;
+  change_given: number | null;
+  payment_notes: string | null;
   origin: OrderOrigin;
   sold_by: string | null;
   created_at: string;
@@ -90,6 +101,10 @@ function fromRows(order: OrderRow, items: OrderItemRow[]): Order {
     shippingZoneId: order.shipping_zone_id ?? "",
     status: order.status,
     paymentMethod: order.payment_method,
+    paymentCurrency: order.payment_currency ?? "ARS",
+    amountReceived: order.amount_received != null ? Number(order.amount_received) : undefined,
+    changeGiven: order.change_given != null ? Number(order.change_given) : undefined,
+    paymentNotes: order.payment_notes ?? undefined,
     origin: order.origin,
     soldBy: order.sold_by,
     createdAt: order.created_at,
@@ -112,9 +127,13 @@ export async function createOrder(order: Order) {
     customer_name: order.customerName,
     customer_phone: order.customerPhone,
     customer_city: order.customerCity,
-    shipping_zone_id: order.shippingZoneId,
+    shipping_zone_id: order.shippingZoneId || null,
     status: order.status,
     payment_method: order.paymentMethod,
+    payment_currency: order.paymentCurrency,
+    amount_received: order.amountReceived ?? null,
+    change_given: order.changeGiven ?? null,
+    payment_notes: order.paymentNotes ?? null,
     origin: order.origin,
     sold_by: order.soldBy,
     created_at: order.createdAt,
@@ -126,6 +145,14 @@ export async function createOrder(order: Order) {
       order.items.map((i) => ({ order_id: order.id, product_id: i.productId, qty: i.qty })),
     );
     if (itemsError) throw itemsError;
+
+    // Vender descuenta stock solo — antes había que ajustarlo a mano en
+    // Stock después de cada venta.
+    await Promise.all(
+      order.items.map((i) =>
+        supabase.rpc("decrement_product_stock", { p_id: i.productId, p_qty: i.qty }),
+      ),
+    );
   }
 }
 
