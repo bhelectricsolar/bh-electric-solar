@@ -1,7 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { useAdminSettings, type Currency, type ExchangeRateMode } from "@/lib/admin-settings";
+import {
+  useAdminSettings,
+  CARD_TYPES,
+  type Currency,
+  type ExchangeRateMode,
+  type CardType,
+  type CardKind,
+  type InstallmentPlan,
+} from "@/lib/admin-settings";
 import SectorEyebrow from "@/components/admin/SectorEyebrow";
 import Chip from "@/components/admin/Chip";
 import { useTheme } from "../ThemeProvider";
@@ -15,6 +23,30 @@ export default function AdminConfiguracionPage() {
     useAdminSettings();
   const { theme, toggle } = useTheme();
   const [saved, setSaved] = useState(false);
+  const [planDraft, setPlanDraft] = useState<{
+    cardType: CardType;
+    cardKind: CardKind;
+    installments: string;
+    surchargePct: string;
+    label: string;
+  }>({ cardType: "Visa", cardKind: "credito", installments: "3", surchargePct: "0", label: "" });
+
+  function addPlan() {
+    const plan: InstallmentPlan = {
+      id: Date.now().toString(36),
+      cardType: planDraft.cardType,
+      cardKind: planDraft.cardKind,
+      installments: Number(planDraft.installments) || 1,
+      surchargePct: Number(planDraft.surchargePct) || 0,
+      label: planDraft.label.trim() || undefined,
+    };
+    updateSettings({ installmentPlans: [...settings.installmentPlans, plan] });
+    setPlanDraft({ ...planDraft, installments: "3", surchargePct: "0", label: "" });
+  }
+
+  function removePlan(id: string) {
+    updateSettings({ installmentPlans: settings.installmentPlans.filter((p) => p.id !== id) });
+  }
 
   function flashSaved() {
     setSaved(true);
@@ -31,9 +63,8 @@ export default function AdminConfiguracionPage() {
         </p>
 
         <div className="mt-4 rounded-xl border border-dashed border-ink/20 bg-surface p-4 text-xs text-body">
-          Esto sí se guarda — queda en este dispositivo (localStorage). Con
-          Supabase conectado, va a sincronizar entre todos los dispositivos
-          desde donde entren a administrar la tienda.
+          Conectado a Supabase — se guarda de verdad y sincroniza en
+          cualquier dispositivo desde donde entren a administrar la tienda.
         </div>
 
         {/* Apariencia */}
@@ -209,6 +240,103 @@ export default function AdminConfiguracionPage() {
           </label>
         </SettingsCard>
 
+        {/* Planes de cuotas */}
+        <SettingsCard title="Planes de cuotas">
+          <p className="text-xs text-body">
+            Se usan como cotizador en Caja → Registrar venta, cuando la
+            forma de pago es &ldquo;Cuotas&rdquo;.
+          </p>
+
+          <div className="mt-3 flex flex-col gap-2">
+            {settings.installmentPlans.map((plan) => (
+              <div
+                key={plan.id}
+                className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-ink/10 bg-background p-3 text-xs"
+              >
+                <span className="font-bold text-ink">{plan.cardType}</span>
+                <span className="text-body">{plan.cardKind === "credito" ? "Crédito" : "Débito"}</span>
+                <span className="text-body">{plan.installments} cuotas</span>
+                <span className="text-body">{plan.surchargePct}% recargo</span>
+                {plan.label && <span className="text-body">· {plan.label}</span>}
+                <button
+                  type="button"
+                  onClick={() => removePlan(plan.id)}
+                  className="ml-auto cursor-pointer touch-manipulation text-red-500 hover:underline"
+                >
+                  Quitar
+                </button>
+              </div>
+            ))}
+            {settings.installmentPlans.length === 0 && (
+              <p className="text-xs text-body">Todavía no cargaste ningún plan.</p>
+            )}
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-3 border-t border-ink/10 pt-4 sm:grid-cols-4">
+            <label className="block">
+              <span className="text-xs font-semibold text-ink">Tarjeta</span>
+              <select
+                value={planDraft.cardType}
+                onChange={(e) => setPlanDraft({ ...planDraft, cardType: e.target.value as CardType })}
+                className="mt-1.5 w-full rounded-lg border border-ink/10 bg-background px-2.5 py-2 text-sm text-ink"
+              >
+                {CARD_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="text-xs font-semibold text-ink">Modelo</span>
+              <select
+                value={planDraft.cardKind}
+                onChange={(e) => setPlanDraft({ ...planDraft, cardKind: e.target.value as CardKind })}
+                className="mt-1.5 w-full rounded-lg border border-ink/10 bg-background px-2.5 py-2 text-sm text-ink"
+              >
+                <option value="credito">Crédito</option>
+                <option value="debito">Débito</option>
+              </select>
+            </label>
+            <label className="block">
+              <span className="text-xs font-semibold text-ink">Cuotas</span>
+              <input
+                type="number"
+                min={1}
+                value={planDraft.installments}
+                onChange={(e) => setPlanDraft({ ...planDraft, installments: e.target.value })}
+                className="mt-1.5 w-full rounded-lg border border-ink/10 bg-background px-2.5 py-2 text-sm text-ink"
+              />
+            </label>
+            <label className="block">
+              <span className="text-xs font-semibold text-ink">Recargo %</span>
+              <input
+                type="number"
+                min={0}
+                value={planDraft.surchargePct}
+                onChange={(e) => setPlanDraft({ ...planDraft, surchargePct: e.target.value })}
+                className="mt-1.5 w-full rounded-lg border border-ink/10 bg-background px-2.5 py-2 text-sm text-ink"
+              />
+            </label>
+          </div>
+          <label className="mt-3 block">
+            <span className="text-xs font-semibold text-ink">Forma / nombre (opcional)</span>
+            <input
+              value={planDraft.label}
+              onChange={(e) => setPlanDraft({ ...planDraft, label: e.target.value })}
+              placeholder="Ej: Ahora 12, Plan Z, cuotas sin interés..."
+              className="mt-1.5 w-full rounded-lg border border-ink/10 bg-background px-3 py-2.5 text-sm text-ink"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={addPlan}
+            className="mt-3 cursor-pointer touch-manipulation rounded-lg border border-ink/15 bg-background px-4 py-2 text-xs font-semibold text-ink shadow-sm transition-all hover:shadow-md"
+          >
+            + Agregar plan
+          </button>
+        </SettingsCard>
+
         {/* Exportar datos */}
         <SettingsCard title="Exportar datos">
           <p className="text-xs text-body">
@@ -233,16 +361,17 @@ export default function AdminConfiguracionPage() {
               }}
             />
             <ExportButton
-              label="Clientes"
+              label="Clientes y leads"
               onClick={async () => {
                 const customers = await getCustomers();
                 downloadCSV(
-                  "clientes.csv",
+                  "clientes-y-leads.csv",
                   customers.map((c) => ({
                     nombre: c.name,
                     email: c.email,
                     telefono: c.phone,
                     ciudad: c.city,
+                    estado: c.status,
                   })),
                 );
               }}

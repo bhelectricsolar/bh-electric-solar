@@ -124,7 +124,7 @@ export default function AdminPage() {
                 tone="done"
               />
               <StatCard
-                href="/admin/clientes"
+                href="/admin/leads"
                 label="Leads sin atender"
                 value={staleLeads.length}
                 accent={staleLeads.length > 0}
@@ -144,7 +144,7 @@ export default function AdminPage() {
 
             {staleLeads.length > 0 && (
               <Link
-                href="/admin/clientes"
+                href="/admin/leads"
                 className="mt-4 flex items-center justify-between rounded-xl border border-gold-500/30 bg-gold-500/10 px-4 py-3 text-sm font-semibold text-gold-600 transition-all hover:bg-gold-500/15"
               >
                 <span>

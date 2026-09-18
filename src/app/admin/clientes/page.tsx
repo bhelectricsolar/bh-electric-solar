@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import {
   getCustomers,
   createCustomer,
-  getInvoiceSignedUrl,
+  deleteCustomer,
   CUSTOMER_STATUS_TONE,
   type Customer,
 } from "@/lib/customers";
@@ -13,42 +13,29 @@ import { pickField } from "@/lib/csv-import";
 import ImportButton from "@/components/admin/ImportButton";
 import SectorEyebrow from "@/components/admin/SectorEyebrow";
 import StatusBadge from "@/components/admin/StatusBadge";
-import Chip from "@/components/admin/Chip";
 
-const STATUS_LABELS = {
-  lead: "Lead",
-  cliente: "Cliente",
-};
-
-const LEAD_STALE_DAYS = 3;
-
-function daysSince(dateStr: string) {
-  return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
-}
-
-function isStaleLead(c: Customer) {
-  return c.status === "lead" && daysSince(c.createdAt) >= LEAD_STALE_DAYS;
-}
+const EMPTY_DRAFT = { name: "", email: "", phone: "", city: "" };
 
 export default function AdminClientesPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
-  const [onlyStale, setOnlyStale] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [draft, setDraft] = useState(EMPTY_DRAFT);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  function loadAll() {
+    return getCustomers().then((all) => setCustomers(all.filter((c) => c.status === "cliente")));
+  }
 
   useEffect(() => {
-    getCustomers()
-      .then(setCustomers)
-      .finally(() => setLoading(false));
+    loadAll().finally(() => setLoading(false));
   }, []);
-
-  const staleCount = customers.filter(isStaleLead).length;
 
   const visible = customers.filter(
     (c) =>
-      (!onlyStale || isStaleLead(c)) &&
-      (c.name.toLowerCase().includes(query.toLowerCase()) ||
-        c.city.toLowerCase().includes(query.toLowerCase())),
+      c.name.toLowerCase().includes(query.toLowerCase()) ||
+      c.city.toLowerCase().includes(query.toLowerCase()),
   );
 
   function exportCSV() {
@@ -60,7 +47,6 @@ export default function AdminClientesPage() {
         telefono: c.phone,
         ciudad: c.city,
         origen: c.source,
-        estado: STATUS_LABELS[c.status],
         fecha: c.createdAt,
       })),
     );
@@ -76,16 +62,33 @@ export default function AdminClientesPage() {
         email: pickField(row, ["email", "correo"]),
         phone: pickField(row, ["telefono", "phone", "teléfono"]),
         city: pickField(row, ["ciudad", "city"]),
-        status: "lead",
-        source: "Formulario",
+        status: "cliente",
+        source: "Manual",
       });
     });
     if (imported.length > 0) {
-      Promise.all(imported.map((c) => createCustomer(c))).then(() => {
-        getCustomers().then(setCustomers);
-      });
+      Promise.all(imported.map((c) => createCustomer(c))).then(loadAll);
     }
     return imported.length;
+  }
+
+  function openNew() {
+    setDraft(EMPTY_DRAFT);
+    setPanelOpen(true);
+  }
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    if (!draft.name.trim()) return;
+    await createCustomer({ ...draft, status: "cliente", source: "Manual" });
+    setPanelOpen(false);
+    loadAll();
+  }
+
+  async function handleDelete(id: string) {
+    await deleteCustomer(id);
+    setCustomers((prev) => prev.filter((c) => c.id !== id));
+    setConfirmDeleteId(null);
   }
 
   return (
@@ -96,7 +99,7 @@ export default function AdminClientesPage() {
             <SectorEyebrow />
             <h1 className="mt-1 text-2xl font-extrabold text-ink sm:text-3xl">Clientes</h1>
             <p className="mt-1 text-sm text-body">
-              {customers.length} contactos registrados.
+              {customers.length} clientes confirmados — carga manual, no incluye leads.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -108,13 +111,21 @@ export default function AdminClientesPage() {
             >
               Exportar CSV
             </button>
+            <button
+              type="button"
+              onClick={openNew}
+              className="cursor-pointer touch-manipulation rounded-lg bg-navy-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-navy-800 hover:shadow-md"
+            >
+              + Agregar cliente
+            </button>
           </div>
         </div>
 
         <div className="mt-4 rounded-xl border border-dashed border-ink/20 bg-surface p-4 text-xs text-body">
-          Conectado a Supabase — el formulario de "Presupuesto
-          Personalizado" del sitio público ya carga acá automáticamente
-          cada consulta real, con la factura adjunta si la mandaron.
+          Acá solo aparecen clientes confirmados — cargados a mano o
+          importados por vos. Las consultas del formulario público quedan
+          en <b className="text-ink">Leads</b> hasta que las confirmes como
+          venta.
         </div>
 
         {loading && <p className="mt-5 text-sm text-body">Cargando clientes…</p>}
@@ -126,14 +137,6 @@ export default function AdminClientesPage() {
           className="mt-5 w-full rounded-lg border border-ink/10 bg-surface px-4 py-2.5 text-sm text-ink"
         />
 
-        {staleCount > 0 && (
-          <div className="mt-3">
-            <Chip active={onlyStale} onClick={() => setOnlyStale((v) => !v)} tone="danger">
-              Sin atender ({staleCount})
-            </Chip>
-          </div>
-        )}
-
         <div className="mt-4 flex flex-col gap-3">
           {visible.map((customer) => (
             <div
@@ -142,16 +145,7 @@ export default function AdminClientesPage() {
             >
               <div className="flex items-start justify-between gap-3">
                 <p className="font-semibold text-ink">{customer.name}</p>
-                <div className="flex shrink-0 items-center gap-1.5">
-                  {isStaleLead(customer) && (
-                    <StatusBadge tone="danger">
-                      {daysSince(customer.createdAt)}d sin atender
-                    </StatusBadge>
-                  )}
-                  <StatusBadge tone={CUSTOMER_STATUS_TONE[customer.status]}>
-                    {STATUS_LABELS[customer.status]}
-                  </StatusBadge>
-                </div>
+                <StatusBadge tone={CUSTOMER_STATUS_TONE[customer.status]}>Cliente</StatusBadge>
               </div>
               <p className="mt-1 text-xs text-body">{customer.city}</p>
               <div className="mt-3 grid grid-cols-2 gap-2 border-t border-ink/10 pt-3 text-xs">
@@ -175,73 +169,124 @@ export default function AdminClientesPage() {
                 </div>
               </div>
 
-              {(customer.propertyType || customer.billAmount || customer.kwhMonthly || customer.roofType) && (
-                <div className="mt-3 flex flex-wrap gap-2 border-t border-ink/10 pt-3 text-xs">
-                  {customer.propertyType && (
-                    <span className="rounded bg-background px-2 py-1 text-body">
-                      {customer.propertyType}
-                    </span>
-                  )}
-                  {customer.roofType && (
-                    <span className="rounded bg-background px-2 py-1 text-body">
-                      Techo: {customer.roofType}
-                    </span>
-                  )}
-                  {customer.billAmount != null && (
-                    <span className="font-data rounded bg-background px-2 py-1 text-body">
-                      Factura ~${customer.billAmount}
-                    </span>
-                  )}
-                  {customer.kwhMonthly != null && (
-                    <span className="font-data rounded bg-background px-2 py-1 text-body">
-                      {customer.kwhMonthly} kWh/mes
-                    </span>
-                  )}
+              {confirmDeleteId === customer.id ? (
+                <div className="mt-3 flex items-center gap-2 border-t border-ink/10 pt-3">
+                  <p className="flex-1 text-[11px] font-semibold text-red-500">¿Quitar este cliente?</p>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(customer.id)}
+                    className="cursor-pointer touch-manipulation rounded-lg bg-red-500 px-3 py-2 text-xs font-bold text-white"
+                  >
+                    Sí
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDeleteId(null)}
+                    className="cursor-pointer touch-manipulation rounded-lg bg-cream-200 px-3 py-2 text-xs font-semibold text-ink"
+                  >
+                    No
+                  </button>
                 </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirmDeleteId(customer.id)}
+                  className="mt-3 w-full cursor-pointer touch-manipulation rounded-lg border border-red-500/20 bg-red-500/10 py-2 text-xs font-semibold text-red-500 shadow-sm hover:shadow-md"
+                >
+                  Quitar
+                </button>
               )}
-
-              {customer.message && (
-                <p className="mt-3 border-t border-ink/10 pt-3 text-xs italic text-body">
-                  &ldquo;{customer.message}&rdquo;
-                </p>
-              )}
-
-              {customer.invoicePath && <InvoiceLink path={customer.invoicePath} />}
             </div>
           ))}
-          {visible.length === 0 && (
+          {visible.length === 0 && !loading && (
             <p className="py-10 text-center text-sm text-body">
-              No se encontraron clientes.
+              Todavía no cargaste clientes — usá &ldquo;+ Agregar cliente&rdquo; o importá un CSV.
             </p>
           )}
         </div>
       </div>
+
+      {panelOpen && (
+        <div className="fixed inset-0 z-[70]">
+          <button
+            type="button"
+            aria-label="Cerrar"
+            onClick={() => setPanelOpen(false)}
+            className="absolute inset-0 cursor-pointer touch-manipulation bg-navy-950/60"
+          />
+          <form
+            onSubmit={handleSave}
+            className="animate-sheet-in absolute inset-x-0 bottom-0 flex max-h-[92dvh] flex-col overflow-y-auto rounded-t-3xl bg-surface p-6 shadow-[0_0_60px_-10px_rgba(12,24,48,0.5)] sm:animate-panel-in sm:inset-x-auto sm:inset-y-0 sm:right-0 sm:max-h-none sm:w-full sm:max-w-md sm:rounded-t-none"
+          >
+            <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-ink/15 sm:hidden" />
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-ink">Nuevo cliente</h2>
+              <button
+                type="button"
+                onClick={() => setPanelOpen(false)}
+                aria-label="Cerrar"
+                className="grid h-8 w-8 cursor-pointer touch-manipulation place-items-center rounded-full text-body hover:bg-cream-200 hover:text-ink"
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" d="M6 6l12 12M18 6 6 18" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="mt-6 flex flex-col gap-4">
+              <Field label="Nombre">
+                <input
+                  required
+                  value={draft.name}
+                  onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+                  placeholder="Nombre y apellido"
+                  className="w-full rounded-lg border border-ink/10 bg-background px-3 py-2.5 text-sm text-ink"
+                />
+              </Field>
+              <Field label="Email">
+                <input
+                  type="email"
+                  value={draft.email}
+                  onChange={(e) => setDraft({ ...draft, email: e.target.value })}
+                  className="w-full rounded-lg border border-ink/10 bg-background px-3 py-2.5 text-sm text-ink"
+                />
+              </Field>
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Teléfono">
+                  <input
+                    value={draft.phone}
+                    onChange={(e) => setDraft({ ...draft, phone: e.target.value })}
+                    className="w-full rounded-lg border border-ink/10 bg-background px-3 py-2.5 text-sm text-ink"
+                  />
+                </Field>
+                <Field label="Ciudad">
+                  <input
+                    value={draft.city}
+                    onChange={(e) => setDraft({ ...draft, city: e.target.value })}
+                    className="w-full rounded-lg border border-ink/10 bg-background px-3 py-2.5 text-sm text-ink"
+                  />
+                </Field>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              className="sticky bottom-0 mt-6 rounded-lg bg-navy-900 px-5 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-navy-800"
+            >
+              Agregar cliente
+            </button>
+          </form>
+        </div>
+      )}
     </section>
   );
 }
 
-function InvoiceLink({ path }: { path: string }) {
-  const [loading, setLoading] = useState(false);
-
-  async function openInvoice() {
-    setLoading(true);
-    const url = await getInvoiceSignedUrl(path);
-    setLoading(false);
-    if (url) window.open(url, "_blank", "noopener,noreferrer");
-  }
-
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <button
-      type="button"
-      onClick={openInvoice}
-      disabled={loading}
-      className="mt-3 flex cursor-pointer touch-manipulation items-center gap-1.5 border-t border-ink/10 pt-3 text-xs font-semibold text-ink hover:underline disabled:opacity-60"
-    >
-      <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
-        <path d="M14 2v6h6" />
-      </svg>
-      {loading ? "Abriendo…" : "Ver factura adjunta"}
-    </button>
+    <label className="block">
+      <span className="text-xs font-semibold text-ink">{label}</span>
+      <div className="mt-1.5">{children}</div>
+    </label>
   );
 }

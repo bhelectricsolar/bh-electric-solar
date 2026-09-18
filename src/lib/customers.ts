@@ -14,7 +14,7 @@ export type Customer = {
   phone: string;
   city: string;
   status: "lead" | "cliente";
-  source: "Formulario" | "Calculadora" | "WhatsApp" | "Tienda";
+  source: "Formulario" | "Calculadora" | "WhatsApp" | "Tienda" | "Manual";
   createdAt: string;
   // Detalle que trae el formulario de presupuesto personalizado — no todos
   // los clientes lo tienen (los cargados a mano desde el admin, no).
@@ -69,6 +69,23 @@ export async function getCustomers(): Promise<Customer[]> {
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []).map(fromRow);
+}
+
+export async function updateCustomer(id: string, patch: Partial<Customer>) {
+  const row: Record<string, unknown> = {};
+  if (patch.name !== undefined) row.name = patch.name;
+  if (patch.email !== undefined) row.email = patch.email;
+  if (patch.phone !== undefined) row.phone = patch.phone;
+  if (patch.city !== undefined) row.city = patch.city;
+  if (patch.status !== undefined) row.status = patch.status;
+  if (patch.source !== undefined) row.source = patch.source;
+  const { error } = await supabase.from("customers").update(row).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteCustomer(id: string) {
+  const { error } = await supabase.from("customers").delete().eq("id", id);
+  if (error) throw error;
 }
 
 export async function createCustomer(customer: Omit<Customer, "id" | "createdAt">) {

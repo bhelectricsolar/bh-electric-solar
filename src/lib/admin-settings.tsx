@@ -14,6 +14,21 @@ const supabase = createClient();
 export type Currency = "USD" | "ARS";
 export type ExchangeRateMode = "auto" | "manual";
 
+export type CardType = "Visa" | "Mastercard" | "American Express" | "Cabal" | "Naranja X" | "Otra";
+export type CardKind = "credito" | "debito";
+export const CARD_TYPES: CardType[] = ["Visa", "Mastercard", "American Express", "Cabal", "Naranja X", "Otra"];
+
+// Plan de cuotas configurable por tarjeta — lo arma el dueño acá y se usa
+// como cotizador en Caja → Registrar venta.
+export type InstallmentPlan = {
+  id: string;
+  cardType: CardType;
+  cardKind: CardKind;
+  installments: number;
+  surchargePct: number;
+  label?: string;
+};
+
 export type StoreSettings = {
   storeName: string;
   whatsapp: string;
@@ -26,6 +41,7 @@ export type StoreSettings = {
   exchangeRateMode: ExchangeRateMode;
   exchangeRateUpdatedAt: string | null;
   lowStockThreshold: number;
+  installmentPlans: InstallmentPlan[];
 };
 
 const DEFAULT_SETTINGS: StoreSettings = {
@@ -40,6 +56,7 @@ const DEFAULT_SETTINGS: StoreSettings = {
   exchangeRateMode: "auto",
   exchangeRateUpdatedAt: null,
   lowStockThreshold: 8,
+  installmentPlans: [],
 };
 
 // Dólar blue (precio de venta) en tiempo real — API pública argentina, sin
@@ -62,6 +79,7 @@ type SettingsRow = {
   exchange_rate: number;
   exchange_rate_mode: ExchangeRateMode;
   low_stock_threshold: number;
+  installment_plans: InstallmentPlan[] | null;
 };
 
 function fromRow(row: SettingsRow): StoreSettings {
@@ -77,6 +95,7 @@ function fromRow(row: SettingsRow): StoreSettings {
     exchangeRateMode: row.exchange_rate_mode,
     exchangeRateUpdatedAt: null,
     lowStockThreshold: row.low_stock_threshold,
+    installmentPlans: row.installment_plans ?? [],
   };
 }
 
@@ -92,6 +111,7 @@ function toRow(patch: Partial<StoreSettings>) {
   if (patch.exchangeRate !== undefined) row.exchange_rate = patch.exchangeRate;
   if (patch.exchangeRateMode !== undefined) row.exchange_rate_mode = patch.exchangeRateMode;
   if (patch.lowStockThreshold !== undefined) row.low_stock_threshold = patch.lowStockThreshold;
+  if (patch.installmentPlans !== undefined) row.installment_plans = patch.installmentPlans;
   return row;
 }
 

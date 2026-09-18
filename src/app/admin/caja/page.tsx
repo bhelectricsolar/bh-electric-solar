@@ -42,6 +42,7 @@ type SalePaymentLine = {
   currency: PaymentCurrency;
   amount: string;
   notes: string;
+  installmentPlanId?: string;
 };
 
 const EMPTY_PAYMENT_LINE: SalePaymentLine = { method: "efectivo", currency: "ARS", amount: "", notes: "" };
@@ -750,19 +751,66 @@ function AdminCajaPageInner() {
                         Usar el resto
                       </button>
                     </div>
-                    {line.method !== "efectivo" && (
-                      <input
-                        value={line.notes}
-                        onChange={(e) => updatePaymentLine(idx, { notes: e.target.value })}
-                        placeholder={
-                          line.method === "cheque"
-                            ? "Banco, N° de cheque, fecha..."
-                            : line.method === "cuotas"
-                              ? "Ej: 3 cuotas sin interés"
-                              : "Nota (opcional)"
-                        }
-                        className="w-full rounded-lg border border-ink/10 bg-background px-2.5 py-2 text-xs text-ink"
-                      />
+                    {line.method === "cuotas" ? (
+                      <>
+                        {settings.installmentPlans.length === 0 ? (
+                          <p className="text-[11px] text-body">
+                            No hay planes de cuotas cargados — configuralos en
+                            Configuración → Planes de cuotas.
+                          </p>
+                        ) : (
+                          <select
+                            value={line.installmentPlanId ?? ""}
+                            onChange={(e) => {
+                              const plan = settings.installmentPlans.find((p) => p.id === e.target.value);
+                              updatePaymentLine(idx, {
+                                installmentPlanId: plan?.id,
+                                notes: plan
+                                  ? `${plan.cardType} ${plan.cardKind === "credito" ? "Crédito" : "Débito"} · ${plan.installments} cuotas${plan.surchargePct ? ` (+${plan.surchargePct}%)` : ""}${plan.label ? ` — ${plan.label}` : ""}`
+                                  : "",
+                              });
+                            }}
+                            className="w-full rounded-lg border border-ink/10 bg-background px-2.5 py-2 text-xs text-ink"
+                          >
+                            <option value="">Elegir plan de cuotas…</option>
+                            {settings.installmentPlans.map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.cardType} {p.cardKind === "credito" ? "Créd." : "Déb."} · {p.installments} cuotas
+                                {p.surchargePct ? ` (+${p.surchargePct}%)` : ""}
+                                {p.label ? ` — ${p.label}` : ""}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                        {(() => {
+                          const plan = settings.installmentPlans.find((p) => p.id === line.installmentPlanId);
+                          const base = Number(line.amount) || 0;
+                          if (!plan || base <= 0) return null;
+                          const totalWithSurcharge = base * (1 + plan.surchargePct / 100);
+                          const perInstallment = totalWithSurcharge / plan.installments;
+                          return (
+                            <p className="text-[11px] text-body">
+                              Con recargo: {fmtARS.format(totalWithSurcharge)} · {plan.installments} cuotas de{" "}
+                              {fmtARS.format(perInstallment)}
+                            </p>
+                          );
+                        })()}
+                        <input
+                          value={line.notes}
+                          onChange={(e) => updatePaymentLine(idx, { notes: e.target.value })}
+                          placeholder="Nota adicional (opcional)"
+                          className="w-full rounded-lg border border-ink/10 bg-background px-2.5 py-2 text-xs text-ink"
+                        />
+                      </>
+                    ) : (
+                      line.method !== "efectivo" && (
+                        <input
+                          value={line.notes}
+                          onChange={(e) => updatePaymentLine(idx, { notes: e.target.value })}
+                          placeholder={line.method === "cheque" ? "Banco, N° de cheque, fecha..." : "Nota (opcional)"}
+                          className="w-full rounded-lg border border-ink/10 bg-background px-2.5 py-2 text-xs text-ink"
+                        />
+                      )
                     )}
                   </div>
                 ))}

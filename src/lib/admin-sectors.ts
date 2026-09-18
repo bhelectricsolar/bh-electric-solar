@@ -21,6 +21,7 @@ export const ICONS: Record<string, string> = {
     "M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 7h18v13H3V7Zm0 5h18",
   stock:
     "M3 7 12 3l9 4-9 4-9-4Zm0 5 9 4 9-4M3 12v5l9 4 9-4v-5",
+  funnel: "M3 4h18l-7 8v7l-4 2v-9L3 4Z",
 };
 
 export type SectorId = "tienda" | "negocio";
@@ -57,7 +58,8 @@ export const SECTORS: Sector[] = [
       { href: "/admin/caja", label: "Caja diaria", description: "Apertura, movimientos y cierre.", icon: "cash" },
       { href: "/admin/proyectos", label: "Proyectos", description: "De cotización a instalación.", icon: "projects" },
       { href: "/admin/stock", label: "Stock", description: "Inventario interno completo.", icon: "stock" },
-      { href: "/admin/clientes", label: "Clientes", description: "Contactos y leads.", icon: "users" },
+      { href: "/admin/leads", label: "Leads", description: "Consultas del sitio sin confirmar.", icon: "funnel" },
+      { href: "/admin/clientes", label: "Clientes", description: "Cartera de clientes confirmados.", icon: "users" },
       { href: "/admin/equipo", label: "Equipo", description: "Vendedores, técnicos y roles.", icon: "badge" },
       { href: "/admin/reportes", label: "Reportes", description: "Ventas, margen y estado.", icon: "chart" },
       { href: "/admin/configuracion", label: "Configuración", description: "Nombre, moneda, redes y tema.", icon: "settings" },

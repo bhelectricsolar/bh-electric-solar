@@ -197,11 +197,17 @@ function FullAdminShell({
             Venta rápida
           </Link>
 
-          {SECTORS.map((sector) => (
-            <div key={sector.id} className="mt-5">
-              <div className="flex items-center gap-2 px-3 pb-1.5">
-                <span className={`h-1.5 w-1.5 rounded-full ${ACCENT_BG_SOLID[sector.accent]}`} />
-                <span className="text-[10px] font-bold uppercase tracking-wide text-body">
+          {SECTORS.map((sector, sectorIdx) => (
+            <div key={sector.id} className={sectorIdx === 0 ? "mt-6" : "mt-6 border-t border-ink/10 pt-5"}>
+              <div
+                className={`mb-2 flex items-center gap-2 rounded-lg border px-3 py-2 ${ACCENT_BG_SOFT[sector.accent]} ${
+                  sector.accent === "negocio" ? "border-negocio/30" : "border-tienda/30"
+                }`}
+              >
+                <svg viewBox="0 0 24 24" className={`h-4 w-4 shrink-0 ${ACCENT_TEXT[sector.accent]}`} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+                  <path d={ICONS[sector.icon]} />
+                </svg>
+                <span className={`text-xs font-extrabold uppercase tracking-wide ${ACCENT_TEXT[sector.accent]}`}>
                   {sector.label}
                 </span>
               </div>
