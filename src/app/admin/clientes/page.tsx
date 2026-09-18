@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getCustomers, createCustomer, CUSTOMER_STATUS_TONE, type Customer } from "@/lib/customers";
+import {
+  getCustomers,
+  createCustomer,
+  getInvoiceSignedUrl,
+  CUSTOMER_STATUS_TONE,
+  type Customer,
+} from "@/lib/customers";
 import { downloadCSV } from "@/lib/csv-export";
 import { pickField } from "@/lib/csv-import";
 import ImportButton from "@/components/admin/ImportButton";
@@ -91,9 +97,9 @@ export default function AdminClientesPage() {
         </div>
 
         <div className="mt-4 rounded-xl border border-dashed border-ink/20 bg-surface p-4 text-xs text-body">
-          Conectado a Supabase. Cuando conectemos el formulario de contacto
-          y la calculadora a esta misma base, cada consulta real va a
-          aparecer acá automáticamente.
+          Conectado a Supabase — el formulario de "Presupuesto
+          Personalizado" del sitio público ya carga acá automáticamente
+          cada consulta real, con la factura adjunta si la mandaron.
         </div>
 
         {loading && <p className="mt-5 text-sm text-body">Cargando clientes…</p>}
@@ -138,6 +144,39 @@ export default function AdminClientesPage() {
                   </p>
                 </div>
               </div>
+
+              {(customer.propertyType || customer.billAmount || customer.kwhMonthly || customer.roofType) && (
+                <div className="mt-3 flex flex-wrap gap-2 border-t border-ink/10 pt-3 text-xs">
+                  {customer.propertyType && (
+                    <span className="rounded bg-background px-2 py-1 text-body">
+                      {customer.propertyType}
+                    </span>
+                  )}
+                  {customer.roofType && (
+                    <span className="rounded bg-background px-2 py-1 text-body">
+                      Techo: {customer.roofType}
+                    </span>
+                  )}
+                  {customer.billAmount != null && (
+                    <span className="font-data rounded bg-background px-2 py-1 text-body">
+                      Factura ~${customer.billAmount}
+                    </span>
+                  )}
+                  {customer.kwhMonthly != null && (
+                    <span className="font-data rounded bg-background px-2 py-1 text-body">
+                      {customer.kwhMonthly} kWh/mes
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {customer.message && (
+                <p className="mt-3 border-t border-ink/10 pt-3 text-xs italic text-body">
+                  &ldquo;{customer.message}&rdquo;
+                </p>
+              )}
+
+              {customer.invoicePath && <InvoiceLink path={customer.invoicePath} />}
             </div>
           ))}
           {visible.length === 0 && (
@@ -148,5 +187,31 @@ export default function AdminClientesPage() {
         </div>
       </div>
     </section>
+  );
+}
+
+function InvoiceLink({ path }: { path: string }) {
+  const [loading, setLoading] = useState(false);
+
+  async function openInvoice() {
+    setLoading(true);
+    const url = await getInvoiceSignedUrl(path);
+    setLoading(false);
+    if (url) window.open(url, "_blank", "noopener,noreferrer");
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={openInvoice}
+      disabled={loading}
+      className="mt-3 flex cursor-pointer touch-manipulation items-center gap-1.5 border-t border-ink/10 pt-3 text-xs font-semibold text-ink hover:underline disabled:opacity-60"
+    >
+      <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
+        <path d="M14 2v6h6" />
+      </svg>
+      {loading ? "Abriendo…" : "Ver factura adjunta"}
+    </button>
   );
 }

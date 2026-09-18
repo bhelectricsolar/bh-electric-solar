@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { submitContactForm } from "@/lib/customers";
 
 const PROPERTY_TYPES = [
   "Seleccionar",
@@ -19,19 +20,41 @@ const ROOF_TYPES = [
   "Fibrocemento",
 ];
 
+const EMPTY_FORM = {
+  name: "",
+  whatsapp: "",
+  email: "",
+  city: "",
+  propertyType: "",
+  billAmount: "",
+  kwhMonthly: "",
+  roofType: "",
+  message: "",
+};
+
 export default function ContactForm() {
-  const [fileName, setFileName] = useState<string | null>(null);
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  function set<K extends keyof typeof EMPTY_FORM>(key: K, value: string) {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    // TODO: conectar a Supabase (tabla de leads + storage para la factura) cuando el proyecto esté creado.
     setSubmitting(true);
-    window.setTimeout(() => {
-      setSubmitting(false);
+    setError(null);
+    try {
+      await submitContactForm({ ...form, invoiceFile });
       setSubmitted(true);
-    }, 700);
+    } catch {
+      setError("No pudimos enviar tu solicitud. Probá de nuevo en unos minutos o escribinos por WhatsApp.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   if (submitted) {
@@ -66,6 +89,8 @@ export default function ContactForm() {
           <input
             required
             type="text"
+            value={form.name}
+            onChange={(e) => set("name", e.target.value)}
             placeholder="Ej: Juan Perez"
             className="mt-2 w-full rounded-xl border border-black/10 px-4 py-3 text-sm text-ink"
           />
@@ -75,6 +100,8 @@ export default function ContactForm() {
           <input
             required
             type="tel"
+            value={form.whatsapp}
+            onChange={(e) => set("whatsapp", e.target.value)}
             placeholder="Ej: +54 9 11 0000 0000"
             className="mt-2 w-full rounded-xl border border-black/10 px-4 py-3 text-sm text-ink"
           />
@@ -84,6 +111,8 @@ export default function ContactForm() {
           <input
             required
             type="email"
+            value={form.email}
+            onChange={(e) => set("email", e.target.value)}
             placeholder="tuemail@ejemplo.com"
             className="mt-2 w-full rounded-xl border border-black/10 px-4 py-3 text-sm text-ink"
           />
@@ -94,6 +123,8 @@ export default function ContactForm() {
           </label>
           <input
             type="text"
+            value={form.city}
+            onChange={(e) => set("city", e.target.value)}
             placeholder="Ej: Posadas, Misiones"
             className="mt-2 w-full rounded-xl border border-black/10 px-4 py-3 text-sm text-ink"
           />
@@ -102,9 +133,15 @@ export default function ContactForm() {
           <label className="text-sm font-semibold text-ink">
             Tipo de propiedad
           </label>
-          <select className="mt-2 w-full rounded-xl border border-black/10 bg-white px-4 py-3 text-sm text-ink">
+          <select
+            value={form.propertyType}
+            onChange={(e) => set("propertyType", e.target.value)}
+            className="mt-2 w-full rounded-xl border border-black/10 bg-white px-4 py-3 text-sm text-ink"
+          >
             {PROPERTY_TYPES.map((type) => (
-              <option key={type}>{type}</option>
+              <option key={type} value={type === "Seleccionar" ? "" : type}>
+                {type}
+              </option>
             ))}
           </select>
         </div>
@@ -114,6 +151,8 @@ export default function ContactForm() {
           </label>
           <input
             type="number"
+            value={form.billAmount}
+            onChange={(e) => set("billAmount", e.target.value)}
             placeholder="Ej: 85000"
             className="mt-2 w-full rounded-xl border border-black/10 px-4 py-3 text-sm text-ink"
           />
@@ -124,6 +163,8 @@ export default function ContactForm() {
           </label>
           <input
             type="number"
+            value={form.kwhMonthly}
+            onChange={(e) => set("kwhMonthly", e.target.value)}
             placeholder="Ej: 420"
             className="mt-2 w-full rounded-xl border border-black/10 px-4 py-3 text-sm text-ink"
           />
@@ -132,9 +173,15 @@ export default function ContactForm() {
           <label className="text-sm font-semibold text-ink">
             Tipo de techo
           </label>
-          <select className="mt-2 w-full rounded-xl border border-black/10 bg-white px-4 py-3 text-sm text-ink">
+          <select
+            value={form.roofType}
+            onChange={(e) => set("roofType", e.target.value)}
+            className="mt-2 w-full rounded-xl border border-black/10 bg-white px-4 py-3 text-sm text-ink"
+          >
             {ROOF_TYPES.map((type) => (
-              <option key={type}>{type}</option>
+              <option key={type} value={type === "No estoy seguro" ? "" : type}>
+                {type}
+              </option>
             ))}
           </select>
         </div>
@@ -144,6 +191,8 @@ export default function ContactForm() {
         <label className="text-sm font-semibold text-ink">Contanos más</label>
         <textarea
           rows={3}
+          value={form.message}
+          onChange={(e) => set("message", e.target.value)}
           placeholder="Contanos si buscás ahorro, respaldo, instalación industrial, ampliación futura o una visita técnica."
           className="mt-2 w-full resize-none rounded-xl border border-black/10 px-4 py-3 text-sm text-ink"
         />
@@ -160,11 +209,11 @@ export default function ContactForm() {
               type="file"
               accept=".pdf,.jpg,.jpeg,.png,.webp"
               className="hidden"
-              onChange={(e) => setFileName(e.target.files?.[0]?.name ?? null)}
+              onChange={(e) => setInvoiceFile(e.target.files?.[0] ?? null)}
             />
           </label>
           <span className="text-xs text-body">
-            {fileName ?? "Ningún archivo seleccionado"}
+            {invoiceFile?.name ?? "Ningún archivo seleccionado"}
           </span>
         </div>
         <p className="mt-1.5 text-xs text-body">
@@ -178,6 +227,12 @@ export default function ContactForm() {
         Acepto que BH Electric Solar use estos datos para responder mi
         consulta y preparar una propuesta personalizada.
       </label>
+
+      {error && (
+        <p className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs font-medium text-red-600">
+          {error}
+        </p>
+      )}
 
       <button
         type="submit"

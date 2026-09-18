@@ -140,7 +140,7 @@ export default function AdminCategoriasPage() {
                   <button
                     type="button"
                     onClick={saveEdit}
-                    className="text-navy-900 hover:underline"
+                    className="text-ink hover:underline"
                   >
                     Guardar
                   </button>
@@ -148,7 +148,7 @@ export default function AdminCategoriasPage() {
                   <button
                     type="button"
                     onClick={() => startEdit(cat)}
-                    className="text-navy-900 hover:underline"
+                    className="text-ink hover:underline"
                   >
                     Editar
                   </button>

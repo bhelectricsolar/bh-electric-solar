@@ -16,6 +16,14 @@ export type Customer = {
   status: "lead" | "cliente";
   source: "Formulario" | "Calculadora" | "WhatsApp" | "Tienda";
   createdAt: string;
+  // Detalle que trae el formulario de presupuesto personalizado — no todos
+  // los clientes lo tienen (los cargados a mano desde el admin, no).
+  propertyType?: string;
+  billAmount?: number;
+  kwhMonthly?: number;
+  roofType?: string;
+  message?: string;
+  invoicePath?: string;
 };
 
 type CustomerRow = {
@@ -27,6 +35,12 @@ type CustomerRow = {
   status: "lead" | "cliente";
   source: string | null;
   created_at: string;
+  property_type: string | null;
+  bill_amount: number | null;
+  kwh_monthly: number | null;
+  roof_type: string | null;
+  message: string | null;
+  invoice_path: string | null;
 };
 
 function fromRow(row: CustomerRow): Customer {
@@ -39,6 +53,12 @@ function fromRow(row: CustomerRow): Customer {
     status: row.status,
     source: (row.source as Customer["source"]) ?? "Formulario",
     createdAt: row.created_at,
+    propertyType: row.property_type ?? undefined,
+    billAmount: row.bill_amount != null ? Number(row.bill_amount) : undefined,
+    kwhMonthly: row.kwh_monthly != null ? Number(row.kwh_monthly) : undefined,
+    roofType: row.roof_type ?? undefined,
+    message: row.message ?? undefined,
+    invoicePath: row.invoice_path ?? undefined,
   };
 }
 
@@ -59,6 +79,64 @@ export async function createCustomer(customer: Omit<Customer, "id" | "createdAt"
     city: customer.city,
     status: customer.status,
     source: customer.source,
+    property_type: customer.propertyType ?? null,
+    bill_amount: customer.billAmount ?? null,
+    kwh_monthly: customer.kwhMonthly ?? null,
+    roof_type: customer.roofType ?? null,
+    message: customer.message ?? null,
+    invoice_path: customer.invoicePath ?? null,
   });
   if (error) throw error;
+}
+
+export type ContactFormSubmission = {
+  name: string;
+  whatsapp: string;
+  email: string;
+  city: string;
+  propertyType: string;
+  billAmount: string;
+  kwhMonthly: string;
+  roofType: string;
+  message: string;
+  invoiceFile: File | null;
+};
+
+// Lo usa el formulario público de /contacto — el visitante no está
+// logueado, así que sube al bucket privado y crea el lead con el
+// cliente anónimo (las políticas de Supabase ya permiten ambas cosas).
+export async function submitContactForm(form: ContactFormSubmission) {
+  let invoicePath: string | undefined;
+  if (form.invoiceFile) {
+    const ext = form.invoiceFile.name.split(".").pop() ?? "pdf";
+    const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const { error: uploadError } = await supabase.storage
+      .from("customer-invoices")
+      .upload(path, form.invoiceFile);
+    if (uploadError) throw uploadError;
+    invoicePath = path;
+  }
+
+  await createCustomer({
+    name: form.name,
+    email: form.email,
+    phone: form.whatsapp,
+    city: form.city,
+    status: "lead",
+    source: "Formulario",
+    propertyType: form.propertyType || undefined,
+    billAmount: form.billAmount ? Number(form.billAmount) : undefined,
+    kwhMonthly: form.kwhMonthly ? Number(form.kwhMonthly) : undefined,
+    roofType: form.roofType || undefined,
+    message: form.message || undefined,
+    invoicePath,
+  });
+}
+
+export async function getInvoiceSignedUrl(path: string): Promise<string | null> {
+  const { data, error } = await supabase.storage
+    .from("customer-invoices")
+    .createSignedUrl(path, 60 * 10);
+  if (error) return null;
+  return data.signedUrl;
 }
