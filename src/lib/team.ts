@@ -54,14 +54,12 @@ function fromRow(row: TeamMemberRow): TeamMember {
   };
 }
 
-export async function getTeam(): Promise<TeamMember[]> {
+export async function getTeam(includeDev = false): Promise<TeamMember[]> {
   // Las cuentas de desarrollador (sandbox de prueba) no son parte del
-  // equipo real del dueño — nunca deben aparecer acá.
-  const { data, error } = await supabase
-    .from("team_members")
-    .select("*")
-    .eq("is_dev_account", false)
-    .order("name");
+  // equipo real del dueño — solo las ve el propio desarrollador.
+  let query = supabase.from("team_members").select("*");
+  if (!includeDev) query = query.eq("is_dev_account", false);
+  const { data, error } = await query.order("name");
   if (error) throw error;
   return (data ?? []).map(fromRow);
 }

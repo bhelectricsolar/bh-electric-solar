@@ -92,12 +92,15 @@ export async function getOpenSessionFor(teamMemberId: string): Promise<CashSessi
 // Todas las cajas abiertas ahora mismo, de cualquier persona (para el dueño).
 // Las cuentas de desarrollador (sandbox de prueba) quedan afuera — su caja
 // de prueba no debe mezclarse con las cajas reales del equipo.
-export async function getAllOpenSessions(): Promise<CashSession[]> {
-  const { data: sessions, error } = await supabase
-    .from("cash_sessions")
-    .select("*, team_members!inner(is_dev_account)")
+export async function getAllOpenSessions(includeDev = false): Promise<CashSession[]> {
+  let query = includeDev
+    ? supabase.from("cash_sessions").select("*")
+    : supabase
+        .from("cash_sessions")
+        .select("*, team_members!inner(is_dev_account)")
+        .eq("team_members.is_dev_account", false);
+  const { data: sessions, error } = await query
     .is("closed_at", null)
-    .eq("team_members.is_dev_account", false)
     .order("opened_at", { ascending: false });
   if (error) throw error;
   const ids = (sessions ?? []).map((s) => s.id as string);

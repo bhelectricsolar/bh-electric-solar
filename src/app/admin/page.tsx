@@ -16,6 +16,7 @@ import { getProjects, PROJECT_STAGES, type Project } from "@/lib/projects";
 import { getTeam, getDevTeamMemberIds, type TeamMember } from "@/lib/team";
 import { getCustomers, type Customer } from "@/lib/customers";
 import { getAllOpenSessions, getCashHistory, type CashSession } from "@/lib/caja";
+import { useCurrentDeveloper } from "@/lib/current-user";
 import { getShippingZones, type ShippingZone } from "@/lib/shipping";
 import { useLiveRefresh } from "@/lib/realtime";
 import { computeStats, rangeBounds, RANGE_OPTIONS, type Range } from "@/lib/dashboard-stats";
@@ -30,6 +31,11 @@ const fmtUSD2 = new Intl.NumberFormat("es-AR", { style: "currency", currency: "U
 
 export default function AdminPage() {
   const { settings } = useAdminSettings();
+  const { developer, loading: devLoading } = useCurrentDeveloper();
+  // El desarrollador ve también sus ventas de prueba (con interruptor);
+  // el dueño nunca las ve.
+  const [showDev, setShowDev] = useState(true);
+  const includeDev = !!developer && showDev;
   const [range, setRange] = useState<Range>("hoy");
   const [orders, setOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -49,16 +55,16 @@ export default function AdminPage() {
         getOrders(),
         getProducts(),
         getProjects(),
-        getTeam(),
+        getTeam(includeDev),
         getCustomers(),
-        getAllOpenSessions(),
+        getAllOpenSessions(includeDev),
         getDevTeamMemberIds(),
         getShippingZones(),
         getCashHistory(),
       ]);
       // Las ventas y cajas de prueba del desarrollador no son del negocio.
-      setOrders(o.filter((ord) => !devIds.includes(ord.soldBy ?? "")));
-      setClosedSessions(hist.filter((h) => !devIds.includes(h.openedBy ?? "")));
+      setOrders(includeDev ? o : o.filter((ord) => !devIds.includes(ord.soldBy ?? "")));
+      setClosedSessions(includeDev ? hist : hist.filter((h) => !devIds.includes(h.openedBy ?? "")));
       setProducts(p);
       setProjects(pr);
       setTeam(t);
@@ -73,12 +79,13 @@ export default function AdminPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [includeDev]);
 
   useEffect(() => {
+    if (devLoading) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
-  }, [load]);
+  }, [load, devLoading]);
 
   const live = useLiveRefresh(
     [
@@ -176,6 +183,15 @@ export default function AdminPage() {
           <p className="mt-8 text-sm text-body">Cargando panel…</p>
         ) : (
           <>
+            {developer && (
+              <div className="mt-6 flex flex-wrap items-center gap-2 rounded-xl border border-violet-500/25 bg-violet-500/10 px-3 py-2.5">
+                <Chip active={showDev} onClick={() => setShowDev((v) => !v)}>
+                  Incluir mis ventas de prueba
+                </Chip>
+                <span className="text-[11px] text-body">Solo las ves vos — el dueño no las ve.</span>
+              </div>
+            )}
+
             <div className="mt-6 flex flex-wrap gap-2">
               {RANGE_OPTIONS.map((opt) => (
                 <Chip key={opt.value} active={range === opt.value} onClick={() => setRange(opt.value)}>

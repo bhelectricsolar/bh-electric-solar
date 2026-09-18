@@ -136,7 +136,7 @@ export default function AdminPedidosPage() {
       payments: [],
       origin: "manual",
       soldBy: member?.id ?? null,
-      createdAt: new Date().toISOString().slice(0, 10),
+      createdAt: new Date().toISOString(),
     };
     await createOrder(newOrder);
     setOrders((prev) => [newOrder, ...prev]);
