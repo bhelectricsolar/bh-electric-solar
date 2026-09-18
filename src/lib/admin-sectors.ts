@@ -22,6 +22,7 @@ export const ICONS: Record<string, string> = {
   stock:
     "M3 7 12 3l9 4-9 4-9-4Zm0 5 9 4 9-4M3 12v5l9 4 9-4v-5",
   funnel: "M3 4h18l-7 8v7l-4 2v-9L3 4Z",
+  bag: "M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4ZM3 6h18M16 10a4 4 0 0 1-8 0",
 };
 
 export type SectorId = "tienda" | "negocio";

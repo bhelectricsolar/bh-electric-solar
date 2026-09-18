@@ -189,12 +189,15 @@ function FullAdminShell({
 
           <Link
             href="/admin/caja?venta=1"
-            className="mt-1 flex items-center gap-3 rounded-lg border border-negocio/30 bg-negocio/10 px-3 py-2.5 text-sm font-bold text-negocio transition-all hover:bg-negocio/20"
+            className="mt-2 flex items-center gap-3 rounded-xl bg-gold-500 px-3.5 py-3 text-sm font-extrabold text-navy-950 shadow-[0_8px_22px_-6px_rgba(245,154,31,0.65)] transition-all hover:brightness-105 active:scale-[0.98]"
           >
-            <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
-              <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z" />
+            <svg viewBox="0 0 24 24" className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+              <path d={ICONS.bag} />
             </svg>
-            Venta rápida
+            <span className="flex flex-col leading-tight">
+              Vender ahora
+              <span className="text-[10px] font-semibold opacity-70">Venta rápida</span>
+            </span>
           </Link>
 
           {SECTORS.map((sector, sectorIdx) => (
@@ -321,11 +324,12 @@ function FullAdminShell({
       <Link
         href="/admin/caja?venta=1"
         aria-label="Venta rápida"
-        className="fixed bottom-24 right-4 z-40 flex h-14 w-14 cursor-pointer touch-manipulation items-center justify-center rounded-full bg-gold-500 text-navy-950 shadow-[0_10px_30px_-8px_rgba(245,154,31,0.6)] transition-transform active:scale-95 lg:hidden"
+        className="fixed bottom-24 right-4 z-40 flex h-14 cursor-pointer touch-manipulation items-center justify-center gap-2 rounded-full bg-gold-500 px-5 text-sm font-extrabold text-navy-950 shadow-[0_10px_30px_-8px_rgba(245,154,31,0.7)] transition-transform active:scale-95 lg:hidden"
       >
         <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
-          <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z" />
+          <path d={ICONS.bag} />
         </svg>
+        Vender
       </Link>
 
       {/* Mobile bottom tab bar: en Resumen es el selector de sistema; adentro

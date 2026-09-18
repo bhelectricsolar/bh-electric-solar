@@ -16,6 +16,11 @@ export type OrderPayment = {
   currency: PaymentCurrency;
   amount: number;
   notes?: string;
+  // Solo para pagos en cuotas — el plan elegido en el cotizador.
+  cardType?: string;
+  cardKind?: "credito" | "debito";
+  installments?: number;
+  surchargePct?: number;
 };
 
 // Los métodos que se pueden elegir para UNA línea de pago — "combinado" no
@@ -115,6 +120,10 @@ type OrderPaymentRow = {
   currency: PaymentCurrency;
   amount: number;
   notes: string | null;
+  card_type: string | null;
+  card_kind: "credito" | "debito" | null;
+  installments: number | null;
+  surcharge_pct: number | null;
 };
 
 function fromRows(order: OrderRow, items: OrderItemRow[], payments: OrderPaymentRow[]): Order {
@@ -140,6 +149,10 @@ function fromRows(order: OrderRow, items: OrderItemRow[], payments: OrderPayment
         currency: p.currency,
         amount: Number(p.amount),
         notes: p.notes ?? undefined,
+        cardType: p.card_type ?? undefined,
+        cardKind: p.card_kind ?? undefined,
+        installments: p.installments ?? undefined,
+        surchargePct: p.surcharge_pct != null ? Number(p.surcharge_pct) : undefined,
       })),
     origin: order.origin,
     soldBy: order.sold_by,
@@ -190,6 +203,10 @@ export async function createOrder(order: Order) {
         currency: p.currency,
         amount: p.amount,
         notes: p.notes || null,
+        card_type: p.cardType ?? null,
+        card_kind: p.cardKind ?? null,
+        installments: p.installments ?? null,
+        surcharge_pct: p.surchargePct ?? null,
       })),
     );
     if (paymentsError) throw paymentsError;

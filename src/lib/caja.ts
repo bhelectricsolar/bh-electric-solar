@@ -100,7 +100,17 @@ export async function getAllOpenSessions(): Promise<CashSession[]> {
     .eq("team_members.is_dev_account", false)
     .order("opened_at", { ascending: false });
   if (error) throw error;
-  return (sessions ?? []).map((s) => fromRows(s, []));
+  const ids = (sessions ?? []).map((s) => s.id as string);
+  let movements: MovementRow[] = [];
+  if (ids.length > 0) {
+    const { data: movs, error: movError } = await supabase
+      .from("cash_movements")
+      .select("*")
+      .in("session_id", ids);
+    if (movError) throw movError;
+    movements = movs ?? [];
+  }
+  return (sessions ?? []).map((s) => fromRows(s, movements));
 }
 
 export async function getCashHistory(teamMemberId?: string): Promise<CashSession[]> {

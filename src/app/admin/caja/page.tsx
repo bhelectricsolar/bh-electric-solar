@@ -290,12 +290,22 @@ function AdminCajaPageInner() {
     if (!session || !member || saleItems.length === 0) return;
     setSaleSaving(true);
     try {
-      const payments: OrderPayment[] = salePayments.map((l) => ({
-        method: l.method,
-        currency: l.currency,
-        amount: Number(l.amount) || 0,
-        notes: l.notes.trim() || undefined,
-      }));
+      const payments: OrderPayment[] = salePayments.map((l) => {
+        const plan =
+          l.method === "cuotas"
+            ? settings.installmentPlans.find((p) => p.id === l.installmentPlanId)
+            : undefined;
+        return {
+          method: l.method,
+          currency: l.currency,
+          amount: Number(l.amount) || 0,
+          notes: l.notes.trim() || undefined,
+          cardType: plan?.cardType,
+          cardKind: plan?.cardKind,
+          installments: plan?.installments,
+          surchargePct: plan?.surchargePct,
+        };
+      });
       const isCombined = payments.length > 1;
       const primary = payments[0] ?? { method: "efectivo" as const, currency: "ARS" as const, amount: 0 };
       const changeARS = !isCombined && primary.method === "efectivo" ? saleDiffARS : 0;
