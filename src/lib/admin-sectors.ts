@@ -47,6 +47,23 @@ export type Sector = {
 // sitio — sigue siendo "interno", no algo que ve el cliente).
 export const SECTORS: Sector[] = [
   {
+    id: "negocio",
+    label: "Mi Negocio",
+    shortLabel: "Negocio",
+    tagline: "Todo lo interno de BH",
+    accent: "negocio",
+    icon: "briefcase",
+    items: [
+      { href: "/admin/caja", label: "Caja diaria", description: "Apertura, movimientos y cierre.", icon: "cash" },
+      { href: "/admin/proyectos", label: "Proyectos", description: "De cotización a instalación.", icon: "projects" },
+      { href: "/admin/stock", label: "Stock", description: "Inventario interno completo.", icon: "stock" },
+      { href: "/admin/clientes", label: "Clientes", description: "Contactos y leads.", icon: "users" },
+      { href: "/admin/equipo", label: "Equipo", description: "Vendedores, técnicos y roles.", icon: "badge" },
+      { href: "/admin/reportes", label: "Reportes", description: "Ventas, margen y estado.", icon: "chart" },
+      { href: "/admin/configuracion", label: "Configuración", description: "Nombre, moneda, redes y tema.", icon: "settings" },
+    ],
+  },
+  {
     id: "tienda",
     label: "Tienda Online",
     shortLabel: "Tienda",
@@ -58,23 +75,6 @@ export const SECTORS: Sector[] = [
       { href: "/admin/categorias", label: "Categorías", description: "Organización del catálogo.", icon: "tag" },
       { href: "/admin/pedidos", label: "Pedidos", description: "Ventas cerradas por WhatsApp.", icon: "list" },
       { href: "/admin/envios", label: "Envíos", description: "Costo por zona del país.", icon: "truck" },
-    ],
-  },
-  {
-    id: "negocio",
-    label: "Mi Negocio",
-    shortLabel: "Negocio",
-    tagline: "Todo lo interno de BH",
-    accent: "negocio",
-    icon: "briefcase",
-    items: [
-      { href: "/admin/proyectos", label: "Proyectos", description: "De cotización a instalación.", icon: "projects" },
-      { href: "/admin/stock", label: "Stock", description: "Inventario interno completo.", icon: "stock" },
-      { href: "/admin/clientes", label: "Clientes", description: "Contactos y leads.", icon: "users" },
-      { href: "/admin/equipo", label: "Equipo", description: "Vendedores, técnicos y roles.", icon: "badge" },
-      { href: "/admin/reportes", label: "Reportes", description: "Ventas, margen y estado.", icon: "chart" },
-      { href: "/admin/caja", label: "Caja diaria", description: "Apertura, movimientos y cierre.", icon: "cash" },
-      { href: "/admin/configuracion", label: "Configuración", description: "Nombre, moneda, redes y tema.", icon: "settings" },
     ],
   },
 ];

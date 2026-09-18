@@ -5,9 +5,28 @@ import type { Product } from "./products";
 import type { StatusTone } from "@/components/admin/StatusBadge";
 
 export type OrderStatus = "nuevo" | "en_proceso" | "enviado" | "completado";
-export type PaymentMethod = "efectivo" | "transferencia" | "tarjeta" | "cheque" | "cuotas";
+export type PaymentMethod = "efectivo" | "transferencia" | "tarjeta" | "cheque" | "cuotas" | "combinado";
 export type PaymentCurrency = "ARS" | "USD";
 export type OrderOrigin = "tienda" | "manual";
+
+// Una venta puede cobrarse con más de una forma de pago a la vez (ej: dos
+// cheques distintos, o mitad efectivo mitad transferencia).
+export type OrderPayment = {
+  method: Exclude<PaymentMethod, "combinado">;
+  currency: PaymentCurrency;
+  amount: number;
+  notes?: string;
+};
+
+// Los métodos que se pueden elegir para UNA línea de pago — "combinado" no
+// es un método real, es lo que queda cuando hay más de una línea.
+export const PAYMENT_LINE_METHODS: Exclude<PaymentMethod, "combinado">[] = [
+  "efectivo",
+  "transferencia",
+  "tarjeta",
+  "cheque",
+  "cuotas",
+];
 
 export type Order = {
   id: string;
@@ -22,6 +41,7 @@ export type Order = {
   amountReceived?: number;
   changeGiven?: number;
   paymentNotes?: string;
+  payments: OrderPayment[];
   origin: OrderOrigin;
   soldBy: string | null;
   createdAt: string;
@@ -52,6 +72,7 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   tarjeta: "Tarjeta",
   cheque: "Cheque",
   cuotas: "Cuotas",
+  combinado: "Pago combinado",
 };
 
 export function orderStatusMessage(order: Order, storeName: string) {
@@ -88,8 +109,15 @@ type OrderRow = {
 };
 
 type OrderItemRow = { order_id: string; product_id: string; qty: number };
+type OrderPaymentRow = {
+  order_id: string;
+  method: Exclude<PaymentMethod, "combinado">;
+  currency: PaymentCurrency;
+  amount: number;
+  notes: string | null;
+};
 
-function fromRows(order: OrderRow, items: OrderItemRow[]): Order {
+function fromRows(order: OrderRow, items: OrderItemRow[], payments: OrderPaymentRow[]): Order {
   return {
     id: order.id,
     customerName: order.customer_name,
@@ -105,6 +133,14 @@ function fromRows(order: OrderRow, items: OrderItemRow[]): Order {
     amountReceived: order.amount_received != null ? Number(order.amount_received) : undefined,
     changeGiven: order.change_given != null ? Number(order.change_given) : undefined,
     paymentNotes: order.payment_notes ?? undefined,
+    payments: payments
+      .filter((p) => p.order_id === order.id)
+      .map((p) => ({
+        method: p.method,
+        currency: p.currency,
+        amount: Number(p.amount),
+        notes: p.notes ?? undefined,
+      })),
     origin: order.origin,
     soldBy: order.sold_by,
     createdAt: order.created_at,
@@ -112,13 +148,19 @@ function fromRows(order: OrderRow, items: OrderItemRow[]): Order {
 }
 
 export async function getOrders(): Promise<Order[]> {
-  const [{ data: orders, error }, { data: items, error: itemsError }] = await Promise.all([
+  const [
+    { data: orders, error },
+    { data: items, error: itemsError },
+    { data: payments, error: paymentsError },
+  ] = await Promise.all([
     supabase.from("orders").select("*").order("created_at", { ascending: false }),
     supabase.from("order_items").select("*"),
+    supabase.from("order_payments").select("*"),
   ]);
   if (error) throw error;
   if (itemsError) throw itemsError;
-  return (orders ?? []).map((o) => fromRows(o, items ?? []));
+  if (paymentsError) throw paymentsError;
+  return (orders ?? []).map((o) => fromRows(o, items ?? [], payments ?? []));
 }
 
 export async function createOrder(order: Order) {
@@ -139,6 +181,19 @@ export async function createOrder(order: Order) {
     created_at: order.createdAt,
   });
   if (error) throw error;
+
+  if (order.payments.length > 0) {
+    const { error: paymentsError } = await supabase.from("order_payments").insert(
+      order.payments.map((p) => ({
+        order_id: order.id,
+        method: p.method,
+        currency: p.currency,
+        amount: p.amount,
+        notes: p.notes || null,
+      })),
+    );
+    if (paymentsError) throw paymentsError;
+  }
 
   if (order.items.length > 0) {
     const { error: itemsError } = await supabase.from("order_items").insert(

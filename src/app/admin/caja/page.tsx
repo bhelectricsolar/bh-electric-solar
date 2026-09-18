@@ -1,12 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   getOrders,
   createOrder,
   getOrderItemsWithProduct,
   PAYMENT_METHOD_LABELS,
+  PAYMENT_LINE_METHODS,
   type Order,
+  type OrderPayment,
   type PaymentMethod,
   type PaymentCurrency,
 } from "@/lib/orders";
@@ -27,7 +30,6 @@ import {
 } from "@/lib/caja";
 import PrintDocument from "@/components/admin/PrintDocument";
 import SectorEyebrow from "@/components/admin/SectorEyebrow";
-import Chip from "@/components/admin/Chip";
 
 const fmtARS = new Intl.NumberFormat("es-AR", {
   style: "currency",
@@ -35,9 +37,36 @@ const fmtARS = new Intl.NumberFormat("es-AR", {
   maximumFractionDigits: 0,
 });
 
+type SalePaymentLine = {
+  method: Exclude<PaymentMethod, "combinado">;
+  currency: PaymentCurrency;
+  amount: string;
+  notes: string;
+};
+
+const EMPTY_PAYMENT_LINE: SalePaymentLine = { method: "efectivo", currency: "ARS", amount: "", notes: "" };
+
 export default function AdminCajaPage() {
+  return (
+    <Suspense
+      fallback={
+        <section className="px-4 py-6 sm:px-8 sm:py-10">
+          <p className="text-sm text-body">Cargando…</p>
+        </section>
+      }
+    >
+      <AdminCajaPageInner />
+    </Suspense>
+  );
+}
+
+function AdminCajaPageInner() {
   const { settings } = useAdminSettings();
   const { member, loading: memberLoading } = useCurrentTeamMember();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const wantsQuickSale = searchParams.get("venta") === "1";
+
   const [session, setSession] = useState<CashSession | null>(null);
   const [history, setHistory] = useState<CashSession[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -58,13 +87,10 @@ export default function AdminCajaPage() {
   const [saleOpen, setSaleOpen] = useState(false);
   const [saleItems, setSaleItems] = useState<{ productId: string; qty: number }[]>([]);
   const [saleProductQuery, setSaleProductQuery] = useState("");
-  const [saleCustomerQuery, setSaleCustomerQuery] = useState("");
+  const [selectedCustomerId, setSelectedCustomerId] = useState("");
   const [saleCustomer, setSaleCustomer] = useState({ name: "", phone: "", city: "" });
   const [saveAsNewCustomer, setSaveAsNewCustomer] = useState(false);
-  const [salePaymentMethod, setSalePaymentMethod] = useState<PaymentMethod>("efectivo");
-  const [salePaymentCurrency, setSalePaymentCurrency] = useState<PaymentCurrency>("ARS");
-  const [saleAmountReceived, setSaleAmountReceived] = useState("");
-  const [salePaymentNotes, setSalePaymentNotes] = useState("");
+  const [salePayments, setSalePayments] = useState<SalePaymentLine[]>([{ ...EMPTY_PAYMENT_LINE }]);
   const [saleSaving, setSaleSaving] = useState(false);
   const [saleReceipt, setSaleReceipt] = useState<Order | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -97,6 +123,16 @@ export default function AdminCajaPage() {
       .finally(() => setLoading(false));
   }, [member, memberLoading, reloadKey]);
 
+  // Venta rápida: si venimos de un acceso directo y la caja ya está
+  // abierta, entramos derecho al panel de vender.
+  useEffect(() => {
+    if (wantsQuickSale && !loading && session && !saleOpen) {
+      openSale();
+      router.replace("/admin/caja");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wantsQuickSale, loading, session]);
+
   function orderTotalUSD(orderId: string) {
     const order = orders.find((o) => o.id === orderId);
     if (!order) return 0;
@@ -106,17 +142,26 @@ export default function AdminCajaPage() {
     return itemsTotal + (zone?.priceUSD ?? 0);
   }
 
+  // Cuánto de una venta entró como efectivo físico a esta caja — si se
+  // pagó combinado, solo cuenta la parte en efectivo, no el total.
+  function orderCashARS(order: Order) {
+    if (order.paymentMethod !== "efectivo" && order.paymentMethod !== "combinado") return 0;
+    if (order.payments.length === 0) {
+      return order.paymentMethod === "efectivo" ? orderTotalUSD(order.id) * settings.exchangeRate : 0;
+    }
+    return order.payments
+      .filter((p) => p.method === "efectivo")
+      .reduce((sum, p) => sum + (p.currency === "USD" ? p.amount * settings.exchangeRate : p.amount), 0);
+  }
+
   const today = new Date().toDateString();
   const cashOrdersToday = orders.filter(
     (o) =>
-      o.paymentMethod === "efectivo" &&
+      (o.paymentMethod === "efectivo" || o.paymentMethod === "combinado") &&
       o.soldBy === member?.id &&
       new Date(o.createdAt).toDateString() === today,
   );
-  const cashSalesARS = cashOrdersToday.reduce(
-    (sum, o) => sum + orderTotalUSD(o.id) * settings.exchangeRate,
-    0,
-  );
+  const cashSalesARS = cashOrdersToday.reduce((sum, o) => sum + orderCashARS(o), 0);
 
   const ingresos = session ? sessionMovementsTotal(session, "ingreso") : 0;
   const egresos = session ? sessionMovementsTotal(session, "egreso") : 0;
@@ -129,6 +174,10 @@ export default function AdminCajaPage() {
     const created = await openCashSession(member.id, amount);
     setSession(created);
     setOpeningAmount("");
+    if (wantsQuickSale) {
+      openSale();
+      router.replace("/admin/caja");
+    }
   }
 
   async function agregarMovimiento(e: React.FormEvent) {
@@ -163,19 +212,27 @@ export default function AdminCajaPage() {
   const saleMatchingProducts = products.filter((p) =>
     p.name.toLowerCase().includes(saleProductQuery.toLowerCase()),
   );
-  const saleMatchingCustomers = saleCustomerQuery
-    ? customers.filter((c) => c.name.toLowerCase().includes(saleCustomerQuery.toLowerCase()))
-    : [];
   const saleTotalUSD = saleItems.reduce(
     (sum, i) => sum + (products.find((p) => p.id === i.productId)?.priceUSD ?? 0) * i.qty,
     0,
   );
-  const saleTotalInCurrency =
-    salePaymentCurrency === "USD" ? saleTotalUSD : saleTotalUSD * settings.exchangeRate;
-  const saleChange =
-    salePaymentMethod === "efectivo" && saleAmountReceived
-      ? Number(saleAmountReceived) - saleTotalInCurrency
-      : null;
+  const saleTotalARS = saleTotalUSD * settings.exchangeRate;
+
+  function lineAmountARS(line: SalePaymentLine) {
+    const amt = Number(line.amount) || 0;
+    return line.currency === "USD" ? amt * settings.exchangeRate : amt;
+  }
+  const salePaidARS = salePayments.reduce((sum, l) => sum + lineAmountARS(l), 0);
+  const saleDiffARS = salePaidARS - saleTotalARS;
+
+  function remainingForLine(idx: number) {
+    const others = salePayments
+      .filter((_, i) => i !== idx)
+      .reduce((sum, l) => sum + lineAmountARS(l), 0);
+    const remainingARS = Math.max(0, saleTotalARS - others);
+    const line = salePayments[idx];
+    return line.currency === "USD" ? remainingARS / settings.exchangeRate : remainingARS;
+  }
 
   function addSaleItem(productId: string) {
     setSaleItems((prev) => {
@@ -191,23 +248,39 @@ export default function AdminCajaPage() {
     setSaleItems((prev) => prev.filter((i) => i.productId !== productId));
   }
 
-  function pickSaleCustomer(customer: Customer) {
-    setSaleCustomer({ name: customer.name, phone: customer.phone, city: customer.city });
-    setSaleCustomerQuery("");
-    setSaveAsNewCustomer(false);
+  function addPaymentLine() {
+    setSalePayments((prev) => [...prev, { ...EMPTY_PAYMENT_LINE, method: "cheque", currency: "ARS" }]);
+  }
+
+  function removePaymentLine(idx: number) {
+    setSalePayments((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  function updatePaymentLine(idx: number, patch: Partial<SalePaymentLine>) {
+    setSalePayments((prev) => prev.map((l, i) => (i === idx ? { ...l, ...patch } : l)));
   }
 
   function openSale() {
     setSaleItems([]);
     setSaleProductQuery("");
-    setSaleCustomerQuery("");
+    setSelectedCustomerId("");
     setSaleCustomer({ name: "", phone: "", city: "" });
     setSaveAsNewCustomer(false);
-    setSalePaymentMethod("efectivo");
-    setSalePaymentCurrency("ARS");
-    setSaleAmountReceived("");
-    setSalePaymentNotes("");
+    setSalePayments([{ ...EMPTY_PAYMENT_LINE }]);
     setSaleOpen(true);
+  }
+
+  function pickExistingCustomer(id: string) {
+    setSelectedCustomerId(id);
+    if (!id) {
+      setSaleCustomer({ name: "", phone: "", city: "" });
+      return;
+    }
+    const c = customers.find((c) => c.id === id);
+    if (c) {
+      setSaleCustomer({ name: c.name, phone: c.phone, city: c.city });
+      setSaveAsNewCustomer(false);
+    }
   }
 
   async function registrarVenta(e: React.FormEvent) {
@@ -215,6 +288,18 @@ export default function AdminCajaPage() {
     if (!session || !member || saleItems.length === 0) return;
     setSaleSaving(true);
     try {
+      const payments: OrderPayment[] = salePayments.map((l) => ({
+        method: l.method,
+        currency: l.currency,
+        amount: Number(l.amount) || 0,
+        notes: l.notes.trim() || undefined,
+      }));
+      const isCombined = payments.length > 1;
+      const primary = payments[0] ?? { method: "efectivo" as const, currency: "ARS" as const, amount: 0 };
+      const changeARS = !isCombined && primary.method === "efectivo" ? saleDiffARS : 0;
+      const changeInPrimaryCurrency =
+        changeARS > 0 ? (primary.currency === "USD" ? changeARS / settings.exchangeRate : changeARS) : 0;
+
       const newOrder: Order = {
         id: "V-" + Date.now().toString(36).toUpperCase(),
         customerName: saleCustomer.name.trim() || "Consumidor final",
@@ -223,18 +308,24 @@ export default function AdminCajaPage() {
         items: saleItems,
         shippingZoneId: "",
         status: "completado",
-        paymentMethod: salePaymentMethod,
-        paymentCurrency: salePaymentCurrency,
-        amountReceived: saleAmountReceived ? Number(saleAmountReceived) : undefined,
-        changeGiven: saleChange != null && saleChange > 0 ? saleChange : undefined,
-        paymentNotes: salePaymentNotes || undefined,
+        paymentMethod: isCombined ? "combinado" : primary.method,
+        paymentCurrency: isCombined ? "ARS" : primary.currency,
+        amountReceived: isCombined ? undefined : primary.amount || undefined,
+        changeGiven: changeInPrimaryCurrency > 0 ? changeInPrimaryCurrency : undefined,
+        paymentNotes: isCombined
+          ? payments
+              .filter((p) => p.notes)
+              .map((p) => `${PAYMENT_METHOD_LABELS[p.method]}: ${p.notes}`)
+              .join(" · ") || undefined
+          : primary.notes,
+        payments,
         origin: "manual",
         soldBy: member.id,
         createdAt: new Date().toISOString(),
       };
       await createOrder(newOrder);
 
-      if (saveAsNewCustomer && saleCustomer.name.trim()) {
+      if (saveAsNewCustomer && !selectedCustomerId && saleCustomer.name.trim()) {
         await createCustomer({
           name: saleCustomer.name,
           email: "",
@@ -304,6 +395,11 @@ export default function AdminCajaPage() {
             onSubmit={abrirCaja}
             className="mt-6 rounded-2xl border border-ink/10 bg-surface p-6 shadow-sm"
           >
+            {wantsQuickSale && (
+              <div className="mb-4 rounded-lg border border-gold-500/30 bg-gold-500/10 px-3 py-2.5 text-xs font-semibold text-gold-600">
+                ⚡ Venta rápida: tu caja está cerrada. Abrila para poder vender.
+              </div>
+            )}
             <h2 className="text-lg font-bold text-ink">Abrir caja</h2>
             <p className="mt-1 text-sm text-body">
               Ingresá el monto inicial en efectivo con el que arrancás el día.
@@ -324,7 +420,7 @@ export default function AdminCajaPage() {
               type="submit"
               className="mt-4 cursor-pointer touch-manipulation rounded-lg bg-navy-900 px-5 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-navy-800 hover:shadow-md"
             >
-              Abrir caja
+              {wantsQuickSale ? "Abrir caja y vender" : "Abrir caja"}
             </button>
           </form>
         ) : (
@@ -451,19 +547,34 @@ export default function AdminCajaPage() {
                   placeholder="Buscar producto..."
                   className="mt-1.5 w-full rounded-lg border border-ink/10 bg-background px-3 py-2.5 text-sm text-ink"
                 />
-                <div className="mt-2 max-h-40 overflow-y-auto rounded-lg border border-ink/10">
+                <div className="mt-2 max-h-44 overflow-y-auto rounded-lg border border-ink/10">
                   {saleMatchingProducts.map((p) => (
                     <button
                       key={p.id}
                       type="button"
                       onClick={() => addSaleItem(p.id)}
                       disabled={p.stock <= 0}
-                      className="flex w-full cursor-pointer touch-manipulation items-center justify-between border-b border-ink/10 px-3 py-2 text-left text-xs last:border-0 hover:bg-cream-200 disabled:cursor-not-allowed disabled:opacity-40"
+                      className="flex w-full cursor-pointer touch-manipulation items-center justify-between gap-2 border-b border-ink/10 px-3 py-2 text-left text-xs last:border-0 hover:bg-cream-200 disabled:cursor-not-allowed disabled:opacity-40"
                     >
-                      <span className="text-ink">
-                        {p.name} {p.stock <= 0 && "(sin stock)"}
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-md bg-gradient-to-br from-navy-800 to-navy-950">
+                          {p.images[0] ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={p.images[0]} alt="" className="h-full w-full object-cover" />
+                          ) : (
+                            <svg viewBox="0 0 24 24" className="h-4 w-4 text-gold-500/70" fill="none" stroke="currentColor" strokeWidth={1.6}>
+                              <path d="M4 5h16v14H4V5Zm0 4.7h16M4 14.3h16M9.3 5v14M14.7 5v14" />
+                            </svg>
+                          )}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block truncate text-ink">{p.name}</span>
+                          <span className="block text-[10px] text-body">
+                            {p.stock <= 0 ? "Sin stock" : `Stock: ${p.stock}`}
+                          </span>
+                        </span>
                       </span>
-                      <span className="font-data text-body">US$ {p.priceUSD}</span>
+                      <span className="font-data shrink-0 text-body">US$ {p.priceUSD}</span>
                     </button>
                   ))}
                   {saleMatchingProducts.length === 0 && (
@@ -495,155 +606,178 @@ export default function AdminCajaPage() {
                     })}
                   </ul>
                   <p className="mt-2 border-t border-ink/10 pt-2 text-right text-sm font-bold text-ink">
-                    Total: US$ {saleTotalUSD}
+                    Total: US$ {saleTotalUSD}{" "}
+                    <span className="font-normal text-body">(~{fmtARS.format(saleTotalARS)})</span>
                   </p>
                 </div>
               )}
 
               <label className="block">
                 <span className="text-xs font-semibold text-ink">Cliente</span>
-                <input
-                  value={saleCustomer.name}
-                  onChange={(e) => {
-                    setSaleCustomer({ ...saleCustomer, name: e.target.value });
-                    setSaleCustomerQuery(e.target.value);
-                  }}
-                  placeholder="Nombre (dejalo vacío para Consumidor final)"
+                <select
+                  value={selectedCustomerId}
+                  onChange={(e) => pickExistingCustomer(e.target.value)}
                   className="mt-1.5 w-full rounded-lg border border-ink/10 bg-background px-3 py-2.5 text-sm text-ink"
-                />
-                {saleMatchingCustomers.length > 0 && (
-                  <div className="mt-1.5 max-h-32 overflow-y-auto rounded-lg border border-ink/10">
-                    {saleMatchingCustomers.map((c) => (
-                      <button
-                        key={c.id}
-                        type="button"
-                        onClick={() => pickSaleCustomer(c)}
-                        className="flex w-full cursor-pointer touch-manipulation flex-col border-b border-ink/10 px-3 py-2 text-left text-xs last:border-0 hover:bg-cream-200"
-                      >
-                        <span className="text-ink">{c.name}</span>
-                        <span className="text-body">{c.city || c.phone}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </label>
-
-              <div className="grid grid-cols-2 gap-4">
-                <label className="block">
-                  <span className="text-xs font-semibold text-ink">Teléfono</span>
-                  <input
-                    value={saleCustomer.phone}
-                    onChange={(e) => setSaleCustomer({ ...saleCustomer, phone: e.target.value })}
-                    className="mt-1.5 w-full rounded-lg border border-ink/10 bg-background px-3 py-2.5 text-sm text-ink"
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-xs font-semibold text-ink">Ciudad</span>
-                  <input
-                    value={saleCustomer.city}
-                    onChange={(e) => setSaleCustomer({ ...saleCustomer, city: e.target.value })}
-                    className="mt-1.5 w-full rounded-lg border border-ink/10 bg-background px-3 py-2.5 text-sm text-ink"
-                  />
-                </label>
-              </div>
-
-              {saleCustomer.name.trim() && (
-                <label className="flex items-center gap-2 text-xs text-body">
-                  <input
-                    type="checkbox"
-                    checked={saveAsNewCustomer}
-                    onChange={(e) => setSaveAsNewCustomer(e.target.checked)}
-                  />
-                  Guardar como cliente nuevo en mi cartera
-                </label>
-              )}
-
-              <label className="block">
-                <span className="text-xs font-semibold text-ink">Método de pago</span>
-                <div className="mt-1.5 flex flex-wrap gap-2">
-                  {(Object.keys(PAYMENT_METHOD_LABELS) as PaymentMethod[]).map((method) => (
-                    <Chip
-                      key={method}
-                      active={salePaymentMethod === method}
-                      onClick={() => setSalePaymentMethod(method)}
-                    >
-                      {PAYMENT_METHOD_LABELS[method]}
-                    </Chip>
+                >
+                  <option value="">+ Cliente nuevo / Consumidor final</option>
+                  {customers.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                      {c.city ? ` — ${c.city}` : ""}
+                    </option>
                   ))}
-                </div>
+                </select>
               </label>
 
-              {(salePaymentMethod === "efectivo" || salePaymentMethod === "transferencia") && (
-                <label className="block">
-                  <span className="text-xs font-semibold text-ink">Moneda</span>
-                  <div className="mt-1.5 flex gap-2">
-                    {(["ARS", "USD"] as PaymentCurrency[]).map((cur) => (
-                      <Chip
-                        key={cur}
-                        active={salePaymentCurrency === cur}
-                        onClick={() => setSalePaymentCurrency(cur)}
-                      >
-                        {cur === "ARS" ? "Pesos" : "Dólares"}
-                      </Chip>
-                    ))}
-                  </div>
-                </label>
-              )}
-
-              {saleItems.length > 0 && (
-                <div className="rounded-lg border border-ink/10 bg-background p-3 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-body">Total a cobrar</span>
-                    <span className="font-data font-bold text-ink">
-                      {salePaymentCurrency === "USD"
-                        ? `US$ ${saleTotalInCurrency.toFixed(2)}`
-                        : fmtARS.format(saleTotalInCurrency)}
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {salePaymentMethod === "efectivo" && (
+              {selectedCustomerId ? (
+                <p className="rounded-lg bg-background px-3 py-2.5 text-xs text-body">
+                  {saleCustomer.name} · {saleCustomer.phone || "sin teléfono"} ·{" "}
+                  {saleCustomer.city || "sin ciudad"}
+                </p>
+              ) : (
                 <>
                   <label className="block">
-                    <span className="text-xs font-semibold text-ink">
-                      Monto recibido ({salePaymentCurrency === "USD" ? "US$" : "ARS"})
-                    </span>
+                    <span className="text-xs font-semibold text-ink">Nombre</span>
                     <input
-                      type="number"
-                      min={0}
-                      value={saleAmountReceived}
-                      onChange={(e) => setSaleAmountReceived(e.target.value)}
+                      value={saleCustomer.name}
+                      onChange={(e) => setSaleCustomer({ ...saleCustomer, name: e.target.value })}
+                      placeholder="Dejalo vacío para Consumidor final"
                       className="mt-1.5 w-full rounded-lg border border-ink/10 bg-background px-3 py-2.5 text-sm text-ink"
                     />
                   </label>
-                  {saleChange != null && (
-                    <p className={`text-sm font-bold ${saleChange < 0 ? "text-red-500" : "text-ink"}`}>
-                      {saleChange < 0
-                        ? `Falta ${salePaymentCurrency === "USD" ? "US$" : "$"} ${Math.abs(saleChange).toFixed(2)}`
-                        : `Vuelto: ${salePaymentCurrency === "USD" ? "US$" : "$"} ${saleChange.toFixed(2)}`}
-                    </p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <label className="block">
+                      <span className="text-xs font-semibold text-ink">Teléfono</span>
+                      <input
+                        value={saleCustomer.phone}
+                        onChange={(e) => setSaleCustomer({ ...saleCustomer, phone: e.target.value })}
+                        className="mt-1.5 w-full rounded-lg border border-ink/10 bg-background px-3 py-2.5 text-sm text-ink"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="text-xs font-semibold text-ink">Ciudad</span>
+                      <input
+                        value={saleCustomer.city}
+                        onChange={(e) => setSaleCustomer({ ...saleCustomer, city: e.target.value })}
+                        className="mt-1.5 w-full rounded-lg border border-ink/10 bg-background px-3 py-2.5 text-sm text-ink"
+                      />
+                    </label>
+                  </div>
+
+                  {saleCustomer.name.trim() && (
+                    <label className="flex items-center gap-2 text-xs text-body">
+                      <input
+                        type="checkbox"
+                        checked={saveAsNewCustomer}
+                        onChange={(e) => setSaveAsNewCustomer(e.target.checked)}
+                      />
+                      Guardar como cliente nuevo en mi cartera
+                    </label>
                   )}
                 </>
               )}
 
-              {(salePaymentMethod === "cheque" || salePaymentMethod === "cuotas") && (
-                <label className="block">
-                  <span className="text-xs font-semibold text-ink">
-                    {salePaymentMethod === "cheque" ? "Datos del cheque" : "Detalle de las cuotas"}
+              <div className="flex flex-col gap-3 rounded-lg border border-ink/10 bg-background p-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-ink">Formas de pago</span>
+                  <button
+                    type="button"
+                    onClick={addPaymentLine}
+                    className="cursor-pointer touch-manipulation text-xs font-semibold text-gold-600 hover:underline"
+                  >
+                    + Agregar otra
+                  </button>
+                </div>
+
+                {salePayments.map((line, idx) => (
+                  <div key={idx} className="flex flex-col gap-2 rounded-lg border border-ink/10 bg-surface p-3">
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={line.method}
+                        onChange={(e) =>
+                          updatePaymentLine(idx, { method: e.target.value as SalePaymentLine["method"] })
+                        }
+                        className="flex-1 rounded-lg border border-ink/10 bg-background px-2.5 py-2 text-xs text-ink"
+                      >
+                        {PAYMENT_LINE_METHODS.map((m) => (
+                          <option key={m} value={m}>
+                            {PAYMENT_METHOD_LABELS[m]}
+                          </option>
+                        ))}
+                      </select>
+                      {(line.method === "efectivo" || line.method === "transferencia") && (
+                        <select
+                          value={line.currency}
+                          onChange={(e) => updatePaymentLine(idx, { currency: e.target.value as PaymentCurrency })}
+                          className="w-24 shrink-0 rounded-lg border border-ink/10 bg-background px-2.5 py-2 text-xs text-ink"
+                        >
+                          <option value="ARS">Pesos</option>
+                          <option value="USD">Dólares</option>
+                        </select>
+                      )}
+                      {salePayments.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removePaymentLine(idx)}
+                          aria-label="Quitar forma de pago"
+                          className="shrink-0 cursor-pointer touch-manipulation text-red-500"
+                        >
+                          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" d="M6 6l12 12M18 6 6 18" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min={0}
+                        value={line.amount}
+                        onChange={(e) => updatePaymentLine(idx, { amount: e.target.value })}
+                        placeholder={`Monto (${line.currency === "USD" ? "US$" : "ARS"})`}
+                        className="w-full rounded-lg border border-ink/10 bg-background px-2.5 py-2 text-xs text-ink"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const rest = remainingForLine(idx);
+                          updatePaymentLine(idx, {
+                            amount: line.currency === "USD" ? rest.toFixed(2) : String(Math.round(rest)),
+                          });
+                        }}
+                        className="shrink-0 cursor-pointer touch-manipulation whitespace-nowrap rounded-lg border border-ink/15 bg-background px-2 py-2 text-[10px] font-semibold text-ink"
+                      >
+                        Usar el resto
+                      </button>
+                    </div>
+                    {line.method !== "efectivo" && (
+                      <input
+                        value={line.notes}
+                        onChange={(e) => updatePaymentLine(idx, { notes: e.target.value })}
+                        placeholder={
+                          line.method === "cheque"
+                            ? "Banco, N° de cheque, fecha..."
+                            : line.method === "cuotas"
+                              ? "Ej: 3 cuotas sin interés"
+                              : "Nota (opcional)"
+                        }
+                        className="w-full rounded-lg border border-ink/10 bg-background px-2.5 py-2 text-xs text-ink"
+                      />
+                    )}
+                  </div>
+                ))}
+
+                <div className="flex items-center justify-between border-t border-ink/10 pt-2 text-xs">
+                  <span className="text-body">Cobrado: {fmtARS.format(salePaidARS)}</span>
+                  <span className={`font-bold ${saleDiffARS < 0 ? "text-red-500" : "text-ink"}`}>
+                    {saleDiffARS < 0
+                      ? `Falta ${fmtARS.format(-saleDiffARS)}`
+                      : saleDiffARS > 0
+                        ? `Vuelto ${fmtARS.format(saleDiffARS)}`
+                        : "Cobrado justo"}
                   </span>
-                  <input
-                    value={salePaymentNotes}
-                    onChange={(e) => setSalePaymentNotes(e.target.value)}
-                    placeholder={
-                      salePaymentMethod === "cheque"
-                        ? "Ej: Banco, N° de cheque, fecha"
-                        : "Ej: 3 cuotas sin interés con tarjeta"
-                    }
-                    className="mt-1.5 w-full rounded-lg border border-ink/10 bg-background px-3 py-2.5 text-sm text-ink"
-                  />
-                </label>
-              )}
+                </div>
+              </div>
             </div>
 
             <button
@@ -683,10 +817,27 @@ export default function AdminCajaPage() {
                   <span>TOTAL</span>
                   <span>US$ {total}</span>
                 </div>
-                <div className="mt-2">
-                  Método de pago: {PAYMENT_METHOD_LABELS[saleReceipt.paymentMethod]}
-                  {saleReceipt.paymentCurrency === "USD" ? " (dólares)" : " (pesos)"}
-                </div>
+                {saleReceipt.payments.length > 1 ? (
+                  <div className="mt-2">
+                    <div>Pago combinado:</div>
+                    {saleReceipt.payments.map((p, i) => (
+                      <div key={i} className="flex justify-between pl-3">
+                        <span>
+                          {PAYMENT_METHOD_LABELS[p.method]}
+                          {p.notes ? ` (${p.notes})` : ""}
+                        </span>
+                        <span>
+                          {p.currency === "USD" ? "US$" : "$"} {p.amount}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-2">
+                    Método de pago: {PAYMENT_METHOD_LABELS[saleReceipt.paymentMethod]}
+                    {saleReceipt.paymentCurrency === "USD" ? " (dólares)" : " (pesos)"}
+                  </div>
+                )}
                 {saleReceipt.amountReceived != null && (
                   <div>
                     Recibido: {saleReceipt.paymentCurrency === "USD" ? "US$" : "$"}{" "}
@@ -699,7 +850,9 @@ export default function AdminCajaPage() {
                     {saleReceipt.changeGiven.toFixed(2)}
                   </div>
                 )}
-                {saleReceipt.paymentNotes && <div>Nota: {saleReceipt.paymentNotes}</div>}
+                {saleReceipt.payments.length <= 1 && saleReceipt.paymentNotes && (
+                  <div>Nota: {saleReceipt.paymentNotes}</div>
+                )}
                 <div className="bh-recibo-line" />
                 <p className="text-[11px] opacity-75">Conserve este comprobante como constancia de su compra.</p>
               </>
@@ -723,18 +876,19 @@ export default function AdminCajaPage() {
             <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-ink/15 sm:hidden" />
             <h2 className="text-lg font-bold text-ink">Registrar movimiento</h2>
 
-            <div className="mt-4 flex gap-2">
-              {(["ingreso", "egreso"] as CashMovementType[]).map((type) => (
-                <Chip
-                  key={type}
-                  active={movementDraft.type === type}
-                  onClick={() => setMovementDraft({ ...movementDraft, type })}
-                  tone={type === "ingreso" ? "done" : "danger"}
-                >
-                  {type === "ingreso" ? "Ingreso" : "Egreso"}
-                </Chip>
-              ))}
-            </div>
+            <label className="mt-4 block">
+              <span className="text-xs font-semibold text-ink">Tipo</span>
+              <select
+                value={movementDraft.type}
+                onChange={(e) =>
+                  setMovementDraft({ ...movementDraft, type: e.target.value as CashMovementType })
+                }
+                className="mt-1.5 w-full rounded-lg border border-ink/10 bg-background px-3 py-2.5 text-sm text-ink"
+              >
+                <option value="ingreso">Ingreso</option>
+                <option value="egreso">Egreso</option>
+              </select>
+            </label>
 
             <label className="mt-4 block">
               <span className="text-xs font-semibold text-ink">Monto (ARS)</span>

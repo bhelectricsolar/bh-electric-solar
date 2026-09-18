@@ -9,6 +9,7 @@ import {
   ORDER_STATUS_TONE,
   ORDER_ORIGIN_LABELS,
   PAYMENT_METHOD_LABELS,
+  PAYMENT_LINE_METHODS,
   getOrderItemsWithProduct,
   orderStatusMessage,
   type Order,
@@ -132,6 +133,7 @@ export default function AdminPedidosPage() {
       status: "nuevo",
       paymentMethod: manualForm.paymentMethod,
       paymentCurrency: "ARS",
+      payments: [],
       origin: "manual",
       soldBy: member?.id ?? null,
       createdAt: new Date().toISOString().slice(0, 10),
@@ -253,13 +255,32 @@ export default function AdminPedidosPage() {
                           {formatPrice(zone?.priceUSD ?? 0)}
                         </span>
                       </li>
-                      <li className="flex justify-between text-body">
-                        <span>Método de pago</span>
-                        <span className="text-ink">
-                          {PAYMENT_METHOD_LABELS[order.paymentMethod]}
-                          {order.paymentCurrency === "USD" ? " (dólares)" : ""}
-                        </span>
-                      </li>
+                      {order.payments.length > 1 ? (
+                        <li className="flex flex-col gap-1 text-body">
+                          <span>Pago combinado:</span>
+                          <ul className="flex flex-col gap-1 pl-3">
+                            {order.payments.map((p, i) => (
+                              <li key={i} className="flex justify-between">
+                                <span>
+                                  {PAYMENT_METHOD_LABELS[p.method]}
+                                  {p.notes ? ` — ${p.notes}` : ""}
+                                </span>
+                                <span className="font-data text-ink">
+                                  {p.currency === "USD" ? "US$" : "$"} {p.amount}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </li>
+                      ) : (
+                        <li className="flex justify-between text-body">
+                          <span>Método de pago</span>
+                          <span className="text-ink">
+                            {PAYMENT_METHOD_LABELS[order.paymentMethod]}
+                            {order.paymentCurrency === "USD" ? " (dólares)" : ""}
+                          </span>
+                        </li>
+                      )}
                       {order.changeGiven != null && order.changeGiven > 0 && (
                         <li className="flex justify-between text-body">
                           <span>Vuelto</span>
@@ -268,7 +289,7 @@ export default function AdminPedidosPage() {
                           </span>
                         </li>
                       )}
-                      {order.paymentNotes && (
+                      {order.payments.length <= 1 && order.paymentNotes && (
                         <li className="flex justify-between text-body">
                           <span>Nota de pago</span>
                           <span className="text-ink">{order.paymentNotes}</span>
@@ -397,7 +418,7 @@ export default function AdminPedidosPage() {
 
               <Field label="Método de pago">
                 <div className="flex gap-2">
-                  {(Object.keys(PAYMENT_METHOD_LABELS) as PaymentMethod[]).map((method) => (
+                  {PAYMENT_LINE_METHODS.map((method) => (
                     <Chip
                       key={method}
                       active={manualForm.paymentMethod === method}

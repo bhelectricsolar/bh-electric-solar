@@ -187,6 +187,16 @@ function FullAdminShell({
             Inicio
           </Link>
 
+          <Link
+            href="/admin/caja?venta=1"
+            className="mt-1 flex items-center gap-3 rounded-lg border border-negocio/30 bg-negocio/10 px-3 py-2.5 text-sm font-bold text-negocio transition-all hover:bg-negocio/20"
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z" />
+            </svg>
+            Venta rápida
+          </Link>
+
           {SECTORS.map((sector) => (
             <div key={sector.id} className="mt-5">
               <div className="flex items-center gap-2 px-3 pb-1.5">
@@ -299,6 +309,18 @@ function FullAdminShell({
 
       {/* Content */}
       <main className="flex-1 pb-20 lg:pb-0">{children}</main>
+
+      {/* Venta rápida — flotante en mobile, siempre a mano porque nunca se
+          sabe cuándo cae un cliente que quiere comprar ya mismo. */}
+      <Link
+        href="/admin/caja?venta=1"
+        aria-label="Venta rápida"
+        className="fixed bottom-24 right-4 z-40 flex h-14 w-14 cursor-pointer touch-manipulation items-center justify-center rounded-full bg-gold-500 text-navy-950 shadow-[0_10px_30px_-8px_rgba(245,154,31,0.6)] transition-transform active:scale-95 lg:hidden"
+      >
+        <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z" />
+        </svg>
+      </Link>
 
       {/* Mobile bottom tab bar: en Resumen es el selector de sistema; adentro
           de un sistema muestra solo los menús de ESE sistema. */}
