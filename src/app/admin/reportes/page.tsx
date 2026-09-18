@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { getOrders, getOrderItemsWithProduct, type Order } from "@/lib/orders";
+import {
+  getOrders,
+  getOrderItemsWithProduct,
+  PAYMENT_METHOD_LABELS,
+  type Order,
+  type PaymentMethod,
+  type PaymentCurrency,
+} from "@/lib/orders";
 import { getProducts, type Product } from "@/lib/products";
 import { getProjects, PROJECT_STAGES, PROJECT_STAGE_TONE, type Project } from "@/lib/projects";
 import { getDevTeamMemberIds } from "@/lib/team";
@@ -36,8 +43,19 @@ function rangeStart(range: Range): Date | null {
   return null;
 }
 
+const fmtARS = new Intl.NumberFormat("es-AR", {
+  style: "currency",
+  currency: "ARS",
+  maximumFractionDigits: 0,
+});
+
+function orderTotalUSD(o: Order, products: Product[]) {
+  const items = getOrderItemsWithProduct(o, products);
+  return items.reduce((s, i) => s + (i.product?.priceUSD ?? 0) * i.qty, 0);
+}
+
 export default function AdminReportesPage() {
-  const { formatPrice } = useAdminSettings();
+  const { formatPrice, settings } = useAdminSettings();
   const [range, setRange] = useState<Range>("mes");
   const [orders, setOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -94,6 +112,32 @@ export default function AdminReportesPage() {
     ...stage,
     count: projects.filter((p) => p.status === stage.value).length,
   }));
+
+  // Desglose real de cómo entró la plata — línea por línea, así una venta
+  // combinada (mitad efectivo, mitad cheque) o en cuotas se ve completa,
+  // no escondida bajo un único "método de pago".
+  const paymentBreakdown = useMemo(() => {
+    type Row = { key: string; method: PaymentMethod; currency: PaymentCurrency; amount: number; count: number };
+    const map = new Map<string, Row>();
+    function add(method: PaymentMethod, currency: PaymentCurrency, amount: number) {
+      if (method === "combinado") return;
+      const key = `${method}-${currency}`;
+      const prev = map.get(key) ?? { key, method, currency, amount: 0, count: 0 };
+      prev.amount += amount;
+      prev.count += 1;
+      map.set(key, prev);
+    }
+    ordersInRange.forEach((o) => {
+      if (o.payments.length > 0) {
+        o.payments.forEach((p) => add(p.method, p.currency, p.amount));
+      } else {
+        const total = orderTotalUSD(o, products);
+        const method = o.paymentMethod === "combinado" ? "efectivo" : o.paymentMethod;
+        add(method, o.paymentCurrency, o.paymentCurrency === "USD" ? total : total * settings.exchangeRate);
+      }
+    });
+    return [...map.values()].sort((a, b) => b.amount / (b.currency === "USD" ? 1 : settings.exchangeRate) - a.amount / (a.currency === "USD" ? 1 : settings.exchangeRate));
+  }, [ordersInRange, products, settings.exchangeRate]);
 
   return (
     <section className="px-4 py-6 sm:px-8 sm:py-10">
@@ -157,6 +201,36 @@ export default function AdminReportesPage() {
                 </li>
               ))}
             </ul>
+          </div>
+
+          <div className="rounded-2xl border border-ink/10 bg-surface p-5 shadow-sm sm:col-span-2">
+            <h2 className="text-sm font-bold text-ink">Formas de pago</h2>
+            <p className="mt-1 text-xs text-body">
+              Desglosado por línea — una venta combinada o en cuotas cuenta cada parte por separado.
+            </p>
+            {paymentBreakdown.length === 0 ? (
+              <p className="mt-4 text-center text-sm text-body">Sin ventas en este período.</p>
+            ) : (
+              <ul className="mt-4 flex flex-col gap-2">
+                {paymentBreakdown.map((row) => (
+                  <li
+                    key={row.key}
+                    className="flex items-center justify-between gap-3 rounded-lg border border-ink/10 bg-background px-3 py-2.5 text-sm"
+                  >
+                    <span className="text-ink">
+                      {PAYMENT_METHOD_LABELS[row.method]}
+                      {row.currency === "USD" ? " (dólares)" : ""}
+                      <span className="ml-2 text-xs text-body">
+                        {row.count} pago{row.count > 1 ? "s" : ""}
+                      </span>
+                    </span>
+                    <span className="font-data font-semibold text-ink">
+                      {row.currency === "USD" ? `US$ ${row.amount.toFixed(2)}` : fmtARS.format(row.amount)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </div>
       </div>

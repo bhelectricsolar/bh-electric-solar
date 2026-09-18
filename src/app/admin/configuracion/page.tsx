@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   useAdminSettings,
   CARD_TYPES,
@@ -22,7 +22,6 @@ export default function AdminConfiguracionPage() {
   const { settings, updateSettings, formatPrice, refreshExchangeRate, exchangeRateStatus } =
     useAdminSettings();
   const { theme, toggle } = useTheme();
-  const [saved, setSaved] = useState(false);
   const [planDraft, setPlanDraft] = useState<{
     cardType: CardType;
     cardKind: CardKind;
@@ -46,11 +45,6 @@ export default function AdminConfiguracionPage() {
 
   function removePlan(id: string) {
     updateSettings({ installmentPlans: settings.installmentPlans.filter((p) => p.id !== id) });
-  }
-
-  function flashSaved() {
-    setSaved(true);
-    window.setTimeout(() => setSaved(false), 1500);
   }
 
   return (
@@ -155,15 +149,14 @@ export default function AdminConfiguracionPage() {
                   </p>
                 </div>
               ) : (
-                <input
-                  type="number"
-                  min={1}
-                  value={settings.exchangeRate}
-                  onChange={(e) =>
-                    updateSettings({ exchangeRate: Number(e.target.value) || 0 })
-                  }
-                  className="mt-3 w-full rounded-lg border border-ink/10 bg-background px-3 py-2.5 text-sm text-ink"
-                />
+                <div className="mt-3">
+                  <SavableField
+                    label="Monto manual (ARS por 1 USD)"
+                    value={settings.exchangeRate}
+                    type="number"
+                    onSave={(v) => updateSettings({ exchangeRate: Number(v) || 0 })}
+                  />
+                </div>
               )}
 
               <p className="mt-3 text-xs text-body">
@@ -178,21 +171,21 @@ export default function AdminConfiguracionPage() {
         {/* Datos de la tienda */}
         <SettingsCard title="Datos de la tienda">
           <div className="flex flex-col gap-4">
-            <TextField
+            <SavableField
               label="Nombre de la tienda"
               value={settings.storeName}
-              onChange={(v) => updateSettings({ storeName: v })}
+              onSave={(v) => updateSettings({ storeName: v })}
             />
-            <TextField
+            <SavableField
               label="WhatsApp para pedidos"
               value={settings.whatsapp}
-              onChange={(v) => updateSettings({ whatsapp: v })}
+              onSave={(v) => updateSettings({ whatsapp: v })}
               placeholder="+54 9 3754 419198"
             />
-            <TextField
+            <SavableField
               label="Email de contacto"
               value={settings.email}
-              onChange={(v) => updateSettings({ email: v })}
+              onSave={(v) => updateSettings({ email: v })}
               placeholder="info@bhelectricsolar.com"
             />
           </div>
@@ -201,22 +194,22 @@ export default function AdminConfiguracionPage() {
         {/* Redes sociales */}
         <SettingsCard title="Redes sociales">
           <div className="flex flex-col gap-4">
-            <TextField
+            <SavableField
               label="Instagram"
               value={settings.instagram}
-              onChange={(v) => updateSettings({ instagram: v })}
+              onSave={(v) => updateSettings({ instagram: v })}
               placeholder="https://instagram.com/tu_cuenta"
             />
-            <TextField
+            <SavableField
               label="Facebook"
               value={settings.facebook}
-              onChange={(v) => updateSettings({ facebook: v })}
+              onSave={(v) => updateSettings({ facebook: v })}
               placeholder="https://facebook.com/tu_pagina"
             />
-            <TextField
+            <SavableField
               label="LinkedIn"
               value={settings.linkedin}
-              onChange={(v) => updateSettings({ linkedin: v })}
+              onSave={(v) => updateSettings({ linkedin: v })}
               placeholder="https://linkedin.com/company/tu_empresa"
             />
           </div>
@@ -224,20 +217,12 @@ export default function AdminConfiguracionPage() {
 
         {/* Inventario */}
         <SettingsCard title="Inventario">
-          <label className="block">
-            <span className="text-xs font-semibold text-ink">
-              Avisar cuando el stock de un producto sea igual o menor a:
-            </span>
-            <input
-              type="number"
-              min={0}
-              value={settings.lowStockThreshold}
-              onChange={(e) =>
-                updateSettings({ lowStockThreshold: Number(e.target.value) || 0 })
-              }
-              className="mt-1.5 w-28 rounded-lg border border-ink/10 bg-background px-3 py-2.5 text-sm text-ink"
-            />
-          </label>
+          <SavableField
+            label="Avisar cuando el stock de un producto sea igual o menor a:"
+            value={settings.lowStockThreshold}
+            type="number"
+            onSave={(v) => updateSettings({ lowStockThreshold: Number(v) || 0 })}
+          />
         </SettingsCard>
 
         {/* Planes de cuotas */}
@@ -393,14 +378,6 @@ export default function AdminConfiguracionPage() {
             />
           </div>
         </SettingsCard>
-
-        <button
-          type="button"
-          onClick={flashSaved}
-          className="mt-6 w-full cursor-pointer touch-manipulation rounded-lg bg-navy-900 py-3.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-navy-800 hover:shadow-md sm:w-auto sm:px-8"
-        >
-          {saved ? "✓ Guardado" : "Listo"}
-        </button>
       </div>
     </section>
   );
@@ -415,26 +392,65 @@ function SettingsCard({ title, children }: { title: string; children: React.Reac
   );
 }
 
-function TextField({
+// Cada campo se edita en borrador local y solo se guarda de verdad cuando
+// se aprieta "Guardar" — así no dispara una escritura a Supabase por cada
+// letra tipeada, y queda claro cuándo algo todavía no se guardó.
+function SavableField({
   label,
   value,
-  onChange,
+  onSave,
   placeholder,
+  type = "text",
 }: {
   label: string;
-  value: string;
-  onChange: (value: string) => void;
+  value: string | number;
+  onSave: (value: string) => void | Promise<void>;
   placeholder?: string;
+  type?: "text" | "number" | "email";
 }) {
+  const [draft, setDraft] = useState(String(value));
+  const [saving, setSaving] = useState(false);
+  const [justSaved, setJustSaved] = useState(false);
+
+  useEffect(() => {
+    setDraft(String(value));
+  }, [value]);
+
+  const dirty = draft !== String(value);
+
+  async function handleSave() {
+    setSaving(true);
+    await onSave(draft);
+    setSaving(false);
+    setJustSaved(true);
+    window.setTimeout(() => setJustSaved(false), 1500);
+  }
+
   return (
     <label className="block">
       <span className="text-xs font-semibold text-ink">{label}</span>
-      <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="mt-1.5 w-full rounded-lg border border-ink/10 bg-background px-3 py-2.5 text-sm text-ink"
-      />
+      <div className="mt-1.5 flex gap-2">
+        <input
+          type={type}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder={placeholder}
+          className="w-full rounded-lg border border-ink/10 bg-background px-3 py-2.5 text-sm text-ink"
+        />
+        {dirty && (
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className="shrink-0 cursor-pointer touch-manipulation rounded-lg bg-navy-900 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition-all hover:bg-navy-800 disabled:opacity-60"
+          >
+            {saving ? "…" : "Guardar"}
+          </button>
+        )}
+        {!dirty && justSaved && (
+          <span className="shrink-0 self-center text-xs font-semibold text-green-600">✓ Guardado</span>
+        )}
+      </div>
     </label>
   );
 }

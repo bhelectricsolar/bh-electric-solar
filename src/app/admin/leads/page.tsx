@@ -19,8 +19,14 @@ function daysSince(dateStr: string) {
   return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
 }
 
+// El reloj de "sin atender" arranca de nuevo cada vez que alguien lo marca
+// como atendido — si nunca lo tocaron, cuenta desde que llegó.
+function referenceDate(c: Customer) {
+  return c.lastContactedAt ?? c.createdAt;
+}
+
 function isStale(c: Customer) {
-  return daysSince(c.createdAt) >= LEAD_STALE_DAYS;
+  return daysSince(referenceDate(c)) >= LEAD_STALE_DAYS;
 }
 
 export default function AdminLeadsPage() {
@@ -29,6 +35,7 @@ export default function AdminLeadsPage() {
   const [query, setQuery] = useState("");
   const [onlyStale, setOnlyStale] = useState(false);
   const [convertingId, setConvertingId] = useState<string | null>(null);
+  const [attendingId, setAttendingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   function loadAll() {
@@ -69,6 +76,17 @@ export default function AdminLeadsPage() {
       setLeads((prev) => prev.filter((c) => c.id !== id));
     } finally {
       setConvertingId(null);
+    }
+  }
+
+  async function markAttended(id: string) {
+    setAttendingId(id);
+    try {
+      const now = new Date().toISOString();
+      await updateCustomer(id, { lastContactedAt: now });
+      setLeads((prev) => prev.map((c) => (c.id === id ? { ...c, lastContactedAt: now } : c)));
+    } finally {
+      setAttendingId(null);
     }
   }
 
@@ -132,7 +150,7 @@ export default function AdminLeadsPage() {
                 <p className="font-semibold text-ink">{lead.name}</p>
                 <div className="flex shrink-0 items-center gap-1.5">
                   {isStale(lead) && (
-                    <StatusBadge tone="danger">{daysSince(lead.createdAt)}d sin atender</StatusBadge>
+                    <StatusBadge tone="danger">{daysSince(referenceDate(lead))}d sin atender</StatusBadge>
                   )}
                   <StatusBadge tone="gold">Lead</StatusBadge>
                 </div>
@@ -157,6 +175,14 @@ export default function AdminLeadsPage() {
                     {new Date(lead.createdAt).toLocaleDateString("es-AR")}
                   </p>
                 </div>
+                {lead.lastContactedAt && (
+                  <div>
+                    <p className="text-body">Último contacto</p>
+                    <p className="font-data mt-0.5 text-ink">
+                      {new Date(lead.lastContactedAt).toLocaleDateString("es-AR")}
+                    </p>
+                  </div>
+                )}
               </div>
 
               {(lead.propertyType || lead.billAmount || lead.kwhMonthly || lead.roofType) && (
@@ -207,7 +233,17 @@ export default function AdminLeadsPage() {
                   </button>
                 </div>
               ) : (
-                <div className="mt-3 flex gap-2 border-t border-ink/10 pt-3">
+                <div className="mt-3 flex flex-wrap gap-2 border-t border-ink/10 pt-3">
+                  {isStale(lead) && (
+                    <button
+                      type="button"
+                      onClick={() => markAttended(lead.id)}
+                      disabled={attendingId === lead.id}
+                      className="cursor-pointer touch-manipulation rounded-lg border border-ink/15 bg-background px-3 py-2 text-xs font-semibold text-ink shadow-sm hover:shadow-md disabled:opacity-60"
+                    >
+                      {attendingId === lead.id ? "Marcando…" : "Marcar como atendido"}
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => convertToClient(lead.id)}

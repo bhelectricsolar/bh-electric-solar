@@ -24,6 +24,9 @@ export type Customer = {
   roofType?: string;
   message?: string;
   invoicePath?: string;
+  // Última vez que alguien del equipo habló con este lead — sin esto, un
+  // lead contactado hoy seguía marcado "sin atender" para siempre.
+  lastContactedAt?: string;
 };
 
 type CustomerRow = {
@@ -41,6 +44,7 @@ type CustomerRow = {
   roof_type: string | null;
   message: string | null;
   invoice_path: string | null;
+  last_contacted_at: string | null;
 };
 
 function fromRow(row: CustomerRow): Customer {
@@ -59,6 +63,7 @@ function fromRow(row: CustomerRow): Customer {
     roofType: row.roof_type ?? undefined,
     message: row.message ?? undefined,
     invoicePath: row.invoice_path ?? undefined,
+    lastContactedAt: row.last_contacted_at ?? undefined,
   };
 }
 
@@ -79,6 +84,7 @@ export async function updateCustomer(id: string, patch: Partial<Customer>) {
   if (patch.city !== undefined) row.city = patch.city;
   if (patch.status !== undefined) row.status = patch.status;
   if (patch.source !== undefined) row.source = patch.source;
+  if (patch.lastContactedAt !== undefined) row.last_contacted_at = patch.lastContactedAt;
   const { error } = await supabase.from("customers").update(row).eq("id", id);
   if (error) throw error;
 }

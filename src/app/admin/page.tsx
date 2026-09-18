@@ -67,7 +67,7 @@ export default function AdminPage() {
 
   const staleLeads = customers.filter((c) => {
     if (c.status !== "lead") return false;
-    const days = (Date.now() - new Date(c.createdAt).getTime()) / 86400000;
+    const days = (Date.now() - new Date(c.lastContactedAt ?? c.createdAt).getTime()) / 86400000;
     return days >= LEAD_STALE_DAYS;
   });
 

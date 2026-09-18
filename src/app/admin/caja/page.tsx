@@ -591,14 +591,26 @@ function AdminCajaPageInner() {
                     {saleItems.map((item) => {
                       const product = products.find((p) => p.id === item.productId);
                       return (
-                        <li key={item.productId} className="flex items-center justify-between text-xs">
-                          <span className="text-ink">
-                            {item.qty}x {product?.name}
+                        <li key={item.productId} className="flex items-center justify-between gap-2 text-xs">
+                          <span className="flex min-w-0 items-center gap-2">
+                            <span className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-md bg-gradient-to-br from-navy-800 to-navy-950">
+                              {product?.images[0] ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={product.images[0]} alt="" className="h-full w-full object-cover" />
+                              ) : (
+                                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-gold-500/70" fill="none" stroke="currentColor" strokeWidth={1.6}>
+                                  <path d="M4 5h16v14H4V5Zm0 4.7h16M4 14.3h16M9.3 5v14M14.7 5v14" />
+                                </svg>
+                              )}
+                            </span>
+                            <span className="truncate text-ink">
+                              {item.qty}x {product?.name}
+                            </span>
                           </span>
                           <button
                             type="button"
                             onClick={() => removeSaleItem(item.productId)}
-                            className="cursor-pointer touch-manipulation text-red-500 hover:underline"
+                            className="shrink-0 cursor-pointer touch-manipulation text-red-500 hover:underline"
                           >
                             Quitar
                           </button>
@@ -763,11 +775,15 @@ function AdminCajaPageInner() {
                             value={line.installmentPlanId ?? ""}
                             onChange={(e) => {
                               const plan = settings.installmentPlans.find((p) => p.id === e.target.value);
+                              // Autocompletamos el monto base con lo que falta cobrar —
+                              // así el cotizador se ve al toque, sin pasos extra.
+                              const autoAmount = !line.amount && plan ? remainingForLine(idx) : undefined;
                               updatePaymentLine(idx, {
                                 installmentPlanId: plan?.id,
                                 notes: plan
                                   ? `${plan.cardType} ${plan.cardKind === "credito" ? "Crédito" : "Débito"} · ${plan.installments} cuotas${plan.surchargePct ? ` (+${plan.surchargePct}%)` : ""}${plan.label ? ` — ${plan.label}` : ""}`
                                   : "",
+                                ...(autoAmount != null ? { amount: String(Math.round(autoAmount)) } : {}),
                               });
                             }}
                             className="w-full rounded-lg border border-ink/10 bg-background px-2.5 py-2 text-xs text-ink"
@@ -785,14 +801,25 @@ function AdminCajaPageInner() {
                         {(() => {
                           const plan = settings.installmentPlans.find((p) => p.id === line.installmentPlanId);
                           const base = Number(line.amount) || 0;
-                          if (!plan || base <= 0) return null;
+                          if (!plan) return null;
+                          if (base <= 0) {
+                            return (
+                              <p className="text-[11px] text-body">
+                                Cargá el monto base para ver el valor de cada cuota.
+                              </p>
+                            );
+                          }
                           const totalWithSurcharge = base * (1 + plan.surchargePct / 100);
                           const perInstallment = totalWithSurcharge / plan.installments;
                           return (
-                            <p className="text-[11px] text-body">
-                              Con recargo: {fmtARS.format(totalWithSurcharge)} · {plan.installments} cuotas de{" "}
-                              {fmtARS.format(perInstallment)}
-                            </p>
+                            <div className="rounded-lg border border-gold-500/30 bg-gold-500/10 px-3 py-2">
+                              <p className="text-xs font-bold text-gold-600">
+                                {plan.installments} cuotas de {fmtARS.format(perInstallment)}
+                              </p>
+                              <p className="mt-0.5 text-[11px] text-body">
+                                Total con recargo ({plan.surchargePct}%): {fmtARS.format(totalWithSurcharge)}
+                              </p>
+                            </div>
                           );
                         })()}
                         <input
@@ -826,6 +853,41 @@ function AdminCajaPageInner() {
                   </span>
                 </div>
               </div>
+
+              {saleItems.length > 0 && (
+                <div className="rounded-lg border border-ink/10 bg-background p-3">
+                  <p className="text-xs font-bold uppercase tracking-wide text-body">Resumen antes de confirmar</p>
+                  <div className="mt-2 flex items-center justify-between text-xs">
+                    <span className="text-body">Cliente</span>
+                    <span className="text-ink">{saleCustomer.name.trim() || "Consumidor final"}</span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between text-xs">
+                    <span className="text-body">Total de la venta</span>
+                    <span className="font-data text-ink">
+                      US$ {saleTotalUSD} (~{fmtARS.format(saleTotalARS)})
+                    </span>
+                  </div>
+                  <div className="mt-2 flex flex-col gap-1 border-t border-ink/10 pt-2">
+                    {salePayments.map((line, i) => {
+                      const plan = settings.installmentPlans.find((p) => p.id === line.installmentPlanId);
+                      const base = Number(line.amount) || 0;
+                      return (
+                        <div key={i} className="flex items-center justify-between text-xs">
+                          <span className="text-ink">
+                            {PAYMENT_METHOD_LABELS[line.method]}
+                            {line.method === "cuotas" && plan
+                              ? ` · ${plan.installments}x ${fmtARS.format((base * (1 + plan.surchargePct / 100)) / plan.installments)}`
+                              : ""}
+                          </span>
+                          <span className="font-data text-ink">
+                            {line.currency === "USD" ? `US$ ${base}` : fmtARS.format(base)}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
             <button
