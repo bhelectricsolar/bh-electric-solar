@@ -173,9 +173,12 @@ export function AdminSettingsProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded, settings.exchangeRateMode]);
 
-  function updateSettings(patch: Partial<StoreSettings>) {
+  async function updateSettings(patch: Partial<StoreSettings>) {
     setSettings((prev) => ({ ...prev, ...patch }));
-    supabase.from("store_settings").update(toRow(patch)).eq("id", 1);
+    // El builder de Supabase es "thenable" — si nadie lo espera, el fetch
+    // nunca sale y el cambio queda solo en la pantalla, sin guardarse.
+    const { error } = await supabase.from("store_settings").update(toRow(patch)).eq("id", 1);
+    if (error) console.error("updateSettings:", error);
   }
 
   function formatPrice(usdValue: number) {
