@@ -335,7 +335,7 @@ export default function AdminProductosPage() {
                   </span>
                 </div>
                 {confirmDeleteId === product.id ? (
-                  <div className="mt-3 flex items-center gap-2 rounded-lg border-t border-ink/10 pt-3">
+                  <div className="mt-auto flex items-center gap-2 rounded-lg border-t border-ink/10 pt-3">
                     <p className="flex-1 text-[11px] font-semibold text-red-500">¿Eliminar?</p>
                     <button
                       type="button"
@@ -353,7 +353,7 @@ export default function AdminProductosPage() {
                     </button>
                   </div>
                 ) : (
-                  <div className="mt-3 flex gap-2 border-t border-ink/10 pt-3">
+                  <div className="mt-auto flex gap-2 border-t border-ink/10 pt-3">
                     <button
                       type="button"
                       onClick={() => openEdit(product)}

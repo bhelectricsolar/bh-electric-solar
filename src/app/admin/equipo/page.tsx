@@ -251,7 +251,7 @@ export default function AdminEquipoPage() {
           {visible.map((member) => (
             <div
               key={member.id}
-              className={`rounded-xl border border-ink/10 bg-surface p-4 shadow-sm transition-shadow hover:shadow-md ${!member.active ? "opacity-50" : ""}`}
+              className={`flex flex-col rounded-xl border border-ink/10 bg-surface p-4 shadow-sm transition-shadow hover:shadow-md ${!member.active ? "opacity-50" : ""}`}
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -306,7 +306,7 @@ export default function AdminEquipoPage() {
               )}
 
               {confirmDeleteId === member.id ? (
-                <div className="mt-3 flex items-center gap-2 border-t border-ink/10 pt-3">
+                <div className="mt-auto flex items-center gap-2 border-t border-ink/10 pt-3">
                   <p className="flex-1 text-[11px] font-semibold text-red-500">¿Quitar del equipo?</p>
                   <button
                     type="button"
@@ -324,7 +324,7 @@ export default function AdminEquipoPage() {
                   </button>
                 </div>
               ) : (
-                <div className="mt-3 flex gap-2 border-t border-ink/10 pt-3">
+                <div className="mt-auto flex gap-2 border-t border-ink/10 pt-3">
                   <button
                     type="button"
                     onClick={() => openEdit(member)}

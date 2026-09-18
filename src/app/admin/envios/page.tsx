@@ -320,7 +320,7 @@ export default function AdminEnviosPage() {
                   <button
                     type="button"
                     onClick={() => startEdit(zone)}
-                    className="text-xs font-semibold text-navy-900 hover:underline"
+                    className="cursor-pointer touch-manipulation rounded-lg bg-cream-200 px-3 py-1.5 text-xs font-semibold text-ink hover:underline"
                   >
                     Editar
                   </button>

@@ -99,19 +99,35 @@ export default function AdminStockPage() {
               key={product.id}
               className="flex flex-col gap-3 rounded-2xl border border-ink/10 bg-surface p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between"
             >
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="font-semibold text-ink">{product.name}</p>
-                  {product.publishedOnline === false ? (
-                    <StatusBadge tone="neutral">Solo interno</StatusBadge>
-                  ) : (
-                    <StatusBadge tone="negocio">Publicado</StatusBadge>
+              <div className="flex min-w-0 items-center gap-3">
+                <div
+                  className={`h-12 w-12 shrink-0 overflow-hidden rounded-lg ${
+                    product.images?.[0] ? "bg-white" : `bg-gradient-to-br ${product.gradient}`
+                  }`}
+                >
+                  {product.images?.[0] && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={product.images[0]}
+                      alt={product.name}
+                      className="h-full w-full object-contain p-1"
+                    />
                   )}
-                  {lowStock(product) && <StatusBadge tone="danger">Poco stock</StatusBadge>}
                 </div>
-                <p className="mt-0.5 text-xs text-body">
-                  {categories.find((c) => c.value === product.category)?.label}
-                </p>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-semibold text-ink">{product.name}</p>
+                    {product.publishedOnline === false ? (
+                      <StatusBadge tone="neutral">Solo interno</StatusBadge>
+                    ) : (
+                      <StatusBadge tone="negocio">Publicado</StatusBadge>
+                    )}
+                    {lowStock(product) && <StatusBadge tone="danger">Poco stock</StatusBadge>}
+                  </div>
+                  <p className="mt-0.5 text-xs text-body">
+                    {categories.find((c) => c.value === product.category)?.label}
+                  </p>
+                </div>
               </div>
 
               <div className="flex shrink-0 items-center gap-4">

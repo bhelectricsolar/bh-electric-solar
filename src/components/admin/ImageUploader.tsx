@@ -52,7 +52,8 @@ export default function ImageUploader({
 
   return (
     <div>
-      <div
+      <label
+        htmlFor="product-image-input"
         onDragOver={(e) => {
           e.preventDefault();
           setDragOver(true);
@@ -63,7 +64,6 @@ export default function ImageUploader({
           setDragOver(false);
           addFiles(e.dataTransfer.files);
         }}
-        onClick={() => !uploading && inputRef.current?.click()}
         className={`flex cursor-pointer touch-manipulation flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-6 text-center transition-colors ${
           dragOver ? "border-gold-500 bg-gold-500/5" : "border-ink/15 hover:border-ink/30"
         } ${uploading ? "pointer-events-none opacity-60" : ""}`}
@@ -81,13 +81,14 @@ export default function ImageUploader({
         </p>
         <input
           ref={inputRef}
+          id="product-image-input"
           type="file"
           accept={ACCEPTED}
           multiple
           className="hidden"
           onChange={(e) => addFiles(e.target.files)}
         />
-      </div>
+      </label>
 
       {error && (
         <p className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-500">
