@@ -35,7 +35,7 @@ export default function BenefitCards() {
             key={card.title}
             type="button"
             onClick={() => setActiveIndex(index)}
-            className={`group relative block cursor-pointer touch-manipulation rounded-2xl border bg-white p-6 text-left transition-colors ${
+            className={`premium-card group relative block cursor-pointer touch-manipulation rounded-2xl border bg-white p-6 text-left transition-colors ${
               isActive ? "border-navy-900" : "border-ink/10 hover:border-navy-900/30"
             }`}
           >

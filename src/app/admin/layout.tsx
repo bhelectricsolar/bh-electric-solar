@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import SheetManager from "@/components/SheetManager";
 import { Outfit, Plus_Jakarta_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./admin-globals.css";
 import InstallServiceWorker from "./InstallServiceWorker";
@@ -58,6 +59,7 @@ export default function AdminRootLayout({ children }: { children: React.ReactNod
       </head>
       <body className="min-h-dvh bg-background text-ink">
         <InstallServiceWorker />
+        <SheetManager />
         <ThemeProvider>
           <AdminSettingsProvider>
             <AdminShell>{children}</AdminShell>

@@ -64,7 +64,7 @@ export default function Projects() {
           {PROJECTS.map((project) => (
             <article
               key={project.title}
-              className="group overflow-hidden rounded-2xl border border-ink/10 bg-white transition-all hover:-translate-y-1 hover:shadow-[0_30px_60px_-25px_rgba(245,154,31,0.3)]"
+              className="premium-card group overflow-hidden rounded-2xl border border-ink/10 bg-white transition-all hover:-translate-y-1 hover:shadow-[0_30px_60px_-25px_rgba(245,154,31,0.3)]"
             >
               <div
                 className={`flex h-48 items-end overflow-hidden bg-gradient-to-br p-4 text-[11px] font-medium uppercase tracking-wide text-white/70 transition-transform duration-500 group-hover:scale-105 ${project.gradient}`}

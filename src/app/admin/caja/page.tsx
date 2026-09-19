@@ -95,6 +95,7 @@ function AdminCajaPageInner() {
   const [salePayments, setSalePayments] = useState<SalePaymentLine[]>([{ ...EMPTY_PAYMENT_LINE }]);
   const [saleSaving, setSaleSaving] = useState(false);
   const [saleReceipt, setSaleReceipt] = useState<Order | null>(null);
+  const [quote, setQuote] = useState<{ id: string; at: Date } | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -236,14 +237,25 @@ function AdminCajaPageInner() {
     return line.currency === "USD" ? remainingARS / settings.exchangeRate : remainingARS;
   }
 
+  function maxQty(productId: string) {
+    return Math.max(1, products.find((p) => p.id === productId)?.stock ?? 1);
+  }
+
   function addSaleItem(productId: string) {
     setSaleItems((prev) => {
       const existing = prev.find((i) => i.productId === productId);
       if (existing) {
-        return prev.map((i) => (i.productId === productId ? { ...i, qty: i.qty + 1 } : i));
+        return prev.map((i) =>
+          i.productId === productId ? { ...i, qty: Math.min(i.qty + 1, maxQty(productId)) } : i,
+        );
       }
       return [...prev, { productId, qty: 1 }];
     });
+  }
+
+  function setSaleQty(productId: string, qty: number) {
+    const next = Math.max(1, Math.min(qty, maxQty(productId)));
+    setSaleItems((prev) => prev.map((i) => (i.productId === productId ? { ...i, qty: next } : i)));
   }
 
   function removeSaleItem(productId: string) {
@@ -523,7 +535,7 @@ function AdminCajaPageInner() {
       </div>
 
       {saleOpen && (
-        <div className="fixed inset-0 z-[70]">
+        <div data-sheet className="fixed inset-0 z-[70]">
           <button
             type="button"
             aria-label="Cerrar"
@@ -613,17 +625,50 @@ function AdminCajaPageInner() {
                                 </svg>
                               )}
                             </span>
-                            <span className="truncate text-ink">
-                              {item.qty}x {product?.name}
+                            <span className="min-w-0">
+                              <span className="block truncate text-ink">{product?.name}</span>
+                              <span className="block text-[10px] text-body">
+                                US$ {product?.priceUSD} c/u ·{" "}
+                                {item.qty >= maxQty(item.productId) ? "máximo en stock" : `stock ${product?.stock}`}
+                              </span>
                             </span>
                           </span>
-                          <button
-                            type="button"
-                            onClick={() => removeSaleItem(item.productId)}
-                            className="shrink-0 cursor-pointer touch-manipulation text-red-500 hover:underline"
-                          >
-                            Quitar
-                          </button>
+                          <span className="flex shrink-0 items-center gap-2">
+                            <span className="flex items-center overflow-hidden rounded-lg border border-ink/15 bg-surface">
+                              <button
+                                type="button"
+                                aria-label="Menos"
+                                onClick={() => setSaleQty(item.productId, item.qty - 1)}
+                                disabled={item.qty <= 1}
+                                className="grid h-9 w-9 touch-manipulation place-items-center text-lg font-bold text-ink hover:bg-cream-200 disabled:opacity-35"
+                              >
+                                −
+                              </button>
+                              <NumberField
+                                aria-label="Cantidad"
+                                value={item.qty}
+                                onValueChange={(v) => setSaleQty(item.productId, Number(v) || 1)}
+                                onFocus={(e) => e.target.select()}
+                                className="h-9 w-10 border-x border-ink/10 bg-background text-center text-sm font-bold text-ink"
+                              />
+                              <button
+                                type="button"
+                                aria-label="Más"
+                                onClick={() => setSaleQty(item.productId, item.qty + 1)}
+                                disabled={item.qty >= maxQty(item.productId)}
+                                className="grid h-9 w-9 touch-manipulation place-items-center text-lg font-bold text-ink hover:bg-cream-200 disabled:opacity-35"
+                              >
+                                +
+                              </button>
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => removeSaleItem(item.productId)}
+                              className="touch-manipulation text-red-500 hover:underline"
+                            >
+                              Quitar
+                            </button>
+                          </span>
                         </li>
                       );
                     })}
@@ -643,7 +688,9 @@ function AdminCajaPageInner() {
                   className="mt-1.5 w-full rounded-lg border border-ink/10 bg-background px-3 py-2.5 text-sm text-ink"
                 >
                   <option value="">+ Cliente nuevo / Consumidor final</option>
-                  {customers.map((c) => (
+                  {customers
+                    .filter((c) => c.status === "cliente")
+                    .map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name}
                       {c.city ? ` — ${c.city}` : ""}
@@ -900,15 +947,92 @@ function AdminCajaPageInner() {
               )}
             </div>
 
-            <button
-              type="submit"
-              disabled={saleItems.length === 0 || saleSaving}
-              className="sticky bottom-0 mt-6 rounded-lg bg-gold-500 px-5 py-3.5 text-sm font-bold text-navy-950 shadow-sm transition-all hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {saleSaving ? "Registrando…" : "Registrar venta"}
-            </button>
+            <div className="sticky bottom-0 mt-6 flex items-stretch gap-2 bg-surface pb-1 pt-3">
+              <button
+                type="button"
+                onClick={() => setQuote({ id: "PRES-" + Date.now().toString(36).toUpperCase(), at: new Date() })}
+                disabled={saleItems.length === 0}
+                title="Armar un presupuesto para compartir (no registra la venta)"
+                className="flex shrink-0 items-center gap-1.5 rounded-lg border border-ink/15 bg-background px-3 text-xs font-semibold text-body transition-colors hover:border-gold-500/50 hover:text-ink disabled:opacity-40"
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
+                  <path d="M14 2v6h6M8 13h8M8 17h5" />
+                </svg>
+                Presupuesto
+              </button>
+              <button
+                type="submit"
+                disabled={saleItems.length === 0 || saleSaving}
+                className="flex-1 cursor-pointer rounded-lg bg-gold-500 px-5 py-3.5 text-sm font-bold text-navy-950 shadow-sm transition-all hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {saleSaving ? "Registrando…" : "Registrar venta"}
+              </button>
+            </div>
           </form>
         </div>
+      )}
+
+      {quote && (
+        <PrintDocument title="Presupuesto" onClose={() => setQuote(null)}>
+          {(() => {
+            const valid = new Date(quote.at);
+            valid.setDate(valid.getDate() + 7);
+            const lines = saleItems.map((i) => ({ ...i, product: products.find((p) => p.id === i.productId) }));
+            return (
+              <>
+                <div>
+                  Presupuesto: <b>{quote.id}</b>
+                </div>
+                <div>Fecha: {quote.at.toLocaleDateString("es-AR")}</div>
+                <div>Válido hasta: {valid.toLocaleDateString("es-AR")}</div>
+                <div>Para: {saleCustomer.name.trim() || "—"}</div>
+                <div className="bh-recibo-line" />
+                {lines.map((l) => (
+                  <div key={l.productId} className="mb-1">
+                    <div className="flex justify-between">
+                      <span>
+                        {l.qty}x {l.product?.name ?? "Producto"}
+                      </span>
+                      <span>US$ {(l.product?.priceUSD ?? 0) * l.qty}</span>
+                    </div>
+                    <div className="text-[11px] opacity-70">US$ {l.product?.priceUSD ?? 0} c/u</div>
+                  </div>
+                ))}
+                <div className="bh-recibo-line" />
+                <div className="flex justify-between text-base font-bold">
+                  <span>TOTAL</span>
+                  <span>US$ {saleTotalUSD}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span>En pesos (dólar $ {settings.exchangeRate})</span>
+                  <span>{fmtARS.format(saleTotalARS)}</span>
+                </div>
+                {settings.installmentPlans.length > 0 && (
+                  <>
+                    <div className="bh-recibo-line" />
+                    <div className="font-bold">Opciones en cuotas</div>
+                    {settings.installmentPlans.map((plan) => {
+                      const total = saleTotalARS * (1 + plan.surchargePct / 100);
+                      return (
+                        <div key={plan.id} className="mt-1 text-xs">
+                          {plan.cardType} {plan.cardKind === "credito" ? "Crédito" : "Débito"}
+                          {plan.label ? ` (${plan.label})` : ""}: {plan.installments} cuotas de{" "}
+                          {fmtARS.format(total / plan.installments)} — total {fmtARS.format(total)}
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
+                <div className="bh-recibo-line" />
+                <p className="text-[11px] opacity-75">
+                  Precios en dólares, sujetos a la cotización del día. Presupuesto sin compromiso de compra; no
+                  reserva stock.
+                </p>
+              </>
+            );
+          })()}
+        </PrintDocument>
       )}
 
       {saleReceipt && (
@@ -982,7 +1106,7 @@ function AdminCajaPageInner() {
       )}
 
       {movementOpen && (
-        <div className="fixed inset-0 z-[70]">
+        <div data-sheet className="fixed inset-0 z-[70]">
           <button
             type="button"
             aria-label="Cerrar"
@@ -1042,7 +1166,7 @@ function AdminCajaPageInner() {
       )}
 
       {closeOpen && session && (
-        <div className="fixed inset-0 z-[70]">
+        <div data-sheet className="fixed inset-0 z-[70]">
           <button
             type="button"
             aria-label="Cerrar"

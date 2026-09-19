@@ -203,3 +203,185 @@ h2 {
     font-size: 16px !important;
   }
 }
+
+/* La manito del mouse en todo lo que se puede apretar (antes faltaba en
+   algunos botones, como "Registrar venta"). */
+button:not(:disabled),
+[role="button"],
+summary,
+select,
+label[for],
+input[type="checkbox"],
+input[type="radio"],
+input[type="file"],
+a[href] {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: not-allowed;
+}
+
+/* Menús desplegables: el scroll de adentro no arrastra la pantalla de atrás. */
+[data-sheet],
+[data-sheet] * {
+  overscroll-behavior: contain;
+}
+
+:root {
+  color-scheme: light;
+}
+select,
+option,
+optgroup {
+  color: var(--color-slate-ink);
+}
+option {
+  background-color: #ffffff;
+}
+
+/* ───────── Look premium del sitio público ───────── */
+html {
+  scroll-behavior: smooth;
+}
+body {
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+::selection {
+  background: var(--color-gold-300);
+  color: var(--color-navy-950);
+}
+
+/* Botones: glow dorado al pasar el mouse */
+:where(a, button)[class*="bg-navy-900"],
+:where(a, button)[class*="bg-gold-"] {
+  transition:
+    box-shadow 0.3s ease,
+    transform 0.2s ease,
+    filter 0.3s ease,
+    background-color 0.2s ease;
+}
+@media (hover: hover) {
+  :where(a, button:not(:disabled))[class*="bg-navy-900"]:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      0 0 0 1px rgba(255, 182, 72, 0.5),
+      0 14px 34px -8px rgba(12, 26, 56, 0.6),
+      0 0 30px rgba(245, 154, 31, 0.45);
+  }
+  :where(a, button:not(:disabled))[class*="bg-gold-"]:hover {
+    transform: translateY(-2px);
+    filter: brightness(1.06);
+    box-shadow:
+      0 0 0 1px rgba(255, 217, 138, 0.7),
+      0 14px 36px -8px rgba(245, 154, 31, 0.75),
+      0 0 38px rgba(255, 182, 72, 0.6);
+  }
+}
+:where(a, button):active[class*="bg-navy-900"],
+:where(a, button):active[class*="bg-gold-"] {
+  transform: translateY(0) scale(0.98);
+}
+
+/* Menú: línea dorada con glow que se dibuja al pasar el mouse */
+.nav-link {
+  position: relative;
+  transition:
+    color 0.2s ease,
+    text-shadow 0.3s ease;
+}
+.nav-link::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -7px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, var(--color-gold-500), transparent);
+  box-shadow: 0 0 12px rgba(245, 154, 31, 0.85);
+  transform: scaleX(0);
+  transition: transform 0.3s ease;
+}
+@media (hover: hover) {
+  .nav-link:hover {
+    text-shadow: 0 0 18px rgba(245, 154, 31, 0.4);
+  }
+  .nav-link:hover::after {
+    transform: scaleX(1);
+  }
+}
+
+/* Contorno premium: borde con degradé dorado a azul marino */
+.premium-outline {
+  border: 1px solid transparent !important;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.96)) padding-box,
+    linear-gradient(135deg, #ffd98a 0%, #f59a1f 40%, #12274d 100%) border-box !important;
+  box-shadow:
+    0 0 0 4px rgba(245, 154, 31, 0.08),
+    0 18px 40px -16px rgba(12, 24, 48, 0.4);
+}
+.menu-link {
+  border: 1px solid transparent;
+  transition:
+    border-color 0.25s ease,
+    background-color 0.25s ease,
+    box-shadow 0.25s ease;
+}
+@media (hover: hover), (pointer: coarse) {
+  .menu-link:hover,
+  .menu-link:active {
+    border-color: rgba(245, 154, 31, 0.4);
+    background-color: var(--color-cream-100);
+    box-shadow: 0 8px 22px -12px rgba(245, 154, 31, 0.6);
+  }
+}
+
+/* Tarjetas: sombra en capas y elevación al pasar el mouse */
+.premium-card {
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 2px 4px rgba(12, 24, 48, 0.04),
+    0 14px 32px -18px rgba(12, 24, 48, 0.35),
+    0 34px 64px -34px rgba(12, 24, 48, 0.28);
+  transition:
+    box-shadow 0.35s ease,
+    transform 0.35s ease,
+    border-color 0.35s ease;
+}
+@media (hover: hover) {
+  .premium-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(245, 154, 31, 0.5);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.9) inset,
+      0 4px 8px rgba(12, 24, 48, 0.06),
+      0 26px 50px -20px rgba(12, 24, 48, 0.42),
+      0 0 0 1px rgba(245, 154, 31, 0.25),
+      0 0 44px -10px rgba(245, 154, 31, 0.4);
+  }
+}
+
+/* Campos: aro dorado al enfocar */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  border-color: rgba(245, 154, 31, 0.7);
+  box-shadow: 0 0 0 4px rgba(245, 154, 31, 0.18);
+}
+
+/* Barra de scroll fina y dorada */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-gold-500) transparent;
+}
+::-webkit-scrollbar {
+  width: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(var(--color-gold-400), var(--color-gold-600));
+  border-radius: 8px;
+  border: 2px solid var(--background);
+}

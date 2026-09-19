@@ -11,7 +11,7 @@ export default function CartDrawer({ exchangeRate }: { exchangeRate: number }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[60]">
+    <div data-sheet="side" className="fixed inset-0 z-[60]">
       <button
         type="button"
         aria-label="Cerrar carrito"

@@ -207,7 +207,7 @@ export default function AdminClientesPage() {
       </div>
 
       {panelOpen && (
-        <div className="fixed inset-0 z-[70]">
+        <div data-sheet className="fixed inset-0 z-[70]">
           <button
             type="button"
             aria-label="Cerrar"

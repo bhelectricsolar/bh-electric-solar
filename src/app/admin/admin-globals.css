@@ -231,3 +231,43 @@ h2 {
     font-size: 16px !important;
   }
 }
+
+/* La manito del mouse en todo lo que se puede apretar (antes faltaba en
+   algunos botones, como "Registrar venta"). */
+button:not(:disabled),
+[role="button"],
+summary,
+select,
+label[for],
+input[type="checkbox"],
+input[type="radio"],
+input[type="file"],
+a[href] {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: not-allowed;
+}
+
+/* Menús desplegables: el scroll de adentro no arrastra la pantalla de atrás. */
+[data-sheet],
+[data-sheet] * {
+  overscroll-behavior: contain;
+}
+
+/* Colores nativos según el tema: sin esto, en iPhone las listas
+   desplegables se ven blancas con letra clara (ilegible) en modo oscuro. */
+:root {
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+select,
+option,
+optgroup {
+  color: var(--color-slate-ink);
+}
+option {
+  background-color: var(--color-surface);
+}

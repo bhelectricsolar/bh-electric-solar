@@ -100,7 +100,7 @@ export default function Services() {
           {SERVICES.map((service, index) => (
             <article
               key={service.title}
-              className="group relative rounded-2xl border border-ink/10 bg-white p-7 shadow-[0_15px_35px_-25px_rgba(12,24,48,0.4)] transition-all hover:z-10 hover:bg-cream-100/60 hover:shadow-[0_25px_60px_-20px_rgba(245,154,31,0.35)] sm:rounded-none sm:border-0 sm:shadow-none"
+              className="premium-card group relative rounded-2xl border border-ink/10 bg-white p-7 transition-all hover:z-10 hover:bg-cream-100/60 hover:shadow-[0_25px_60px_-20px_rgba(245,154,31,0.35)] sm:rounded-none sm:border-0 sm:shadow-none"
             >
               <span className="text-xs font-semibold text-body/60">
                 {String(index + 1).padStart(2, "0")}

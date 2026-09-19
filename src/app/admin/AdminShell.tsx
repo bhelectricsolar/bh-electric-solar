@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useTheme } from "./ThemeProvider";
+import FullscreenToggle from "@/components/admin/FullscreenToggle";
 import { ICONS, SECTORS, sectorForPath, type Sector } from "@/lib/admin-sectors";
 import { useCurrentTeamMember, useCurrentDeveloper, signOut } from "@/lib/current-user";
 
@@ -77,13 +78,16 @@ function RestrictedShell({
             </span>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => signOut()}
-          className="cursor-pointer touch-manipulation rounded-lg border border-ink/15 bg-background px-3 py-2 text-xs font-semibold text-ink shadow-sm hover:shadow-md"
-        >
-          Cerrar sesión
-        </button>
+        <div className="flex items-center gap-2">
+          <FullscreenToggle compact />
+          <button
+            type="button"
+            onClick={() => signOut()}
+            className="cursor-pointer touch-manipulation rounded-lg border border-ink/15 bg-background px-3 py-2 text-xs font-semibold text-ink shadow-sm hover:shadow-md"
+          >
+            Cerrar sesión
+          </button>
+        </div>
       </header>
       <main className="flex-1">{children}</main>
     </div>
@@ -272,6 +276,7 @@ function FullAdminShell({
             <ThemeIcon theme={theme} />
             {theme === "dark" ? "Tema claro" : "Tema oscuro"}
           </button>
+          <FullscreenToggle />
           <Link
             href="/"
             className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-xs font-medium text-body hover:bg-cream-200"
@@ -368,7 +373,7 @@ function FullAdminShell({
 
       {/* "Más" — menú de tarjetas del sistema actual (o los 3 sistemas si estás en Resumen) */}
       {moreOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden">
+        <div data-sheet className="fixed inset-0 z-50 lg:hidden">
           <button
             type="button"
             aria-label="Cerrar"

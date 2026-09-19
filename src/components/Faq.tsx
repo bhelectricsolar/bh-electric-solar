@@ -61,7 +61,7 @@ export default function Faq() {
             return (
               <div
                 key={item.q}
-                className="rounded-2xl border border-black/5 bg-white shadow-[0_6px_20px_-16px_rgba(16,28,61,0.4)] transition-shadow hover:shadow-[0_15px_40px_-20px_rgba(245,154,31,0.4)]"
+                className="premium-card rounded-2xl border border-black/5 bg-white transition-shadow hover:shadow-[0_15px_40px_-20px_rgba(245,154,31,0.4)]"
               >
                 <button
                   type="button"

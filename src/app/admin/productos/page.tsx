@@ -383,7 +383,7 @@ export default function AdminProductosPage() {
       </div>
 
       {choiceOpen && (
-        <div className="fixed inset-0 z-[70]">
+        <div data-sheet className="fixed inset-0 z-[70]">
           <button
             type="button"
             aria-label="Cerrar"
@@ -421,7 +421,7 @@ export default function AdminProductosPage() {
       )}
 
       {fromInventoryOpen && (
-        <div className="fixed inset-0 z-[70]">
+        <div data-sheet className="fixed inset-0 z-[70]">
           <button
             type="button"
             aria-label="Cerrar"
@@ -451,7 +451,7 @@ export default function AdminProductosPage() {
       )}
 
       {panelOpen && (
-        <div className="fixed inset-0 z-[70]">
+        <div data-sheet className="fixed inset-0 z-[70]">
           <button
             type="button"
             aria-label="Cerrar"

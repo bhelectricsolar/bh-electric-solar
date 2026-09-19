@@ -18,7 +18,7 @@ export default function Header() {
 
   return (
     <header className="sticky top-4 z-50 px-4">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-6 rounded-2xl border border-black/5 bg-white/90 px-5 py-3 shadow-[0_10px_30px_-12px_rgba(16,28,61,0.25)] backdrop-blur">
+      <div className="premium-outline mx-auto flex max-w-6xl items-center justify-between gap-6 rounded-2xl px-5 py-3 shadow-[0_10px_30px_-12px_rgba(16,28,61,0.25)] backdrop-blur">
         <Link href="/" className="flex items-center gap-3">
           <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-navy-900">
             <svg viewBox="0 0 32 32" className="h-6 w-6">
@@ -42,7 +42,7 @@ export default function Header() {
             <Link
               key={link.label}
               href={link.href}
-              className="text-sm font-medium text-navy-900/80 transition-colors hover:text-navy-900"
+              className="nav-link text-sm font-medium text-navy-900/80 transition-colors hover:text-navy-900"
             >
               {link.label}
             </Link>
@@ -63,7 +63,8 @@ export default function Header() {
             type="button"
             aria-label={open ? "Cerrar menu" : "Abrir menu"}
             onClick={() => setOpen((v) => !v)}
-            className="grid h-10 w-10 shrink-0 cursor-pointer touch-manipulation place-items-center rounded-lg border border-navy-900/10 text-navy-900 lg:hidden"
+            data-dropdown-toggle={open ? "" : undefined}
+            className="grid h-10 w-10 shrink-0 cursor-pointer touch-manipulation place-items-center rounded-lg border border-gold-500/40 bg-cream-100 text-navy-900 shadow-[0_6px_16px_-8px_rgba(245,154,31,0.7)] transition-shadow hover:shadow-[0_0_20px_rgba(245,154,31,0.55)] lg:hidden"
           >
             <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2}>
               {open ? (
@@ -77,13 +78,13 @@ export default function Header() {
       </div>
 
       {open && (
-        <div className="animate-menu-in mx-auto mt-2 flex max-w-6xl flex-col gap-1 rounded-2xl border border-ink/10 bg-white/90 p-4 shadow-[0_30px_60px_-20px_rgba(12,24,48,0.45)] backdrop-blur-xl lg:hidden">
+        <div data-dropdown className="animate-menu-in premium-outline mx-auto mt-2 flex max-w-6xl flex-col gap-1 rounded-2xl p-4 shadow-[0_30px_60px_-20px_rgba(12,24,48,0.45)] backdrop-blur-xl lg:hidden">
           {NAV_LINKS.map((link) => (
             <Link
               key={link.label}
               href={link.href}
               onClick={() => setOpen(false)}
-              className="rounded-lg px-3 py-2.5 text-sm font-medium text-navy-900 transition-colors hover:bg-cream-100"
+              className="menu-link rounded-xl px-3.5 py-3 text-sm font-semibold text-navy-900"
             >
               {link.label}
             </Link>
@@ -91,7 +92,7 @@ export default function Header() {
           <Link
             href="/calculadora-solar"
             onClick={() => setOpen(false)}
-            className="mt-2 rounded-lg bg-navy-900 px-3 py-2.5 text-center text-sm font-semibold text-white shadow-[0_10px_25px_-10px_rgba(12,24,48,0.6)]"
+            className="mt-2 rounded-xl bg-navy-900 px-3 py-3 text-center text-sm font-semibold text-white shadow-[0_10px_25px_-10px_rgba(12,24,48,0.6)]"
           >
             Calcular Proyecto
           </Link>

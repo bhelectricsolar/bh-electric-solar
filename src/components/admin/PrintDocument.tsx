@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef, useState } from "react";
 import { useAdminSettings } from "@/lib/admin-settings";
 
 export default function PrintDocument({
@@ -12,9 +13,33 @@ export default function PrintDocument({
   children: React.ReactNode;
 }) {
   const { settings } = useAdminSettings();
+  const paperRef = useRef<HTMLDivElement>(null);
+  const [copied, setCopied] = useState(false);
+
+  // Comparte el documento como texto: menú nativo de compartir en celular y
+  // Mac; si el equipo no lo tiene, abre WhatsApp con el texto ya escrito.
+  async function share() {
+    const text = paperRef.current?.innerText.trim() ?? title;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title, text });
+        return;
+      } catch (err) {
+        if ((err as Error).name === "AbortError") return;
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // sin portapapeles: seguimos con WhatsApp
+    }
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+  }
 
   return (
-    <div className="fixed inset-0 z-[80]">
+    <div data-sheet className="fixed inset-0 z-[80]">
       <button
         type="button"
         aria-label="Cerrar"
@@ -37,7 +62,7 @@ export default function PrintDocument({
           </button>
         </div>
 
-        <div className="bh-recibo mt-4 border border-black/10">
+        <div ref={paperRef} className="bh-recibo mt-4 border border-black/10">
           <div className="text-center">
             <div className="text-base font-bold">{settings.storeName}</div>
             {settings.whatsapp && <div className="text-xs opacity-80">WhatsApp: {settings.whatsapp}</div>}
@@ -48,13 +73,20 @@ export default function PrintDocument({
           <div className="mt-4 text-center text-xs opacity-70">¡Gracias por confiar en nosotros!</div>
         </div>
 
-        <div className="bh-no-print mt-6 flex justify-end gap-2">
+        <div className="bh-no-print mt-6 flex flex-wrap justify-end gap-2">
           <button
             type="button"
             onClick={onClose}
             className="cursor-pointer touch-manipulation rounded-lg border border-ink/15 px-4 py-2.5 text-sm font-semibold text-ink hover:bg-cream-200"
           >
             Cerrar
+          </button>
+          <button
+            type="button"
+            onClick={share}
+            className="cursor-pointer touch-manipulation rounded-lg border border-gold-500/50 bg-gold-500/10 px-4 py-2.5 text-sm font-semibold text-gold-600 hover:bg-gold-500/20"
+          >
+            {copied ? "Texto copiado ✓" : "Compartir"}
           </button>
           <button
             type="button"

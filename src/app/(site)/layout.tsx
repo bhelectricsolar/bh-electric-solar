@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Outfit, Plus_Jakarta_Sans, IBM_Plex_Mono } from "next/font/google";
 import "../globals.css";
 import Header from "@/components/Header";
+import SheetManager from "@/components/SheetManager";
 import Footer from "@/components/Footer";
 import WhatsAppFloat from "@/components/WhatsAppFloat";
 import { CartProvider } from "@/lib/cart-context";
@@ -39,6 +40,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       className={`${displayFont.variable} ${bodyFont.variable} ${dataFont.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-white">
+        <SheetManager />
         <CartProvider>
           <Header />
           <main className="flex-1">{children}</main>
