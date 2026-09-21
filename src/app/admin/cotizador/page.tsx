@@ -27,7 +27,7 @@ import {
   PROVINCES,
   buildQuoteSummary,
   calculateQuote,
-  inferProvince,
+  parseInvoiceText,
   validateInputs,
   type QuoteInputs,
 } from "@/lib/solar-quote";
@@ -67,9 +67,9 @@ const EMPTY_FORM: Form = {
   projectId: "",
 };
 
-// Achica la foto antes de subirla: las fotos de celular pesan varios MB y
-// no hace falta esa resolución para leer una factura.
-async function prepareImage(file: File): Promise<{ base64: string; mediaType: "image/jpeg" }> {
+// Prepara la foto para el OCR: la achica si es enorme (las fotos de celular
+// pesan varios MB) y la dibuja en un canvas. Todo pasa en este dispositivo.
+async function prepareCanvas(file: File): Promise<HTMLCanvasElement> {
   const url = URL.createObjectURL(file);
   try {
     const img = await new Promise<HTMLImageElement>((resolve, reject) => {
@@ -78,13 +78,12 @@ async function prepareImage(file: File): Promise<{ base64: string; mediaType: "i
       el.onerror = () => reject(new Error("formato"));
       el.src = url;
     });
-    const scale = Math.min(1, 1800 / Math.max(img.naturalWidth, img.naturalHeight));
+    const scale = Math.min(1, 2400 / Math.max(img.naturalWidth, img.naturalHeight));
     const canvas = document.createElement("canvas");
     canvas.width = Math.round(img.naturalWidth * scale);
     canvas.height = Math.round(img.naturalHeight * scale);
     canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
-    return { base64: dataUrl.split(",")[1], mediaType: "image/jpeg" };
+    return canvas;
   } finally {
     URL.revokeObjectURL(url);
   }
@@ -122,6 +121,7 @@ function CotizadorInner() {
   const [customerFilter, setCustomerFilter] = useState<string | null>(customerParam);
 
   const [reading, setReading] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [ocrError, setOcrError] = useState<string | null>(null);
   const [ocrInfo, setOcrInfo] = useState<{ distribuidora: string | null; missing: string[] } | null>(null);
   const [needsConfirm, setNeedsConfirm] = useState(false);
@@ -134,6 +134,7 @@ function CotizadorInner() {
   const [sheet, setSheet] = useState<{ title: string; text: string } | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
   const appliedParam = useRef(false);
 
   const reloadQuotes = useCallback(() => getSolarQuotes().then(setQuotes).catch((e) => console.error("Cotizaciones:", e)), []);
@@ -194,49 +195,63 @@ function CotizadorInner() {
     [inputs, results, f.clientName, f.address],
   );
 
+  // Lectura gratuita: el OCR corre en este dispositivo (sin API ni costo).
+  // Es de "mejor esfuerzo" y por eso siempre se pide confirmar los datos.
   async function readInvoice(file: File) {
     setReading(true);
+    setProgress(0);
     setOcrError(null);
     setOcrInfo(null);
     try {
-      let prepared;
+      let canvas: HTMLCanvasElement;
       try {
-        prepared = await prepareImage(file);
+        canvas = await prepareCanvas(file);
       } catch {
         throw new Error("No se pudo abrir la imagen. Probá con una foto en JPG o PNG.");
       }
-      const res = await fetch("/api/admin/factura-ocr", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: prepared.base64, mediaType: prepared.mediaType }),
+      const { createWorker } = await import("tesseract.js");
+      const worker = await createWorker("spa", 1, {
+        logger: (m) => {
+          if (m.status === "recognizing text") setProgress(Math.round(m.progress * 100));
+        },
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "No se pudo leer la factura.");
+      let text = "";
+      try {
+        const { data } = await worker.recognize(canvas);
+        text = data.text;
+      } finally {
+        await worker.terminate();
+      }
 
-      const province = inferProvince(data.distribuidora, data.provincia);
+      const parsed = parseInvoiceText(text);
       const missing: string[] = [];
       const patch: Partial<Form> = {};
-      if (data.kwh) patch.kwh = String(data.kwh);
+      if (parsed.kwh) patch.kwh = String(parsed.kwh);
       else missing.push("kWh");
-      if (data.dias) patch.days = String(data.dias);
+      if (parsed.days) patch.days = String(parsed.days);
       else missing.push("días del período");
-      if (data.montoTotal) {
-        patch.totalBill = String(data.montoTotal);
+      if (parsed.total) {
+        patch.totalBill = String(parsed.total);
         setPriceOverride(null);
-      }
-      if (province) {
-        patch.province = province;
+      } else missing.push("monto total");
+      if (parsed.province) {
+        patch.province = parsed.province;
         setHspOverride(null);
       } else missing.push("provincia (elegila a mano)");
       setField(patch);
       setFromPhoto(true);
       setNeedsConfirm(true);
-      setOcrInfo({ distribuidora: data.distribuidora, missing });
+      setOcrInfo({ distribuidora: parsed.distribuidora, missing });
     } catch (e) {
-      setOcrError((e as Error).message);
+      setOcrError(
+        (e as Error).message.startsWith("No se pudo abrir")
+          ? (e as Error).message
+          : "No se pudo leer la foto (revisá la conexión, la primera vez descarga el idioma). Cargá los datos a mano.",
+      );
     } finally {
       setReading(false);
       if (fileRef.current) fileRef.current.value = "";
+      if (cameraRef.current) cameraRef.current.value = "";
     }
   }
 
@@ -339,35 +354,63 @@ function CotizadorInner() {
           <div className="flex flex-col gap-5">
             <Card title="1 · Factura de luz">
               <p className="text-xs text-body">
-                Subí una foto y se cargan los datos solos, o completalos a mano abajo.
+                Cargá los datos a mano en los pasos siguientes, o sacale una foto a la factura para autocompletarlos.
+                La lectura es gratuita y se hace en este equipo, pero puede fallar: siempre revisá los datos.
               </p>
-              <input
-                ref={fileRef}
-                id="factura-file"
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) readInvoice(file);
-                }}
-              />
-              <label
-                htmlFor="factura-file"
-                className={`mt-3 flex items-center justify-center gap-2 rounded-lg border border-dashed border-gold-500/50 bg-gold-500/10 px-4 py-3 text-sm font-bold text-gold-600 transition-all hover:bg-gold-500/15 ${reading ? "pointer-events-none opacity-60" : ""}`}
-              >
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M4 8a2 2 0 0 1 2-2h1.5l1.2-2h6.6l1.2 2H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8Z" />
-                  <circle cx="12" cy="13" r="3.5" />
-                </svg>
-                {reading ? "Leyendo la factura…" : "Subir foto de la factura"}
-              </label>
+              {(["camera", "file"] as const).map((kind) => (
+                <input
+                  key={kind}
+                  ref={kind === "camera" ? cameraRef : fileRef}
+                  id={`factura-${kind}`}
+                  type="file"
+                  accept="image/*"
+                  {...(kind === "camera" ? { capture: "environment" as const } : {})}
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) readInvoice(file);
+                  }}
+                />
+              ))}
+              <div className={`mt-3 grid grid-cols-2 gap-2 ${reading ? "pointer-events-none opacity-60" : ""}`}>
+                <label
+                  htmlFor="factura-camera"
+                  className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-gold-500/50 bg-gold-500/10 px-3 py-3 text-sm font-bold text-gold-600 transition-all hover:bg-gold-500/15"
+                >
+                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4 8a2 2 0 0 1 2-2h1.5l1.2-2h6.6l1.2 2H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8Z" />
+                    <circle cx="12" cy="13" r="3.5" />
+                  </svg>
+                  Sacar foto
+                </label>
+                <label
+                  htmlFor="factura-file"
+                  className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-ink/25 bg-background px-3 py-3 text-sm font-bold text-ink transition-all hover:border-gold-500/50"
+                >
+                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="4" width="18" height="16" rx="2" />
+                    <circle cx="9" cy="10" r="1.6" />
+                    <path d="m21 16-5-5-8 8" />
+                  </svg>
+                  Elegir imagen
+                </label>
+              </div>
+              {reading && (
+                <div className="mt-3">
+                  <p className="text-xs font-semibold text-ink">
+                    Leyendo la factura… {progress > 0 ? `${progress}%` : "preparando (la primera vez tarda un poco más)"}
+                  </p>
+                  <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-background">
+                    <div className="h-full rounded-full bg-gold-500 transition-all" style={{ width: `${Math.max(progress, 4)}%` }} />
+                  </div>
+                </div>
+              )}
               {ocrError && (
                 <p className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-600">{ocrError}</p>
               )}
               {ocrInfo && (
                 <p className="mt-3 rounded-lg border border-gold-500/30 bg-gold-500/10 px-3 py-2 text-xs text-gold-600">
-                  Datos leídos de la factura{ocrInfo.distribuidora ? ` (${ocrInfo.distribuidora})` : ""}.
+                  Datos leídos de la foto{ocrInfo.distribuidora ? ` (${ocrInfo.distribuidora})` : ""}.
                   {ocrInfo.missing.length > 0 && <> No se detectó: {ocrInfo.missing.join(", ")}.</>} Revisalos antes
                   de calcular.
                 </p>

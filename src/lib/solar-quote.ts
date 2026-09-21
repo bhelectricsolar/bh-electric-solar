@@ -236,3 +236,86 @@ export function buildQuoteSummary(args: {
   }
   return lines.join("\n");
 }
+
+// ───────── Lectura del texto de una factura (OCR gratuito en el navegador) ─────────
+
+export type ParsedInvoice = {
+  kwh: number | null;
+  days: number | null;
+  total: number | null;
+  province: string | null;
+  distribuidora: string | null;
+};
+
+// "1.234,56" → 1234.56 · "612" → 612 · "45.870,25" → 45870.25
+function parseArNumber(s: string): number | null {
+  const cleaned = s.replace(/[^\d.,]/g, "");
+  if (!cleaned) return null;
+  const n = cleaned.includes(",")
+    ? Number(cleaned.replace(/\./g, "").replace(",", "."))
+    : /^\d{1,3}(\.\d{3})+$/.test(cleaned)
+      ? Number(cleaned.replace(/\./g, ""))
+      : Number(cleaned);
+  return Number.isFinite(n) ? n : null;
+}
+
+// Lee el texto crudo que devuelve el OCR. Es un "mejor esfuerzo": siempre
+// devuelve null en lo que no encuentra, y el ingeniero revisa todo.
+export function parseInvoiceText(raw: string): ParsedInvoice {
+  const text = raw.replace(/\r/g, "");
+  const flat = text.replace(/\s+/g, " ");
+
+  // kWh del período: preferimos los que están cerca de "consumo" / "energía".
+  let kwh: number | null = null;
+  const kwhCandidates: { value: number; near: boolean }[] = [];
+  for (const m of flat.matchAll(/(\d[\d.,]*)\s*kwh/gi)) {
+    const value = parseArNumber(m[1]);
+    if (value == null || value < 10 || value > 50000) continue;
+    const before = flat.slice(Math.max(0, (m.index ?? 0) - 45), m.index ?? 0);
+    kwhCandidates.push({ value, near: /consumo|energ[ií]a|facturad|total/i.test(before) });
+  }
+  const near = kwhCandidates.filter((c) => c.near);
+  if (near.length > 0) kwh = near[0].value;
+  else if (kwhCandidates.length > 0) kwh = Math.max(...kwhCandidates.map((c) => c.value));
+
+  // Días: "60 días" explícito, o la diferencia entre dos fechas seguidas.
+  let days: number | null = null;
+  const explicit = flat.match(/(\d{1,3})\s*d[ií]as/i);
+  if (explicit && Number(explicit[1]) >= 20 && Number(explicit[1]) <= 100) days = Number(explicit[1]);
+  if (days == null) {
+    const dates: Date[] = [];
+    for (const m of flat.matchAll(/(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})/g)) {
+      const y = Number(m[3]) < 100 ? 2000 + Number(m[3]) : Number(m[3]);
+      const d = new Date(y, Number(m[2]) - 1, Number(m[1]));
+      if (!Number.isNaN(d.getTime())) dates.push(d);
+    }
+    for (let i = 0; i + 1 < dates.length && days == null; i++) {
+      const diff = Math.round((dates[i + 1].getTime() - dates[i].getTime()) / 86400000);
+      if (diff >= 25 && diff <= 70) days = diff;
+    }
+  }
+
+  // Monto total: preferimos "total a pagar".
+  let total: number | null = null;
+  const totals: { value: number; pay: boolean }[] = [];
+  for (const m of flat.matchAll(/(total\s*(?:a\s*pagar|factura|facturado)?|importe\s*total|monto\s*total)[^\d]{0,25}(\d[\d.,]*)/gi)) {
+    const value = parseArNumber(m[2]);
+    if (value == null || value < 100) continue;
+    totals.push({ value, pay: /pagar/i.test(m[1]) });
+  }
+  const pay = totals.find((t) => t.pay);
+  if (pay) total = pay.value;
+  else if (totals.length > 0) total = Math.max(...totals.map((t) => t.value));
+
+  const cleanFlat = flat.replace(/\./g, "");
+  const dist = DISTRIBUIDORAS.find((d) => d.pattern.test(cleanFlat));
+  const distName = dist ? (cleanFlat.match(dist.pattern)?.[0] ?? null) : null;
+
+  return {
+    kwh,
+    days,
+    total,
+    province: dist?.province ?? null,
+    distribuidora: distName ? distName.toUpperCase() : null,
+  };
+}
