@@ -143,6 +143,7 @@ export type HistoryPeriod = {
   kwh: number;
   days: number;
   included: boolean;
+  ocr?: boolean; // leído de la foto y todavía sin verificar por una persona
 };
 
 export type SizingBasis = "historial" | "factura";

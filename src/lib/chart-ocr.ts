@@ -29,13 +29,28 @@ export function mergeDetections(dets: Detection[], cropWidth: number): (number |
     else groups.push([d]);
   }
 
-  const pick = (g: Detection[]) => {
-    const score = new Map<number, number>();
-    for (const d of g) score.set(d.v, (score.get(d.v) ?? 0) + 1 + d.conf / 200);
-    return [...score.entries()].sort((a, b) => b[1] - a[1])[0][0];
+  // Precisión antes que cantidad: un valor mal leído es peor que un "?".
+  // Solo se acepta si al menos dos pasadas coinciden (o una con confianza muy alta).
+  const pick = (g: Detection[]): number | null => {
+    const votes = new Map<number, { n: number; conf: number }>();
+    for (const d of g) {
+      const cur = votes.get(d.v) ?? { n: 0, conf: 0 };
+      votes.set(d.v, { n: cur.n + 1, conf: Math.max(cur.conf, d.conf) });
+    }
+    const [v, info] = [...votes.entries()].sort((a, b) => b[1].n - a[1].n || b[1].conf - a[1].conf)[0];
+    return info.n >= 2 || info.conf >= 90 ? v : null;
   };
   const centers = groups.map((g) => g.reduce((s, d) => s + d.x, 0) / g.length);
-  const values = groups.map(pick);
+  const values: (number | null)[] = groups.map(pick);
+
+  // Valores absurdos frente al resto (típico de un dígito perdido): a "?".
+  const known = values.filter((v): v is number => v != null).sort((a, b) => a - b);
+  if (known.length >= 4) {
+    const median = known[Math.floor(known.length / 2)];
+    values.forEach((v, i) => {
+      if (v != null && (v < median * 0.25 || v > median * 4)) values[i] = null;
+    });
+  }
   if (groups.length < 2) return values;
 
   // Paso entre barras: mediana de la mitad más chica de los huecos (así una

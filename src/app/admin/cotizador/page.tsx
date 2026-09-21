@@ -376,7 +376,7 @@ function CotizadorInner() {
   }
 
   // Pega los kWh del gráfico de la factura (del más viejo al más nuevo).
-  function applyPaste(textOverride?: string) {
+  function applyPaste(textOverride?: string, fromChart = false) {
     // "?" = período que no se pudo leer (queda en 0 para completarlo a mano)
     const nums = ((textOverride ?? histText).match(/\d[\d.,]*|\?/g) ?? [])
       .map((t) => (t === "?" ? 0 : parseArNumber(t)))
@@ -391,6 +391,7 @@ function CotizadorInner() {
         kwh,
         days: perDays,
         included: true,
+        ...(fromChart && kwh > 0 ? { ocr: true } : {}),
       };
     });
     // Si el último dato es el de la factura y es un período parcial, usa sus días reales.
@@ -425,10 +426,10 @@ function CotizadorInner() {
       }
       const text = r.values.map((v) => v ?? "?").join(" ");
       setHistText(text);
-      applyPaste(text);
+      applyPaste(text, true);
       setSelectingChart(false);
       setChartMsg(
-        `Leí ${r.read} de ${r.total} períodos${r.read < r.total ? ": los marcados en rojo no se pudieron leer, completalos mirando el gráfico" : ""}. Revisá que estén todos (puede faltar alguno al principio o al final) y corregí lo que haga falta.`,
+        `Leí ${r.read} de ${r.total} períodos${r.read < r.total ? ": los marcados en rojo no se pudieron leer, completalos mirando el gráfico" : ""}. Los valores en ámbar los leyó la foto: verificalos contra el gráfico (tocá uno para confirmarlo). Puede faltar algún período al principio o al final.`,
       );
     } catch (e) {
       console.error("Gráfico:", e);
@@ -811,8 +812,9 @@ function CotizadorInner() {
                           suffix=" kWh"
                           value={row.kwh || ""}
                           placeholder="falta dato"
-                          onValueChange={(v) => updateRow(idx, { kwh: Number(v) || 0 })}
-                          className={`w-full min-w-0 rounded-md border bg-background px-2 py-1.5 text-xs text-ink ${row.kwh > 0 ? "border-ink/10" : "border-red-500/60 bg-red-500/5"}`}
+                          onValueChange={(v) => updateRow(idx, { kwh: Number(v) || 0, ocr: false })}
+                          onFocus={() => row.ocr && updateRow(idx, { ocr: false })}
+                          className={`w-full min-w-0 rounded-md border bg-background px-2 py-1.5 text-xs text-ink ${row.kwh <= 0 ? "border-red-500/60 bg-red-500/5" : row.ocr ? "border-gold-500 bg-gold-500/10" : "border-ink/10"}`}
                         />
                         <NumberField
                           suffix=" d"
