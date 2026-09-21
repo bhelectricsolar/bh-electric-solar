@@ -775,9 +775,15 @@ function CotizadorInner() {
                 placeholder="O pegalos a mano, del más viejo al más nuevo. Ej: 548 753 510 464 447 412 561 574 654 564 669 770 1122 1048 287 (usá ? si no lo sabés)"
                 className={`${INPUT} mt-3 resize-none`}
               />
-              <div className="mt-3 grid grid-cols-2 gap-4">
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                 <Field label="Mes del último dato">
-                  <input type="month" value={histEnd} onChange={(e) => setHistEnd(e.target.value)} className={INPUT} />
+                  <input
+                    type="month"
+                    value={histEnd}
+                    onChange={(e) => setHistEnd(e.target.value)}
+                    className={`${INPUT} min-w-0 appearance-none`}
+                    style={{ minHeight: "2.75rem" }}
+                  />
                 </Field>
                 <Field label="Días por período">
                   <NumberField suffix=" días" value={histDays} onValueChange={setHistDays} className={INPUT} />
@@ -1365,9 +1371,9 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label className="block">
+    <label className="block min-w-0">
       <span className="text-xs font-semibold text-ink">{label}</span>
-      <div className="mt-1.5">{children}</div>
+      <div className="mt-1.5 min-w-0">{children}</div>
     </label>
   );
 }
