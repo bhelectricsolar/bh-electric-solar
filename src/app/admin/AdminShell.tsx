@@ -9,7 +9,7 @@ import { ICONS, SECTORS, sectorForPath, type Sector } from "@/lib/admin-sectors"
 import { useCurrentTeamMember, useCurrentDeveloper, signOut } from "@/lib/current-user";
 
 // Las únicas rutas a las que puede entrar alguien que NO es administrador ni desarrollador.
-const RESTRICTED_ALLOWED_PATHS = ["/admin/caja"];
+const RESTRICTED_ALLOWED_PATHS = ["/admin/caja", "/admin/cotizador"];
 const RESTRICTED_HOME = "/admin/caja";
 
 export default function AdminShell({ children }: { children: React.ReactNode }) {
@@ -60,6 +60,7 @@ function RestrictedShell({
   member: { name: string; role: string };
   children: React.ReactNode;
 }) {
+  const pathname = usePathname();
   const roleLabel = member.role === "vendedor" ? "Vendedor" : "Técnico / Instalador";
   return (
     <div className="flex min-h-dvh flex-col bg-background">
@@ -89,6 +90,22 @@ function RestrictedShell({
           </button>
         </div>
       </header>
+      <nav className="flex gap-1 border-b border-ink/10 bg-surface px-3 py-2">
+        {RESTRICTED_ALLOWED_PATHS.map((href) => {
+          const active = pathname.startsWith(href);
+          return (
+            <Link
+              key={href}
+              href={href}
+              className={`rounded-lg px-3.5 py-2 text-sm font-semibold transition-colors ${
+                active ? "bg-gold-500 text-navy-950" : "text-ink hover:bg-cream-200"
+              }`}
+            >
+              {href === "/admin/caja" ? "Caja" : "Cotizador solar"}
+            </Link>
+          );
+        })}
+      </nav>
       <main className="flex-1">{children}</main>
     </div>
   );

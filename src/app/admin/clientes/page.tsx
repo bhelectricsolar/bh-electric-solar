@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   getCustomers,
   createCustomer,
@@ -147,7 +148,12 @@ export default function AdminClientesPage() {
                 <p className="font-semibold text-ink">{customer.name}</p>
                 <StatusBadge tone={CUSTOMER_STATUS_TONE[customer.status]}>Cliente</StatusBadge>
               </div>
-              <p className="mt-1 text-xs text-body">{customer.city}</p>
+              <p className="mt-1 flex flex-wrap items-center gap-x-3 text-xs text-body">
+                {customer.city}
+                <Link href={`/admin/cotizador?cliente=${customer.id}`} className="font-semibold text-gold-600 hover:underline">
+                  Cotizar sistema solar →
+                </Link>
+              </p>
               <div className="mt-3 grid grid-cols-2 gap-2 border-t border-ink/10 pt-3 text-xs">
                 <div>
                   <p className="text-body">Email</p>

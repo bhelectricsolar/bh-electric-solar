@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { createClient } from "./supabase/client";
+import { DEFAULT_HSP, DEFAULT_INSTALL_COST_PER_WP } from "./solar-quote";
 
 const supabase = createClient();
 
@@ -42,6 +43,8 @@ export type StoreSettings = {
   exchangeRateUpdatedAt: string | null;
   lowStockThreshold: number;
   installmentPlans: InstallmentPlan[];
+  hspTable: Record<string, number>; // horas sol pico por provincia (cotizador solar)
+  installCostPerWp: number; // USD por Wp instalado (cotizador solar)
 };
 
 const DEFAULT_SETTINGS: StoreSettings = {
@@ -57,6 +60,8 @@ const DEFAULT_SETTINGS: StoreSettings = {
   exchangeRateUpdatedAt: null,
   lowStockThreshold: 8,
   installmentPlans: [],
+  hspTable: DEFAULT_HSP,
+  installCostPerWp: DEFAULT_INSTALL_COST_PER_WP,
 };
 
 // Dólar blue (precio de venta) en tiempo real — API pública argentina, sin
@@ -80,6 +85,8 @@ type SettingsRow = {
   exchange_rate_mode: ExchangeRateMode;
   low_stock_threshold: number;
   installment_plans: InstallmentPlan[] | null;
+  hsp_table: Record<string, number> | null;
+  install_cost_per_wp: number | null;
 };
 
 function fromRow(row: SettingsRow): StoreSettings {
@@ -96,6 +103,9 @@ function fromRow(row: SettingsRow): StoreSettings {
     exchangeRateUpdatedAt: null,
     lowStockThreshold: row.low_stock_threshold,
     installmentPlans: row.installment_plans ?? [],
+    hspTable: { ...DEFAULT_HSP, ...(row.hsp_table ?? {}) },
+    installCostPerWp:
+      row.install_cost_per_wp != null ? Number(row.install_cost_per_wp) : DEFAULT_INSTALL_COST_PER_WP,
   };
 }
 
@@ -112,6 +122,8 @@ function toRow(patch: Partial<StoreSettings>) {
   if (patch.exchangeRateMode !== undefined) row.exchange_rate_mode = patch.exchangeRateMode;
   if (patch.lowStockThreshold !== undefined) row.low_stock_threshold = patch.lowStockThreshold;
   if (patch.installmentPlans !== undefined) row.installment_plans = patch.installmentPlans;
+  if (patch.hspTable !== undefined) row.hsp_table = patch.hspTable;
+  if (patch.installCostPerWp !== undefined) row.install_cost_per_wp = patch.installCostPerWp;
   return row;
 }
 

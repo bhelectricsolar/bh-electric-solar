@@ -23,6 +23,7 @@ export const ICONS: Record<string, string> = {
     "M3 7 12 3l9 4-9 4-9-4Zm0 5 9 4 9-4M3 12v5l9 4 9-4v-5",
   funnel: "M3 4h18l-7 8v7l-4 2v-9L3 4Z",
   bag: "M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4ZM3 6h18M16 10a4 4 0 0 1-8 0",
+  sun: "M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z",
 };
 
 export type SectorId = "tienda" | "negocio";
@@ -57,6 +58,7 @@ export const SECTORS: Sector[] = [
     icon: "briefcase",
     items: [
       { href: "/admin/caja", label: "Caja diaria", description: "Apertura, movimientos y cierre.", icon: "cash" },
+      { href: "/admin/cotizador", label: "Cotizador solar", description: "Dimensioná y cotizá desde la factura de luz.", icon: "sun" },
       { href: "/admin/proyectos", label: "Proyectos", description: "De cotización a instalación.", icon: "projects" },
       { href: "/admin/stock", label: "Stock", description: "Inventario interno completo.", icon: "stock" },
       { href: "/admin/leads", label: "Leads", description: "Consultas del sitio sin confirmar.", icon: "funnel" },

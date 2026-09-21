@@ -18,6 +18,7 @@ import { getProducts, getCategories } from "@/lib/products";
 import { getCustomers } from "@/lib/customers";
 import { getOrders } from "@/lib/orders";
 import { downloadCSV } from "@/lib/csv-export";
+import { DEFAULT_HSP, PROVINCES } from "@/lib/solar-quote";
 
 export default function AdminConfiguracionPage() {
   const { settings, updateSettings, formatPrice, refreshExchangeRate, exchangeRateStatus } =
@@ -321,6 +322,49 @@ export default function AdminConfiguracionPage() {
             className="mt-3 cursor-pointer touch-manipulation rounded-lg border border-ink/15 bg-background px-4 py-2 text-xs font-semibold text-ink shadow-sm transition-all hover:shadow-md"
           >
             + Agregar plan
+          </button>
+        </SettingsCard>
+
+        {/* Cotizador solar */}
+        <SettingsCard title="Cotizador solar">
+          <SavableField
+            label="Costo instalado por defecto (USD por Wp)"
+            value={settings.installCostPerWp}
+            type="number"
+            prefix="US$ "
+            suffix=" /Wp"
+            decimals
+            onSave={(v) => updateSettings({ installCostPerWp: Number(v) || settings.installCostPerWp })}
+          />
+          <p className="mt-5 text-xs font-bold uppercase tracking-wide text-body">
+            Horas sol pico (HSP) por provincia
+          </p>
+          <p className="mt-1 text-xs text-body">
+            Valores de referencia — ajustalos con datos más precisos de cada zona. El ingeniero también puede
+            cambiarlos a mano en cada cotización.
+          </p>
+          <div className="mt-3 grid gap-4 sm:grid-cols-2">
+            {PROVINCES.map((province) => (
+              <SavableField
+                key={province}
+                label={province}
+                value={settings.hspTable[province] ?? DEFAULT_HSP[province] ?? 4.5}
+                type="number"
+                decimals
+                onSave={(v) =>
+                  updateSettings({
+                    hspTable: { ...settings.hspTable, [province]: Number(v) || DEFAULT_HSP[province] || 4.5 },
+                  })
+                }
+              />
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => updateSettings({ hspTable: DEFAULT_HSP })}
+            className="mt-4 cursor-pointer touch-manipulation rounded-lg border border-ink/15 bg-background px-4 py-2 text-xs font-semibold text-ink shadow-sm transition-all hover:shadow-md"
+          >
+            Restaurar valores de referencia
           </button>
         </SettingsCard>
 
