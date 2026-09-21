@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { useSearchParams } from "next/navigation";
 import NumberField from "@/components/NumberField";
 import PrintDocument from "@/components/admin/PrintDocument";
+import { readBarChart, type Region } from "@/lib/chart-ocr";
 import SectorEyebrow from "@/components/admin/SectorEyebrow";
 import StatusBadge from "@/components/admin/StatusBadge";
 import Chip from "@/components/admin/Chip";
@@ -138,6 +139,11 @@ function CotizadorInner() {
   const [fromPhoto, setFromPhoto] = useState(false);
   const [priceFromEnergy, setPriceFromEnergy] = useState(false);
 
+  const [chartCanvas, setChartCanvas] = useState<HTMLCanvasElement | null>(null);
+  const [selectingChart, setSelectingChart] = useState(false);
+  const [chartReading, setChartReading] = useState(false);
+  const [chartProgress, setChartProgress] = useState(0);
+  const [chartMsg, setChartMsg] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryPeriod[]>([]);
   const [basisChoice, setBasisChoice] = useState<SizingBasis>("historial");
   const [histText, setHistText] = useState("");
@@ -234,6 +240,7 @@ function CotizadorInner() {
       let canvas: HTMLCanvasElement;
       try {
         canvas = await prepareCanvas(file);
+        setChartCanvas(canvas);
       } catch {
         throw new Error("No se pudo abrir la imagen. Probá con una foto en JPG o PNG.");
       }
@@ -292,10 +299,11 @@ function CotizadorInner() {
   }
 
   // Pega los kWh del gráfico de la factura (del más viejo al más nuevo).
-  function applyPaste() {
-    const nums = (histText.match(/\d[\d.,]*/g) ?? [])
-      .map(parseArNumber)
-      .filter((n): n is number => n != null && n > 0 && n < 100000);
+  function applyPaste(textOverride?: string) {
+    // "?" = período que no se pudo leer (queda en 0 para completarlo a mano)
+    const nums = ((textOverride ?? histText).match(/\d[\d.,]*|\?/g) ?? [])
+      .map((t) => (t === "?" ? 0 : parseArNumber(t)))
+      .filter((n): n is number => n != null && n >= 0 && n < 100000);
     if (nums.length === 0) return;
     const [y, m] = histEnd.split("-").map(Number);
     const perDays = Number(histDays) || 30;
@@ -315,6 +323,42 @@ function CotizadorInner() {
     setHistory(rows);
     setBasisChoice("historial");
     setSavedId(null);
+  }
+
+  async function loadChartPhoto(file: File) {
+    setChartMsg(null);
+    try {
+      setChartCanvas(await prepareCanvas(file));
+      setSelectingChart(true);
+    } catch {
+      setChartMsg("No se pudo abrir la imagen. Probá con una foto en JPG o PNG.");
+    }
+  }
+
+  async function readChart(region: Region) {
+    if (!chartCanvas) return;
+    setChartReading(true);
+    setChartProgress(0);
+    setChartMsg(null);
+    try {
+      const r = await readBarChart(chartCanvas, region, setChartProgress);
+      if (r.read === 0) {
+        setChartMsg("No se pudo leer ningún valor. Probá marcando solo la parte con las barras y sus números, o pegalos a mano.");
+        return;
+      }
+      const text = r.values.map((v) => v ?? "?").join(" ");
+      setHistText(text);
+      applyPaste(text);
+      setSelectingChart(false);
+      setChartMsg(
+        `Leí ${r.read} de ${r.total} períodos${r.read < r.total ? ": los marcados en rojo no se pudieron leer, completalos mirando el gráfico" : ""}. Revisá que estén todos (puede faltar alguno al principio o al final) y corregí lo que haga falta.`,
+      );
+    } catch (e) {
+      console.error("Gráfico:", e);
+      setChartMsg("No se pudo leer el gráfico (revisá la conexión). Pegá los valores a mano.");
+    } finally {
+      setChartReading(false);
+    }
   }
 
   function updateRow(idx: number, patch: Partial<HistoryPeriod>) {
@@ -569,11 +613,61 @@ function CotizadorInner() {
                 Los ingenieros dimensionan con el consumo promedio, no con una sola factura. Copiá los kWh del gráfico
                 de la factura (del más viejo al más nuevo) y pegalos acá.
               </p>
+              <div className="mt-3 rounded-lg border border-gold-500/30 bg-gold-500/10 p-3">
+                <p className="text-xs font-bold text-gold-600">Leer el gráfico de la factura con la foto</p>
+                <p className="mt-1 text-[11px] text-body">
+                  Marcá el gráfico de barras en la foto y se completan los kWh de cada período. Lo que no se pueda
+                  leer queda en rojo para completarlo a mano.
+                </p>
+                {chartCanvas ? (
+                  <button
+                    type="button"
+                    onClick={() => setSelectingChart((v) => !v)}
+                    className="mt-2 rounded-lg bg-gold-500 px-3.5 py-2 text-xs font-bold text-navy-950 shadow-sm transition-all hover:shadow-md"
+                  >
+                    {selectingChart ? "Ocultar la foto" : "Marcar el gráfico en la foto"}
+                  </button>
+                ) : (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {(["chart-camera", "chart-file"] as const).map((id) => (
+                      <label
+                        key={id}
+                        htmlFor={id}
+                        className="rounded-lg border border-gold-500/50 bg-background px-3.5 py-2 text-xs font-bold text-gold-600 transition-all hover:shadow-md"
+                      >
+                        {id === "chart-camera" ? "Sacar foto" : "Elegir imagen"}
+                        <input
+                          id={id}
+                          type="file"
+                          accept="image/*"
+                          {...(id === "chart-camera" ? { capture: "environment" as const } : {})}
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) loadChartPhoto(file);
+                            e.target.value = "";
+                          }}
+                        />
+                      </label>
+                    ))}
+                  </div>
+                )}
+                {selectingChart && chartCanvas && (
+                  <RegionPicker
+                    canvas={chartCanvas}
+                    busy={chartReading}
+                    progress={chartProgress}
+                    onConfirm={readChart}
+                  />
+                )}
+                {chartMsg && <p className="mt-2 text-[11px] font-semibold text-ink">{chartMsg}</p>}
+              </div>
+
               <textarea
                 value={histText}
                 onChange={(e) => setHistText(e.target.value)}
                 rows={2}
-                placeholder="Ej: 548 753 510 464 447 412 561 574 654 564 669 770 1122 1048 287"
+                placeholder="O pegalos a mano, del más viejo al más nuevo. Ej: 548 753 510 464 447 412 561 574 654 564 669 770 1122 1048 287 (usá ? si no lo sabés)"
                 className={`${INPUT} mt-3 resize-none`}
               />
               <div className="mt-3 grid grid-cols-2 gap-4">
@@ -587,7 +681,7 @@ function CotizadorInner() {
               <p className="mt-1 text-[11px] text-body">30 días si la factura es mensual, 60 si es bimestral.</p>
               <button
                 type="button"
-                onClick={applyPaste}
+                onClick={() => applyPaste()}
                 disabled={!histText.trim()}
                 className="mt-3 rounded-lg border border-ink/15 bg-background px-4 py-2.5 text-xs font-semibold text-ink shadow-sm transition-all hover:shadow-md disabled:opacity-50"
               >
@@ -627,9 +721,10 @@ function CotizadorInner() {
                         <span className="font-data w-12 shrink-0 text-xs text-body">{row.label}</span>
                         <NumberField
                           suffix=" kWh"
-                          value={row.kwh}
+                          value={row.kwh || ""}
+                          placeholder="falta dato"
                           onValueChange={(v) => updateRow(idx, { kwh: Number(v) || 0 })}
-                          className="w-full min-w-0 rounded-md border border-ink/10 bg-background px-2 py-1.5 text-xs text-ink"
+                          className={`w-full min-w-0 rounded-md border bg-background px-2 py-1.5 text-xs text-ink ${row.kwh > 0 ? "border-ink/10" : "border-red-500/60 bg-red-500/5"}`}
                         />
                         <NumberField
                           suffix=" d"
@@ -1087,6 +1182,81 @@ function HistoryBlock({
         historial y ahorra en promedio <b className="text-ink">{fmtARS.format(cov.avgMonthlySavingsARS)}</b> por mes.
         {cov.surplusPeriods > 0 && ` En ${cov.surplusPeriods} de ${stats.periods} períodos produce más de lo que se consume (excedente).`}
       </p>
+    </div>
+  );
+}
+
+// Recuadro para marcar el gráfico sobre la foto (mouse o dedo).
+function RegionPicker({
+  canvas,
+  onConfirm,
+  busy,
+  progress,
+}: {
+  canvas: HTMLCanvasElement;
+  onConfirm: (region: Region) => void;
+  busy: boolean;
+  progress: number;
+}) {
+  const [rect, setRect] = useState({ x: 0.04, y: 0.04, w: 0.92, h: 0.92 });
+  const url = useMemo(() => canvas.toDataURL("image/jpeg", 0.75), [canvas]);
+  const boxRef = useRef<HTMLDivElement>(null);
+  const start = useRef<{ x: number; y: number } | null>(null);
+
+  const pointAt = (e: React.PointerEvent) => {
+    const r = boxRef.current!.getBoundingClientRect();
+    const clamp = (n: number) => Math.min(1, Math.max(0, n));
+    return { x: clamp((e.clientX - r.left) / r.width), y: clamp((e.clientY - r.top) / r.height) };
+  };
+
+  return (
+    <div className="mt-3">
+      <p className="text-[11px] text-body">Arrastrá sobre la foto para encerrar solo el gráfico de barras (con los números de cada barra).</p>
+      <div
+        ref={boxRef}
+        className="relative mt-2 touch-none select-none overflow-hidden rounded-lg border border-ink/20"
+        style={{ aspectRatio: `${canvas.width} / ${canvas.height}` }}
+        onPointerDown={(e) => {
+          e.currentTarget.setPointerCapture(e.pointerId);
+          start.current = pointAt(e);
+          setRect({ ...start.current, w: 0, h: 0 });
+        }}
+        onPointerMove={(e) => {
+          if (!start.current) return;
+          const p = pointAt(e);
+          setRect({
+            x: Math.min(start.current.x, p.x),
+            y: Math.min(start.current.y, p.y),
+            w: Math.abs(p.x - start.current.x),
+            h: Math.abs(p.y - start.current.y),
+          });
+        }}
+        onPointerUp={() => {
+          start.current = null;
+        }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={url} alt="Factura" draggable={false} className="pointer-events-none absolute inset-0 h-full w-full" />
+        <div
+          className="pointer-events-none absolute border-2 border-gold-500 bg-gold-500/15"
+          style={{ left: `${rect.x * 100}%`, top: `${rect.y * 100}%`, width: `${rect.w * 100}%`, height: `${rect.h * 100}%` }}
+        />
+      </div>
+      <button
+        type="button"
+        disabled={busy || rect.w < 0.04 || rect.h < 0.03}
+        onClick={() =>
+          onConfirm({
+            x: rect.x * canvas.width,
+            y: rect.y * canvas.height,
+            w: rect.w * canvas.width,
+            h: rect.h * canvas.height,
+          })
+        }
+        className="mt-2 w-full rounded-lg bg-navy-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-navy-800 disabled:opacity-50"
+      >
+        {busy ? `Leyendo el gráfico… ${Math.round(progress * 100)}%` : "Leer el gráfico marcado"}
+      </button>
     </div>
   );
 }

@@ -229,6 +229,12 @@ export function calculateQuote(i: QuoteInputs): QuoteResults | null {
   if (i.basis !== "historial" && (i.days < 25 || i.days > 70)) {
     warnings.push("Los días del período son inusuales (lo normal es ~30 o ~60). Revisalo.");
   }
+  const missing = (i.history ?? []).filter((h) => h.included && !(h.kwh > 0)).length;
+  if (missing > 0) {
+    warnings.push(
+      `Hay ${missing} período${missing > 1 ? "s" : ""} del historial sin dato de consumo: completalos o destildalos, si no el promedio queda incompleto.`,
+    );
+  }
   const hist = summarizeHistory(i.history);
   if (hist && hist.periods >= 3 && i.basis === "factura" && i.billKwh && i.billDays) {
     const billMonthly = (i.billKwh / i.billDays) * 30;
