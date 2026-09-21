@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import {
+  createProject,
   getProjects,
   updateProject,
   PROJECT_STAGES,
@@ -9,7 +10,13 @@ import {
   projectStatusMessage,
   type Project,
   type ProjectStatus,
+  type ProjectType,
 } from "@/lib/projects";
+import { createProjectFromQuote, getSolarQuotes, type SolarQuote } from "@/lib/solar-quotes";
+import { getCustomers, type Customer } from "@/lib/customers";
+import { useCurrentTeamMember } from "@/lib/current-user";
+import { PROVINCES } from "@/lib/solar-quote";
+import NumberField from "@/components/NumberField";
 import { getTeam, type TeamMember } from "@/lib/team";
 import { downloadCSV } from "@/lib/csv-export";
 import { openWhatsApp } from "@/lib/whatsapp";
@@ -28,6 +35,15 @@ export default function AdminProyectosPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [reciboProject, setReciboProject] = useState<Project | null>(null);
   const [conformidadProject, setConformidadProject] = useState<Project | null>(null);
+  const { member } = useCurrentTeamMember();
+  const [newOpen, setNewOpen] = useState(false);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [quotes, setQuotes] = useState<SolarQuote[]>([]);
+
+  useEffect(() => {
+    getCustomers().then(setCustomers).catch(() => {});
+    getSolarQuotes().then(setQuotes).catch(() => {});
+  }, []);
 
   useEffect(() => {
     Promise.all([getProjects(), getTeam()])
@@ -60,6 +76,21 @@ export default function AdminProyectosPage() {
     await updateProject(id, patch);
   }
 
+  async function addFromQuote(q: SolarQuote) {
+    const project = await createProjectFromQuote(q, customers.find((c) => c.id === q.customerId), member?.id ?? null);
+    setProjects((prev) => [project, ...prev]);
+    setQuotes((prev) => prev.map((x) => (x.id === q.id ? { ...x, projectId: project.id } : x)));
+    setNewOpen(false);
+    setExpandedId(project.id);
+  }
+
+  async function addManual(data: Parameters<typeof createProject>[0]) {
+    const project = await createProject(data);
+    setProjects((prev) => [project, ...prev]);
+    setNewOpen(false);
+    setExpandedId(project.id);
+  }
+
   function exportCSV() {
     downloadCSV(
       "proyectos.csv",
@@ -88,19 +119,27 @@ export default function AdminProyectosPage() {
               Seguimiento de cotización a instalación — pensado para el rubro solar.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={exportCSV}
-            className="cursor-pointer touch-manipulation rounded-lg border border-ink/15 bg-surface px-4 py-2.5 text-sm font-semibold text-ink shadow-sm transition-all hover:shadow-md"
-          >
-            Exportar CSV
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={exportCSV}
+              className="flex-1 cursor-pointer touch-manipulation rounded-lg border border-ink/15 bg-surface px-4 py-2.5 text-sm font-semibold text-ink shadow-sm transition-all hover:shadow-md sm:flex-none"
+            >
+              Exportar CSV
+            </button>
+            <button
+              type="button"
+              onClick={() => setNewOpen(true)}
+              className="flex-1 cursor-pointer touch-manipulation rounded-lg bg-navy-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-navy-800 hover:shadow-md sm:flex-none"
+            >
+              + Nuevo proyecto
+            </button>
+          </div>
         </div>
 
         <div className="mt-4 rounded-xl border border-dashed border-ink/20 bg-surface p-4 text-xs text-body">
-          Conectado a Supabase — cuando conectemos la calculadora solar y el
-          formulario, cada cotización nueva va a crear un proyecto acá
-          automáticamente en la etapa &ldquo;Cotización enviada&rdquo;.
+          Creá un proyecto con <b className="text-ink">+ Nuevo proyecto</b>, ya sea desde una cotización solar
+          guardada o cargándolo a mano. Siempre empieza en la etapa &ldquo;Cotización enviada&rdquo;.
         </div>
 
         {loading && <p className="mt-5 text-sm text-body">Cargando proyectos…</p>}
@@ -299,7 +338,220 @@ export default function AdminProyectosPage() {
           </div>
         </PrintDocument>
       )}
+
+      {newOpen && (
+        <NewProjectSheet
+          onClose={() => setNewOpen(false)}
+          quotes={quotes.filter((q) => !q.projectId)}
+          customers={customers}
+          team={team}
+          defaultSalesperson={member?.id ?? ""}
+          onFromQuote={addFromQuote}
+          onManual={addManual}
+        />
+      )}
     </section>
+  );
+}
+
+const SHEET_INPUT = "mt-1.5 w-full rounded-lg border border-ink/10 bg-background px-3 py-2.5 text-sm text-ink";
+
+function NewProjectSheet({
+  onClose,
+  quotes,
+  customers,
+  team,
+  defaultSalesperson,
+  onFromQuote,
+  onManual,
+}: {
+  onClose: () => void;
+  quotes: SolarQuote[];
+  customers: Customer[];
+  team: TeamMember[];
+  defaultSalesperson: string;
+  onFromQuote: (q: SolarQuote) => Promise<void>;
+  onManual: (d: Parameters<typeof createProject>[0]) => Promise<void>;
+}) {
+  const [tab, setTab] = useState<"cotizacion" | "manual">(quotes.length > 0 ? "cotizacion" : "manual");
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [form, setForm] = useState({
+    name: "",
+    phone: "",
+    city: "",
+    zone: "Misiones",
+    type: "residencial" as ProjectType,
+    kwp: "",
+    panels: "",
+    salesperson: defaultSalesperson,
+  });
+  const set = (patch: Partial<typeof form>) => setForm((f) => ({ ...f, ...patch }));
+
+  async function run(key: string, fn: () => Promise<void>) {
+    setBusy(key);
+    setError(null);
+    try {
+      await fn();
+    } catch (e) {
+      console.error("Nuevo proyecto:", e);
+      setError("No se pudo crear el proyecto. Reintentá.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div data-sheet className="fixed inset-0 z-[70]">
+      <button type="button" aria-label="Cerrar" onClick={onClose} className="absolute inset-0 cursor-pointer bg-navy-950/60" />
+      <div className="animate-sheet-in absolute inset-x-0 bottom-0 flex max-h-[90dvh] flex-col rounded-t-3xl bg-surface p-5 shadow-[0_0_60px_-10px_rgba(12,24,48,0.5)] sm:animate-panel-in sm:inset-x-auto sm:inset-y-0 sm:right-0 sm:max-h-none sm:w-full sm:max-w-md sm:rounded-t-none">
+        <div className="mx-auto mb-3 h-1 w-10 shrink-0 rounded-full bg-ink/15 sm:hidden" />
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-lg font-bold text-ink">Nuevo proyecto</h2>
+          <button type="button" onClick={onClose} className="rounded-lg bg-cream-200 px-3 py-1.5 text-xs font-semibold text-ink">
+            Cerrar
+          </button>
+        </div>
+        <div className="mt-3 flex gap-2">
+          <Chip active={tab === "cotizacion"} onClick={() => setTab("cotizacion")}>
+            Desde una cotización ({quotes.length})
+          </Chip>
+          <Chip active={tab === "manual"} onClick={() => setTab("manual")}>
+            Cargar a mano
+          </Chip>
+        </div>
+
+        <div className="mt-4 min-h-0 flex-1 overflow-y-auto">
+          {tab === "cotizacion" ? (
+            quotes.length === 0 ? (
+              <p className="py-8 text-center text-sm text-body">
+                No hay cotizaciones solares sin proyecto. Armá una en Cotizador solar o cargá el proyecto a mano.
+              </p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {quotes.map((q) => (
+                  <button
+                    key={q.id}
+                    type="button"
+                    disabled={busy != null}
+                    onClick={() => run(q.id, () => onFromQuote(q))}
+                    className="flex cursor-pointer flex-col rounded-xl border border-ink/10 bg-background p-3 text-left shadow-sm transition-all hover:shadow-md disabled:opacity-60"
+                  >
+                    <span className="font-semibold text-ink">{q.clientName || "Sin nombre"}</span>
+                    <span className="text-xs text-body">
+                      {new Date(q.createdAt).toLocaleDateString("es-AR")} · {q.province} · {q.systemKwp.toFixed(2)} kWp ·{" "}
+                      {q.panels} paneles
+                    </span>
+                    <span className="mt-1 text-[11px] font-bold text-gold-600">
+                      {busy === q.id ? "Creando…" : "Tocá para crear el proyecto"}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )
+          ) : (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!form.name.trim()) return;
+                run("manual", () =>
+                  onManual({
+                    customerName: form.name.trim(),
+                    customerPhone: form.phone.trim(),
+                    city: form.city.trim(),
+                    zone: form.zone,
+                    type: form.type,
+                    systemKwp: Number(form.kwp) || 0,
+                    panelsCount: Number(form.panels) || 0,
+                    salespersonId: form.salesperson || null,
+                  }),
+                );
+              }}
+              className="flex flex-col gap-3"
+            >
+              <label className="block">
+                <span className="text-xs font-semibold text-ink">Elegir un cliente existente (opcional)</span>
+                <select
+                  className={SHEET_INPUT}
+                  defaultValue=""
+                  onChange={(e) => {
+                    const c = customers.find((x) => x.id === e.target.value);
+                    if (c) set({ name: c.name, phone: c.phone, city: c.city });
+                  }}
+                >
+                  <option value="">— Escribir los datos —</option>
+                  {customers
+                    .filter((c) => c.status === "cliente")
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="text-xs font-semibold text-ink">Nombre del cliente</span>
+                <input value={form.name} onChange={(e) => set({ name: e.target.value })} className={SHEET_INPUT} required />
+              </label>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <label className="block min-w-0">
+                  <span className="text-xs font-semibold text-ink">Teléfono</span>
+                  <input value={form.phone} onChange={(e) => set({ phone: e.target.value })} inputMode="tel" className={SHEET_INPUT} />
+                </label>
+                <label className="block min-w-0">
+                  <span className="text-xs font-semibold text-ink">Ciudad / dirección</span>
+                  <input value={form.city} onChange={(e) => set({ city: e.target.value })} className={SHEET_INPUT} />
+                </label>
+                <label className="block min-w-0">
+                  <span className="text-xs font-semibold text-ink">Provincia</span>
+                  <select value={form.zone} onChange={(e) => set({ zone: e.target.value })} className={SHEET_INPUT}>
+                    {PROVINCES.map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block min-w-0">
+                  <span className="text-xs font-semibold text-ink">Tipo</span>
+                  <select value={form.type} onChange={(e) => set({ type: e.target.value as ProjectType })} className={SHEET_INPUT}>
+                    <option value="residencial">Residencial</option>
+                    <option value="comercial">Comercial</option>
+                  </select>
+                </label>
+                <label className="block min-w-0">
+                  <span className="text-xs font-semibold text-ink">Potencia</span>
+                  <NumberField decimals suffix=" kWp" value={form.kwp} onValueChange={(v) => set({ kwp: v })} className={SHEET_INPUT} />
+                </label>
+                <label className="block min-w-0">
+                  <span className="text-xs font-semibold text-ink">Paneles</span>
+                  <NumberField value={form.panels} onValueChange={(v) => set({ panels: v })} className={SHEET_INPUT} />
+                </label>
+              </div>
+              <label className="block">
+                <span className="text-xs font-semibold text-ink">Vendedor</span>
+                <select value={form.salesperson} onChange={(e) => set({ salesperson: e.target.value })} className={SHEET_INPUT}>
+                  <option value="">Sin asignar</option>
+                  {team.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="submit"
+                disabled={busy != null || !form.name.trim()}
+                className="rounded-lg bg-navy-900 px-4 py-3 text-sm font-bold text-white shadow-sm disabled:opacity-60"
+              >
+                {busy === "manual" ? "Creando…" : "Crear proyecto"}
+              </button>
+            </form>
+          )}
+          {error && <p className="mt-3 text-xs font-semibold text-red-500">{error}</p>}
+        </div>
+      </div>
+    </div>
   );
 }
 

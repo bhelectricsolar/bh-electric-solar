@@ -12,12 +12,12 @@ import Chip from "@/components/admin/Chip";
 import { useAdminSettings } from "@/lib/admin-settings";
 import { useCurrentTeamMember } from "@/lib/current-user";
 import { getCustomers, type Customer } from "@/lib/customers";
-import { createProject, getProjects, type Project } from "@/lib/projects";
+import { getProjects, type Project } from "@/lib/projects";
 import {
   createSolarQuote,
   deleteSolarQuote,
   getSolarQuotes,
-  linkQuoteToProject,
+  createProjectFromQuote,
   uploadChartImage,
   type SolarQuote,
 } from "@/lib/solar-quotes";
@@ -515,17 +515,7 @@ function CotizadorInner() {
     setProjectMsg(null);
     try {
       const customer = customers.find((c) => c.id === q.customerId);
-      const project = await createProject({
-        customerName: q.clientName || customer?.name || "Sin nombre",
-        customerPhone: customer?.phone ?? "",
-        city: q.address || customer?.city || "",
-        zone: q.province,
-        type: q.systemKwp > 15 ? "comercial" : "residencial",
-        systemKwp: Math.round(q.systemKwp * 100) / 100,
-        panelsCount: q.panels,
-        salespersonId: member?.id ?? null,
-      });
-      await linkQuoteToProject(q.id, project.id);
+      await createProjectFromQuote(q, customer, member?.id ?? null);
       await reloadQuotes();
     } catch (e) {
       console.error("Crear proyecto:", e);

@@ -1,4 +1,6 @@
 import { createClient } from "./supabase/client";
+import { createProject, type Project } from "./projects";
+import type { Customer } from "./customers";
 import type { QuoteInputs, QuoteResults } from "./solar-quote";
 
 const supabase = createClient();
@@ -133,6 +135,26 @@ export async function uploadChartImage(dataUrl: string): Promise<string> {
 export async function linkQuoteToProject(id: string, projectId: string) {
   const { error } = await supabase.from("solar_quotes").update({ project_id: projectId }).eq("id", id);
   if (error) throw error;
+}
+
+// Crea un proyecto real desde una cotización y la deja enlazada a él.
+export async function createProjectFromQuote(
+  q: SolarQuote,
+  customer: Customer | undefined,
+  salespersonId: string | null,
+): Promise<Project> {
+  const project = await createProject({
+    customerName: q.clientName || customer?.name || "Sin nombre",
+    customerPhone: customer?.phone ?? "",
+    city: q.address || customer?.city || "",
+    zone: q.province,
+    type: q.systemKwp > 15 ? "comercial" : "residencial",
+    systemKwp: Math.round(q.systemKwp * 100) / 100,
+    panelsCount: q.panels,
+    salespersonId,
+  });
+  await linkQuoteToProject(q.id, project.id);
+  return project;
 }
 
 export async function deleteSolarQuote(id: string) {
