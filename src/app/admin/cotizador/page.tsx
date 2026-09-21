@@ -159,6 +159,7 @@ function CotizadorInner() {
   const [manualLines, setManualLines] = useState<BomLine[]>([]);
   const [chartCanvas, setChartCanvas] = useState<HTMLCanvasElement | null>(null);
   const [selectingChart, setSelectingChart] = useState(false);
+  const [chartRef, setChartRef] = useState<string | null>(null);
   const [chartReading, setChartReading] = useState(false);
   const [chartProgress, setChartProgress] = useState(0);
   const [chartMsg, setChartMsg] = useState<string | null>(null);
@@ -407,10 +408,22 @@ function CotizadorInner() {
     setChartMsg(null);
     try {
       setChartCanvas(await prepareCanvas(file));
+      setChartRef(null);
       setSelectingChart(true);
     } catch {
       setChartMsg("No se pudo abrir la imagen. Probá con una foto en JPG o PNG.");
     }
+  }
+
+  // Recorte del gráfico para tenerlo a la vista mientras se carga o verifica.
+  function showReference(region: Region) {
+    if (!chartCanvas) return;
+    const c = document.createElement("canvas");
+    c.width = Math.round(region.w);
+    c.height = Math.round(region.h);
+    c.getContext("2d")!.drawImage(chartCanvas, region.x, region.y, region.w, region.h, 0, 0, c.width, c.height);
+    setChartRef(c.toDataURL("image/jpeg", 0.85));
+    setSelectingChart(false);
   }
 
   async function readChart(region: Region) {
@@ -427,9 +440,9 @@ function CotizadorInner() {
       const text = r.values.map((v) => v ?? "?").join(" ");
       setHistText(text);
       applyPaste(text, true);
-      setSelectingChart(false);
+      showReference(region);
       setChartMsg(
-        `Leí ${r.read} de ${r.total} períodos${r.read < r.total ? ": los marcados en rojo no se pudieron leer, completalos mirando el gráfico" : ""}. Los valores en ámbar los leyó la foto: verificalos contra el gráfico (tocá uno para confirmarlo). Puede faltar algún período al principio o al final.`,
+        `Leí ${r.read} de ${r.total} períodos${r.read < r.total ? ": los marcados en rojo no se pudieron leer, completalos mirando el gráfico" : ""}. Los valores en ámbar los leyó la foto: verificalos contra el recorte de abajo.`,
       );
     } catch (e) {
       console.error("Gráfico:", e);
@@ -711,10 +724,10 @@ function CotizadorInner() {
                 {chartCanvas ? (
                   <button
                     type="button"
-                    onClick={() => setSelectingChart((v) => !v)}
+                    onClick={() => setSelectingChart(true)}
                     className="mt-2 rounded-lg bg-gold-500 px-3.5 py-2 text-xs font-bold text-navy-950 shadow-sm transition-all hover:shadow-md"
                   >
-                    {selectingChart ? "Ocultar la foto" : "Marcar el gráfico en la foto"}
+                    Marcar el gráfico en la foto
                   </button>
                 ) : (
                   <div className="mt-2 flex flex-wrap gap-2">
@@ -747,6 +760,9 @@ function CotizadorInner() {
                     busy={chartReading}
                     progress={chartProgress}
                     onConfirm={readChart}
+                    onReference={showReference}
+                    onClose={() => setSelectingChart(false)}
+                    onNewPhoto={loadChartPhoto}
                   />
                 )}
                 {chartMsg && <p className="mt-2 text-[11px] font-semibold text-ink">{chartMsg}</p>}
@@ -767,7 +783,10 @@ function CotizadorInner() {
                   <NumberField suffix=" días" value={histDays} onValueChange={setHistDays} className={INPUT} />
                 </Field>
               </div>
-              <p className="mt-1 text-[11px] text-body">30 días si la factura es mensual, 60 si es bimestral.</p>
+              <p className="mt-1 text-[11px] text-body">
+                30 días si la factura es mensual, 60 si es bimestral. Los meses se calculan hacia atrás desde el «mes
+                del último dato» (el de esta factura): si alguno no coincide con el gráfico, corregilo en la lista.
+              </p>
               <button
                 type="button"
                 onClick={() => applyPaste()}
@@ -794,11 +813,21 @@ function CotizadorInner() {
                       Borrar historial
                     </button>
                   </div>
+                  {chartRef && (
+                    <div className="mt-3">
+                      <p className="text-[11px] font-bold text-ink">Gráfico de la factura (para comparar)</p>
+                      <div className="mt-1 max-h-60 overflow-auto rounded-lg border border-ink/10 bg-white">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={chartRef} alt="Gráfico de consumo" className="block min-w-[560px] max-w-none sm:w-full sm:min-w-0" />
+                      </div>
+                      <p className="mt-1 text-[11px] text-body">Deslizá para ver todo el gráfico.</p>
+                    </div>
+                  )}
                   <div className="mt-2 max-h-72 overflow-y-auto rounded-lg border border-ink/10">
                     {history.map((row, idx) => (
                       <div
                         key={idx}
-                        className={`flex items-center gap-2 border-b border-ink/10 px-2.5 py-1.5 last:border-0 ${row.included ? "" : "opacity-45"}`}
+                        className={`grid grid-cols-[auto_3.75rem_minmax(0,1fr)_4.25rem] items-center gap-1.5 border-b border-ink/10 px-2 py-1.5 last:border-0 ${row.included ? "" : "opacity-45"}`}
                       >
                         <input
                           type="checkbox"
@@ -807,7 +836,12 @@ function CotizadorInner() {
                           aria-label={`Incluir ${row.label}`}
                           className="h-4 w-4 shrink-0"
                         />
-                        <span className="font-data w-12 shrink-0 text-xs text-body">{row.label}</span>
+                        <input
+                          value={row.label}
+                          onChange={(e) => updateRow(idx, { label: e.target.value })}
+                          aria-label="Mes"
+                          className="font-data w-full min-w-0 rounded-md border border-ink/10 bg-background px-1.5 py-1.5 text-xs text-ink"
+                        />
                         <NumberField
                           suffix=" kWh"
                           value={row.kwh || ""}
@@ -820,7 +854,7 @@ function CotizadorInner() {
                           suffix=" d"
                           value={row.days}
                           onValueChange={(v) => updateRow(idx, { days: Number(v) || 0 })}
-                          className="w-16 shrink-0 rounded-md border border-ink/10 bg-background px-2 py-1.5 text-xs text-ink"
+                          className="w-full min-w-0 rounded-md border border-ink/10 bg-background px-1.5 py-1.5 text-xs text-ink"
                         />
                       </div>
                     ))}
@@ -1423,77 +1457,174 @@ function HistoryBlock({
   );
 }
 
-// Recuadro para marcar el gráfico sobre la foto (mouse o dedo).
+// Marcador del gráfico en pantalla completa: esquinas grandes para el dedo,
+// arrastrar adentro mueve el recuadro y lo de afuera se oscurece.
+type Frac = { x: number; y: number; w: number; h: number };
+type Drag = "move" | "nw" | "ne" | "sw" | "se" | "new";
+
 function RegionPicker({
   canvas,
   onConfirm,
+  onReference,
+  onClose,
+  onNewPhoto,
   busy,
   progress,
 }: {
   canvas: HTMLCanvasElement;
   onConfirm: (region: Region) => void;
+  onReference: (region: Region) => void;
+  onClose: () => void;
+  onNewPhoto: (file: File) => void;
   busy: boolean;
   progress: number;
 }) {
-  const [rect, setRect] = useState({ x: 0.04, y: 0.04, w: 0.92, h: 0.92 });
-  const url = useMemo(() => canvas.toDataURL("image/jpeg", 0.75), [canvas]);
+  const [rect, setRect] = useState<Frac>({ x: 0.06, y: 0.06, w: 0.88, h: 0.88 });
+  const url = useMemo(() => canvas.toDataURL("image/jpeg", 0.8), [canvas]);
   const boxRef = useRef<HTMLDivElement>(null);
-  const start = useRef<{ x: number; y: number } | null>(null);
+  const drag = useRef<{ mode: Drag; p0: { x: number; y: number }; r0: Frac } | null>(null);
+
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
 
   const pointAt = (e: React.PointerEvent) => {
     const r = boxRef.current!.getBoundingClientRect();
     const clamp = (n: number) => Math.min(1, Math.max(0, n));
     return { x: clamp((e.clientX - r.left) / r.width), y: clamp((e.clientY - r.top) / r.height) };
   };
+  const begin = (e: React.PointerEvent, mode: Drag) => {
+    e.stopPropagation();
+    boxRef.current!.setPointerCapture(e.pointerId);
+    const p0 = pointAt(e);
+    drag.current = { mode, p0, r0: mode === "new" ? { x: p0.x, y: p0.y, w: 0, h: 0 } : rect };
+    if (mode === "new") setRect({ x: p0.x, y: p0.y, w: 0, h: 0 });
+  };
+  const move = (e: React.PointerEvent) => {
+    const d = drag.current;
+    if (!d) return;
+    const p = pointAt(e);
+    const { r0, p0, mode } = d;
+    if (mode === "move") {
+      const dx = Math.min(1 - r0.w - r0.x, Math.max(-r0.x, p.x - p0.x));
+      const dy = Math.min(1 - r0.h - r0.y, Math.max(-r0.y, p.y - p0.y));
+      setRect({ ...r0, x: r0.x + dx, y: r0.y + dy });
+      return;
+    }
+    let x1 = r0.x;
+    let y1 = r0.y;
+    let x2 = r0.x + r0.w;
+    let y2 = r0.y + r0.h;
+    if (mode === "new") {
+      x1 = Math.min(p0.x, p.x);
+      x2 = Math.max(p0.x, p.x);
+      y1 = Math.min(p0.y, p.y);
+      y2 = Math.max(p0.y, p.y);
+    } else {
+      if (mode.includes("w")) x1 = p.x;
+      if (mode.includes("e")) x2 = p.x;
+      if (mode.includes("n")) y1 = p.y;
+      if (mode.includes("s")) y2 = p.y;
+    }
+    setRect({ x: Math.min(x1, x2), y: Math.min(y1, y2), w: Math.abs(x2 - x1), h: Math.abs(y2 - y1) });
+  };
+
+  const toRegion = (): Region => ({
+    x: rect.x * canvas.width,
+    y: rect.y * canvas.height,
+    w: rect.w * canvas.width,
+    h: rect.h * canvas.height,
+  });
+  const tooSmall = rect.w < 0.04 || rect.h < 0.03;
+  const corner = (mode: Drag, style: React.CSSProperties) => (
+    <div
+      onPointerDown={(e) => begin(e, mode)}
+      className="absolute grid h-11 w-11 -translate-x-1/2 -translate-y-1/2 cursor-pointer touch-none place-items-center"
+      style={style}
+    >
+      <span className="h-5 w-5 rounded-full border-[3px] border-white bg-gold-500 shadow-[0_0_0_2px_rgba(0,0,0,0.5)]" />
+    </div>
+  );
 
   return (
-    <div className="mt-3">
-      <p className="text-[11px] text-body">Arrastrá sobre la foto para encerrar solo el gráfico de barras (con los números de cada barra).</p>
-      <div
-        ref={boxRef}
-        className="relative mt-2 touch-none select-none overflow-hidden rounded-lg border border-ink/20"
-        style={{ aspectRatio: `${canvas.width} / ${canvas.height}` }}
-        onPointerDown={(e) => {
-          e.currentTarget.setPointerCapture(e.pointerId);
-          start.current = pointAt(e);
-          setRect({ ...start.current, w: 0, h: 0 });
-        }}
-        onPointerMove={(e) => {
-          if (!start.current) return;
-          const p = pointAt(e);
-          setRect({
-            x: Math.min(start.current.x, p.x),
-            y: Math.min(start.current.y, p.y),
-            w: Math.abs(p.x - start.current.x),
-            h: Math.abs(p.y - start.current.y),
-          });
-        }}
-        onPointerUp={() => {
-          start.current = null;
-        }}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={url} alt="Factura" draggable={false} className="pointer-events-none absolute inset-0 h-full w-full" />
-        <div
-          className="pointer-events-none absolute border-2 border-gold-500 bg-gold-500/15"
-          style={{ left: `${rect.x * 100}%`, top: `${rect.y * 100}%`, width: `${rect.w * 100}%`, height: `${rect.h * 100}%` }}
-        />
+    <div className="fixed inset-0 z-[120] flex flex-col bg-black/95 text-white">
+      <div className="flex items-center justify-between gap-2 px-4 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))]">
+        <p className="text-sm font-bold">Encerrá el gráfico de barras</p>
+        <button type="button" onClick={onClose} className="rounded-lg bg-white/15 px-3 py-1.5 text-xs font-bold">
+          Cerrar
+        </button>
       </div>
-      <button
-        type="button"
-        disabled={busy || rect.w < 0.04 || rect.h < 0.03}
-        onClick={() =>
-          onConfirm({
-            x: rect.x * canvas.width,
-            y: rect.y * canvas.height,
-            w: rect.w * canvas.width,
-            h: rect.h * canvas.height,
-          })
-        }
-        className="mt-2 w-full rounded-lg bg-navy-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-navy-800 disabled:opacity-50"
-      >
-        {busy ? `Leyendo el gráfico… ${Math.round(progress * 100)}%` : "Leer el gráfico marcado"}
-      </button>
+      <p className="px-4 text-[11px] text-white/70">
+        Movelo desde adentro y ajustá las esquinas naranjas. Incluí las barras con sus números; sin el eje ni los
+        meses queda más preciso.
+      </p>
+      <div className="flex min-h-0 flex-1 items-center justify-center p-3">
+        <div
+          ref={boxRef}
+          className="relative max-h-full max-w-full touch-none select-none"
+          style={{
+            aspectRatio: `${canvas.width} / ${canvas.height}`,
+            height: canvas.height >= canvas.width ? "100%" : undefined,
+            width: canvas.height >= canvas.width ? undefined : "100%",
+          }}
+          onPointerDown={(e) => begin(e, "new")}
+          onPointerMove={move}
+          onPointerUp={() => (drag.current = null)}
+          onPointerCancel={() => (drag.current = null)}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={url} alt="Factura" draggable={false} className="pointer-events-none absolute inset-0 h-full w-full" />
+          <div
+            onPointerDown={(e) => begin(e, "move")}
+            className="absolute cursor-move border-[3px] border-gold-500 shadow-[0_0_0_9999px_rgba(0,0,0,0.6)]"
+            style={{ left: `${rect.x * 100}%`, top: `${rect.y * 100}%`, width: `${rect.w * 100}%`, height: `${rect.h * 100}%` }}
+          />
+          {corner("nw", { left: `${rect.x * 100}%`, top: `${rect.y * 100}%` })}
+          {corner("ne", { left: `${(rect.x + rect.w) * 100}%`, top: `${rect.y * 100}%` })}
+          {corner("sw", { left: `${rect.x * 100}%`, top: `${(rect.y + rect.h) * 100}%` })}
+          {corner("se", { left: `${(rect.x + rect.w) * 100}%`, top: `${(rect.y + rect.h) * 100}%` })}
+        </div>
+      </div>
+      <div className="flex flex-col gap-2 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2">
+        <button
+          type="button"
+          disabled={busy || tooSmall}
+          onClick={() => onConfirm(toRegion())}
+          className="w-full rounded-xl bg-gold-500 px-4 py-3 text-sm font-extrabold text-navy-950 disabled:opacity-50"
+        >
+          {busy ? `Leyendo el gráfico… ${Math.round(progress * 100)}%` : "Leer el gráfico marcado"}
+        </button>
+        <div className="grid grid-cols-3 gap-2 text-center text-[11px] font-bold">
+          <button
+            type="button"
+            disabled={busy || tooSmall}
+            onClick={() => onReference(toRegion())}
+            className="rounded-lg bg-white/15 px-2 py-2.5 disabled:opacity-50"
+          >
+            Cargar a mano mirando la foto
+          </button>
+          {(["cam", "gal"] as const).map((k) => (
+            <label key={k} className="grid cursor-pointer place-items-center rounded-lg bg-white/15 px-2 py-2.5">
+              {k === "cam" ? "Sacar otra foto" : "Elegir otra imagen"}
+              <input
+                type="file"
+                accept="image/*"
+                {...(k === "cam" ? { capture: "environment" as const } : {})}
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) onNewPhoto(file);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

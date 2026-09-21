@@ -208,9 +208,10 @@ function FullAdminShell({
             Inicio
           </Link>
 
+          <div className="mt-2 flex items-stretch gap-2">
           <Link
             href="/admin/caja?venta=1"
-            className="mt-2 flex items-center gap-3 rounded-xl bg-gold-500 px-3.5 py-3 text-sm font-extrabold text-navy-950 shadow-[0_8px_22px_-6px_rgba(245,154,31,0.65)] transition-all hover:brightness-105 active:scale-[0.98]"
+            className="flex flex-1 items-center gap-3 rounded-xl bg-gold-500 px-3.5 py-3 text-sm font-extrabold text-navy-950 shadow-[0_8px_22px_-6px_rgba(245,154,31,0.65)] transition-all hover:brightness-105 active:scale-[0.98]"
           >
             <svg viewBox="0 0 24 24" className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
               <path d={ICONS.bag} />
@@ -220,6 +221,17 @@ function FullAdminShell({
               <span className="text-[10px] font-semibold opacity-70">Venta rápida</span>
             </span>
           </Link>
+          <Link
+            href="/admin/cotizador"
+            title="Cotizador solar"
+            aria-label="Cotizador solar"
+            className="grid w-11 shrink-0 place-items-center rounded-xl border border-gold-500/40 bg-gold-500/10 text-gold-600 transition-all hover:bg-gold-500/20 active:scale-95"
+          >
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <path d={ICONS.sun} />
+            </svg>
+          </Link>
+          </div>
 
           {SECTORS.map((sector, sectorIdx) => (
             <div key={sector.id} className={sectorIdx === 0 ? "mt-6" : "mt-6 border-t border-ink/10 pt-5"}>
@@ -343,16 +355,27 @@ function FullAdminShell({
 
       {/* Venta rápida — flotante en mobile, siempre a mano porque nunca se
           sabe cuándo cae un cliente que quiere comprar ya mismo. */}
+      <div className="fixed bottom-24 right-4 z-40 flex items-center gap-2 lg:hidden">
+      <Link
+        href="/admin/cotizador"
+        aria-label="Cotizador solar"
+        className="grid h-11 w-11 cursor-pointer touch-manipulation place-items-center rounded-full border border-gold-500/50 bg-surface text-gold-600 shadow-lg transition-transform active:scale-95"
+      >
+        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <path d={ICONS.sun} />
+        </svg>
+      </Link>
       <Link
         href="/admin/caja?venta=1"
         aria-label="Venta rápida"
-        className="fixed bottom-24 right-4 z-40 flex h-14 cursor-pointer touch-manipulation items-center justify-center gap-2 rounded-full bg-gold-500 px-5 text-sm font-extrabold text-navy-950 shadow-[0_10px_30px_-8px_rgba(245,154,31,0.7)] transition-transform active:scale-95 lg:hidden"
+        className="flex h-14 cursor-pointer touch-manipulation items-center justify-center gap-2 rounded-full bg-gold-500 px-5 text-sm font-extrabold text-navy-950 shadow-[0_10px_30px_-8px_rgba(245,154,31,0.7)] transition-transform active:scale-95"
       >
         <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
           <path d={ICONS.bag} />
         </svg>
         Vender
       </Link>
+      </div>
 
       {/* Mobile bottom tab bar: en Resumen es el selector de sistema; adentro
           de un sistema muestra solo los menús de ESE sistema. */}

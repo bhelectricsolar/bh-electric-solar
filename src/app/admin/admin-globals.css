@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f3f1ec;
+  --background: #f5f8ff;
   --foreground: #0c1830;
 
   --color-navy-950: #081127;
@@ -13,41 +13,41 @@
   --color-gold-500: #f59a1f;
   --color-gold-600: #d97a0c;
   --color-cream-100: #ffffff;
-  --color-cream-200: #eae6dc;
+  --color-cream-200: #e6edfa;
   --color-slate-ink: #0c1830;
-  --color-slate-body: #495168;
+  --color-slate-body: #45506b;
   --color-surface: #ffffff;
-  --color-border-token: rgba(12, 24, 48, 0.14);
+  --color-border-token: rgba(20, 50, 110, 0.16);
 
   /* Acentos de cada uno de los 3 sistemas del admin — para que se distinga
      de un vistazo en qué sistema está parado el usuario. */
   --color-tienda: #b3690a;
-  --color-negocio: #1d54c9;
+  --color-negocio: #1f5fe6;
   --color-sitio: #7c3aed;
   --color-status-done: #1a7d4a;
 }
 
 :root[data-theme="dark"] {
-  --background: #0b111c;
+  --background: #0f1a30;
   --foreground: #eef1f6;
 
   --color-navy-950: #050810;
-  --color-navy-900: #101a2c;
-  --color-navy-800: #1a2740;
-  --color-navy-700: #24365a;
+  --color-navy-900: #16264a;
+  --color-navy-800: #203560;
+  --color-navy-700: #2c4a82;
   --color-gold-300: #ffdd9e;
   --color-gold-400: #ffc266;
-  --color-gold-500: #f5a623;
+  --color-gold-500: #ffb02e;
   --color-gold-600: #ffb648;
-  --color-cream-100: #16202f;
-  --color-cream-200: #1c283a;
+  --color-cream-100: #1b2b4b;
+  --color-cream-200: #24375d;
   --color-slate-ink: #eef1f6;
-  --color-slate-body: #a7b1c7;
-  --color-surface: #131b29;
-  --color-border-token: rgba(255, 255, 255, 0.14);
+  --color-slate-body: #b9c5de;
+  --color-surface: #182643;
+  --color-border-token: rgba(160, 190, 255, 0.22);
 
   --color-tienda: #ffb648;
-  --color-negocio: #6fa2ff;
+  --color-negocio: #7fb0ff;
   --color-sitio: #c3a0ff;
   --color-status-done: #4ade80;
 }
@@ -270,4 +270,21 @@ optgroup {
 }
 option {
   background-color: var(--color-surface);
+}
+
+/* Más luz: fondo con un degradé suave y tarjetas con relieve. */
+body {
+  background:
+    radial-gradient(1100px 500px at 90% -10%, rgba(245, 154, 31, 0.10), transparent 60%),
+    radial-gradient(900px 500px at -10% 0%, rgba(31, 95, 230, 0.09), transparent 60%),
+    var(--background);
+  background-attachment: fixed;
+}
+main .rounded-xl.border,
+main .rounded-2xl.border {
+  box-shadow: 0 1px 2px rgba(12, 24, 48, 0.06), 0 8px 24px -12px rgba(20, 50, 110, 0.22);
+}
+:root[data-theme="dark"] main .rounded-xl.border,
+:root[data-theme="dark"] main .rounded-2xl.border {
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 10px 28px -14px rgba(0, 0, 0, 0.6);
 }
