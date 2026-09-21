@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getAllSlugs, getProductBySlug, getRelatedProducts } from "@/lib/products";
+import { getAllSlugs, getCategories, getProductBySlug, getRelatedProducts } from "@/lib/products";
 import { getExchangeRate } from "@/lib/exchange-rate";
 import { formatUSD, formatARS } from "@/lib/currency";
 import Badge from "@/components/Badge";
@@ -39,10 +39,12 @@ export default async function ProductPage({
   const product = await getProductBySlug(slug);
   if (!product) notFound();
 
-  const [related, exchangeRate] = await Promise.all([
+  const [related, exchangeRate, categories] = await Promise.all([
     getRelatedProducts(product),
     getExchangeRate(),
+    getCategories().catch(() => []),
   ]);
+  const categoryLabel = categories.find((c) => c.value === product.category)?.label ?? product.category;
   const arsPrice = product.priceARS ?? product.priceUSD * exchangeRate;
 
   return (
@@ -65,13 +67,7 @@ export default async function ProductPage({
           />
 
           <div>
-            <Badge>
-              {product.category === "paneles" && "Paneles solares"}
-              {product.category === "inversores" && "Inversores"}
-              {product.category === "baterias" && "Baterías"}
-              {product.category === "estructuras" && "Estructuras de montaje"}
-              {product.category === "accesorios" && "Accesorios"}
-            </Badge>
+            <Badge>{categoryLabel}</Badge>
             <h1 className="balance mt-4 text-3xl font-extrabold leading-tight text-ink">
               {product.name}
             </h1>

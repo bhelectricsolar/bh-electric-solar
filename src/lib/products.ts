@@ -12,7 +12,12 @@ export type ProductCategory =
   | "inversores"
   | "baterias"
   | "estructuras"
-  | "accesorios";
+  | "accesorios"
+  | "kits"
+  | "controladores"
+  | "protecciones"
+  | "iluminacion"
+  | "bombeo";
 
 export type Product = {
   id: string;

@@ -114,4 +114,9 @@ const CATEGORY_LABELS: Record<Product["category"], string> = {
   baterias: "Baterías",
   estructuras: "Estructuras",
   accesorios: "Accesorios",
+  kits: "Kits solares",
+  controladores: "Controladores",
+  protecciones: "Protecciones",
+  iluminacion: "Iluminación solar",
+  bombeo: "Bombeo solar",
 };
