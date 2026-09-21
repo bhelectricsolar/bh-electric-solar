@@ -1551,7 +1551,7 @@ function RegionPicker({
   );
 
   return (
-    <div className="fixed inset-0 z-[120] flex flex-col bg-black/95 text-white">
+    <div className="fixed inset-0 z-[120] flex flex-col bg-black text-white">
       <div className="flex items-center justify-between gap-2 px-4 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))]">
         <p className="text-sm font-bold">Encerrá el gráfico de barras</p>
         <button type="button" onClick={onClose} className="rounded-lg bg-white/15 px-3 py-1.5 text-xs font-bold">

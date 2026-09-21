@@ -68,10 +68,18 @@ export function mergeDetections(dets: Detection[], cropWidth: number): (number |
   return out;
 }
 
-function transform(src: HTMLCanvasElement, region: Region, rot: 90 | 270, scale: number) {
+function transform(src: HTMLCanvasElement, region: Region, rot: 0 | 90 | 270, scale: number) {
   const w = Math.round(region.w * scale);
   const h = Math.round(region.h * scale);
   const c = document.createElement("canvas");
+  if (rot === 0) {
+    c.width = w;
+    c.height = h;
+    const ctx0 = c.getContext("2d")!;
+    ctx0.imageSmoothingQuality = "high";
+    ctx0.drawImage(src, region.x, region.y, region.w, region.h, 0, 0, w, h);
+    return c;
+  }
   c.width = h;
   c.height = w;
   const ctx = c.getContext("2d")!;
@@ -104,7 +112,7 @@ export async function readBarChart(
   const workers = new Map<string, Awaited<ReturnType<typeof createWorker>>>();
   const dets: Detection[] = [];
 
-  async function run(pass: Pass, rot: 90 | 270): Promise<Detection[]> {
+  async function run(pass: Pass, rot: 0 | 90 | 270): Promise<Detection[]> {
     let worker = workers.get(pass.lang);
     if (!worker) {
       worker = await createWorker(pass.lang);
@@ -124,14 +132,15 @@ export async function readBarChart(
             const text = word.text.trim();
             if (!/^\d{2,5}$/.test(text) || word.confidence < 20) continue;
             const yc = (word.bbox.y0 + word.bbox.y1) / 2;
-            const x = rot === 90 ? yc / pass.scale : region.w - yc / pass.scale;
+            const xc = (word.bbox.x0 + word.bbox.x1) / 2;
+            const x = rot === 0 ? xc / pass.scale : rot === 90 ? yc / pass.scale : region.w - yc / pass.scale;
             found.push({ v: Number(text), x, conf: word.confidence });
           }
     return found;
   }
 
   try {
-    const total = PASSES.length + 1;
+    const total = PASSES.length + 2;
     let done = 0;
     const tick = () => onProgress?.(Math.min(1, ++done / total));
 
@@ -140,11 +149,15 @@ export async function readBarChart(
     tick();
     const b = await run(PASSES[0], 270);
     tick();
-    const rot: 90 | 270 = b.length > a.length ? 270 : 90;
-    dets.push(...(rot === 90 ? a : b));
+    const c0 = await run(PASSES[0], 0);
+    tick();
+    const best = Math.max(a.length, b.length, c0.length);
+    const rot: 0 | 90 | 270 = best === c0.length ? 0 : best === b.length ? 270 : 90;
+    dets.push(...(rot === 0 ? c0 : rot === 90 ? a : b));
 
     for (const pass of PASSES.slice(1)) {
-      dets.push(...(await run(pass, rot)));
+      // Con números horizontales se cambia el modo de lectura a "líneas sueltas".
+      dets.push(...(await run(rot === 0 ? { ...pass, psm: pass.psm === "6" ? "11" : pass.psm } : pass, rot)));
       tick();
     }
   } finally {
