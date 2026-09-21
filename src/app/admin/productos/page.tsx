@@ -75,6 +75,7 @@ export default function AdminProductosPage() {
   const [fromInventoryOpen, setFromInventoryOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("todas");
+  const [showHidden, setShowHidden] = useState(true);
 
   useEffect(() => {
     Promise.all([getProducts(), getCategories()])
@@ -98,16 +99,33 @@ export default function AdminProductosPage() {
   const visible = published.filter(
     (p) =>
       p.name.toLowerCase().includes(query.toLowerCase()) &&
-      (categoryFilter === "todas" || p.category === categoryFilter),
+      (categoryFilter === "todas" || p.category === categoryFilter) &&
+      (showHidden || !p.hiddenStore),
   );
+  const hiddenCount = published.filter((p) => p.hiddenStore).length;
   const selectedCategory = categories.find((c) => c.value === categoryFilter);
 
-  async function hideFromStore(id: string) {
-    setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, publishedOnline: false } : p)));
+  // Ocultar / mostrar: el producto sigue en esta lista, con su marca "Oculto".
+  async function toggleHidden(id: string) {
+    const product = products.find((p) => p.id === id);
+    if (!product) return;
+    const next = product.hiddenStore !== true;
+    setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, hiddenStore: next } : p)));
     try {
-      await updateProduct(id, { publishedOnline: false });
+      await updateProduct(id, { hiddenStore: next });
     } catch (e) {
       console.error("Ocultar producto:", e);
+      setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, hiddenStore: !next } : p)));
+    }
+  }
+
+  // Quitar de la tienda online: sale de esta lista y queda solo en el inventario.
+  async function removeFromStore(id: string) {
+    setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, publishedOnline: false, hiddenStore: false } : p)));
+    try {
+      await updateProduct(id, { publishedOnline: false, hiddenStore: false });
+    } catch (e) {
+      console.error("Quitar de la tienda:", e);
       setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, publishedOnline: true } : p)));
     }
   }
@@ -338,6 +356,13 @@ export default function AdminProductosPage() {
               </option>
             ))}
           </select>
+          <button
+            type="button"
+            onClick={() => setShowHidden((v) => !v)}
+            className="cursor-pointer touch-manipulation rounded-lg border border-ink/15 bg-surface px-3 py-2.5 text-xs font-semibold text-ink shadow-sm"
+          >
+            {showHidden ? "Ocultar de la lista los marcados" : "Ver también los ocultos"} ({hiddenCount})
+          </button>
           {selectedCategory && (
             <button
               type="button"
@@ -357,7 +382,9 @@ export default function AdminProductosPage() {
           {visible.map((product) => (
             <div
               key={product.id}
-              className="flex flex-col overflow-hidden rounded-xl border border-ink/10 bg-surface shadow-sm transition-shadow hover:shadow-md"
+              className={`flex flex-col overflow-hidden rounded-xl border bg-surface shadow-sm transition-shadow hover:shadow-md ${
+                product.hiddenStore ? "border-dashed border-red-500/50" : "border-ink/10"
+              }`}
             >
               <div
                 className={`relative flex h-24 items-end justify-between overflow-hidden p-3 ${
@@ -371,6 +398,11 @@ export default function AdminProductosPage() {
                     alt={product.name}
                     className="absolute inset-0 h-full w-full object-contain p-1.5"
                   />
+                )}
+                {product.hiddenStore && (
+                  <span className="absolute left-2 top-2 z-10 rounded bg-red-500 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-white shadow">
+                    Oculto en la tienda
+                  </span>
                 )}
                 <span className="relative rounded bg-navy-950/70 px-2 py-0.5 text-[10px] font-semibold text-white">
                   {categories.find((c) => c.value === product.category)?.label}
@@ -415,26 +447,38 @@ export default function AdminProductosPage() {
                     </button>
                   </div>
                 ) : (
-                  <div className="mt-auto flex gap-2 border-t border-ink/10 pt-3">
+                  <div className="mt-auto grid grid-cols-2 gap-2 border-t border-ink/10 pt-3">
                     <button
                       type="button"
                       onClick={() => openEdit(product)}
-                      className="flex-1 cursor-pointer touch-manipulation rounded-lg bg-cream-200 py-2 text-xs font-semibold text-ink"
+                      className="cursor-pointer touch-manipulation rounded-lg bg-cream-200 py-2 text-xs font-semibold text-ink"
                     >
                       Editar
                     </button>
                     <button
                       type="button"
-                      onClick={() => hideFromStore(product.id)}
-                      title="Se saca de la tienda pero queda en el inventario"
-                      className="flex-1 cursor-pointer touch-manipulation rounded-lg border border-ink/15 bg-background py-2 text-xs font-semibold text-ink"
+                      onClick={() => toggleHidden(product.id)}
+                      title="Deja de verse en la tienda, pero sigue acá con una marca"
+                      className={`cursor-pointer touch-manipulation rounded-lg border py-2 text-xs font-semibold ${
+                        product.hiddenStore
+                          ? "border-red-500/40 bg-red-500/10 text-red-500"
+                          : "border-ink/15 bg-background text-ink"
+                      }`}
                     >
-                      Ocultar
+                      {product.hiddenStore ? "Mostrar" : "Ocultar"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeFromStore(product.id)}
+                      title="Sale de la tienda y de esta lista; queda en el inventario (Stock)"
+                      className="cursor-pointer touch-manipulation rounded-lg border border-ink/15 bg-background py-2 text-xs font-semibold text-ink"
+                    >
+                      Quitar de la tienda online
                     </button>
                     <button
                       type="button"
                       onClick={() => setConfirmDeleteId(product.id)}
-                      className="flex-1 cursor-pointer touch-manipulation rounded-lg bg-red-500/10 py-2 text-xs font-semibold text-red-500"
+                      className="cursor-pointer touch-manipulation rounded-lg bg-red-500/10 py-2 text-xs font-semibold text-red-500"
                     >
                       Eliminar
                     </button>

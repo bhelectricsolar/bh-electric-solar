@@ -39,6 +39,8 @@ export type Product = {
   publishedOnline?: boolean;
   // true = oculto de la lista de Stock del admin (sigue existiendo).
   hiddenStock?: boolean;
+  // true = oculto de la tienda pública pero sigue en la lista del admin, marcado.
+  hiddenStore?: boolean;
 };
 
 export type Category = {
@@ -65,6 +67,7 @@ type ProductRow = {
   images: string[] | null;
   published_online: boolean;
   hidden_stock?: boolean | null;
+  hidden_store?: boolean | null;
 };
 
 function fromRow(row: ProductRow): Product {
@@ -84,6 +87,7 @@ function fromRow(row: ProductRow): Product {
     images: row.images ?? [],
     publishedOnline: row.published_online,
     hiddenStock: row.hidden_stock ?? false,
+    hiddenStore: row.hidden_store ?? false,
   };
 }
 
@@ -103,6 +107,7 @@ function toRow(patch: Partial<Product>) {
   if (patch.images !== undefined) row.images = patch.images;
   if (patch.publishedOnline !== undefined) row.published_online = patch.publishedOnline;
   if (patch.hiddenStock !== undefined) row.hidden_stock = patch.hiddenStock;
+  if (patch.hiddenStore !== undefined) row.hidden_store = patch.hiddenStore;
   return row;
 }
 
@@ -174,7 +179,7 @@ export async function getPublishedProducts(): Promise<Product[]> {
     .order("created_at", { ascending: false });
   if (error) throw error;
   const hidden = await hiddenStoreCategories();
-  return (data ?? []).map(fromRow).filter((p) => !hidden.has(p.category));
+  return (data ?? []).map(fromRow).filter((p) => !hidden.has(p.category) && !p.hiddenStore);
 }
 
 export async function getProductBySlug(slug: string): Promise<Product | undefined> {
@@ -182,15 +187,17 @@ export async function getProductBySlug(slug: string): Promise<Product | undefine
   if (error) throw error;
   if (!data) return undefined;
   const product = fromRow(data);
-  if ((await hiddenStoreCategories()).has(product.category)) return undefined;
+  if (product.hiddenStore || (await hiddenStoreCategories()).has(product.category)) return undefined;
   return product;
 }
 
 export async function getAllSlugs(): Promise<string[]> {
-  const { data, error } = await supabase.from("products").select("slug,category").eq("published_online", true);
+  const { data, error } = await supabase.from("products").select("slug,category,hidden_store").eq("published_online", true);
   if (error) throw error;
   const hidden = await hiddenStoreCategories();
-  return (data ?? []).filter((r) => !hidden.has(r.category as string)).map((r) => r.slug as string);
+  return (data ?? [])
+    .filter((r) => !hidden.has(r.category as string) && !r.hidden_store)
+    .map((r) => r.slug as string);
 }
 
 export async function getRelatedProducts(product: Product, limit = 3): Promise<Product[]> {
@@ -200,9 +207,9 @@ export async function getRelatedProducts(product: Product, limit = 3): Promise<P
     .eq("category", product.category)
     .eq("published_online", true)
     .neq("id", product.id)
-    .limit(limit);
+    .limit(limit + 10);
   if (error) throw error;
-  return (data ?? []).map(fromRow);
+  return (data ?? []).map(fromRow).filter((p) => !p.hiddenStore).slice(0, limit);
 }
 
 export async function createProduct(product: Product) {

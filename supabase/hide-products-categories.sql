@@ -3,3 +3,6 @@
 alter table products add column if not exists hidden_stock boolean not null default false;
 alter table categories add column if not exists hidden_store boolean not null default false;
 alter table categories add column if not exists hidden_stock boolean not null default false;
+
+-- Ocultar un producto de la tienda pública dejándolo marcado en el admin.
+alter table products add column if not exists hidden_store boolean not null default false;

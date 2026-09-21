@@ -24,6 +24,7 @@ export default function AdminStockPage() {
   const [filter, setFilter] = useState<Filter>("todos");
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("todas");
+  const [showHidden, setShowHidden] = useState(true);
 
   useEffect(() => {
     Promise.all([getProducts(), getCategories()])
@@ -38,14 +39,14 @@ export default function AdminStockPage() {
 
   const hiddenCats = new Set(categories.filter((c) => c.hiddenStock).map((c) => c.value));
   const isHidden = (p: Product) => p.hiddenStock === true || hiddenCats.has(p.category);
-  const shown = products.filter((p) => !isHidden(p));
+  const shown = products;
   const selectedCategory = categories.find((c) => c.value === categoryFilter);
 
   const visible = products.filter((p) => {
     if (!p.name.toLowerCase().includes(query.toLowerCase())) return false;
     if (categoryFilter !== "todas" && p.category !== categoryFilter) return false;
     if (filter === "ocultos") return isHidden(p);
-    if (isHidden(p)) return false;
+    if (isHidden(p) && !showHidden) return false;
     if (filter === "publicados") return p.publishedOnline !== false;
     if (filter === "internos") return p.publishedOnline === false;
     if (filter === "poco_stock") return lowStock(p);
@@ -131,8 +132,11 @@ export default function AdminStockPage() {
           <Chip active={filter === "poco_stock"} onClick={() => setFilter("poco_stock")} tone="danger">
             Poco stock ({shown.filter(lowStock).length})
           </Chip>
-          <Chip active={filter === "ocultos"} onClick={() => setFilter("ocultos")} title="Productos ocultados del stock">
+          <Chip active={filter === "ocultos"} onClick={() => setFilter("ocultos")} title="Productos marcados como ocultos del stock">
             Ocultos ({products.filter(isHidden).length})
+          </Chip>
+          <Chip active={!showHidden} onClick={() => setShowHidden((v) => !v)} title="Sacar de la lista los marcados como ocultos">
+            {showHidden ? "Sacar ocultos de la lista" : "Ver también los ocultos"}
           </Chip>
         </div>
 
@@ -170,7 +174,9 @@ export default function AdminStockPage() {
           {visible.map((product) => (
             <div
               key={product.id}
-              className="flex flex-col gap-3 rounded-2xl border border-ink/10 bg-surface p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between"
+              className={`flex flex-col gap-3 rounded-2xl border bg-surface p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between ${
+                isHidden(product) ? "border-dashed border-red-500/50 opacity-75" : "border-ink/10"
+              }`}
             >
               <div className="flex min-w-0 items-center gap-3">
                 <div
@@ -196,6 +202,12 @@ export default function AdminStockPage() {
                       <StatusBadge tone="negocio">Publicado</StatusBadge>
                     )}
                     {lowStock(product) && <StatusBadge tone="danger">Poco stock</StatusBadge>}
+                    {isHidden(product) && (
+                      <StatusBadge tone="danger">
+                        {hiddenCats.has(product.category) ? "Categoría oculta del stock" : "Oculto del stock"}
+                      </StatusBadge>
+                    )}
+                    {product.hiddenStore && <StatusBadge tone="danger">Oculto en la tienda</StatusBadge>}
                   </div>
                   <p className="mt-0.5 text-xs text-body">
                     {categories.find((c) => c.value === product.category)?.label}
