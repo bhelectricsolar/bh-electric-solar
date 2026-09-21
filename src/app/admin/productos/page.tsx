@@ -5,6 +5,7 @@ import NumberField from "@/components/NumberField";
 import {
   getProducts,
   getCategories,
+  setCategoryHidden,
   createProduct,
   updateProduct,
   deleteProduct,
@@ -73,6 +74,7 @@ export default function AdminProductosPage() {
   const [choiceOpen, setChoiceOpen] = useState(false);
   const [fromInventoryOpen, setFromInventoryOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("todas");
 
   useEffect(() => {
     Promise.all([getProducts(), getCategories()])
@@ -93,9 +95,33 @@ export default function AdminProductosPage() {
 
   const published = products.filter((p) => p.publishedOnline !== false);
   const internalOnly = products.filter((p) => p.publishedOnline === false);
-  const visible = published.filter((p) =>
-    p.name.toLowerCase().includes(query.toLowerCase()),
+  const visible = published.filter(
+    (p) =>
+      p.name.toLowerCase().includes(query.toLowerCase()) &&
+      (categoryFilter === "todas" || p.category === categoryFilter),
   );
+  const selectedCategory = categories.find((c) => c.value === categoryFilter);
+
+  async function hideFromStore(id: string) {
+    setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, publishedOnline: false } : p)));
+    try {
+      await updateProduct(id, { publishedOnline: false });
+    } catch (e) {
+      console.error("Ocultar producto:", e);
+      setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, publishedOnline: true } : p)));
+    }
+  }
+
+  async function toggleCategoryStore(cat: Category) {
+    const next = !cat.hiddenStore;
+    setCategories((prev) => prev.map((c) => (c.value === cat.value ? { ...c, hiddenStore: next } : c)));
+    try {
+      await setCategoryHidden(cat.value, { hiddenStore: next });
+    } catch (e) {
+      console.error("Ocultar categoría:", e);
+      setCategories((prev) => prev.map((c) => (c.value === cat.value ? { ...c, hiddenStore: !next } : c)));
+    }
+  }
 
   function openNewChoice() {
     setChoiceOpen(true);
@@ -297,6 +323,36 @@ export default function AdminProductosPage() {
           className="mt-5 w-full rounded-lg border border-ink/10 bg-surface px-4 py-2.5 text-sm text-ink"
         />
 
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            aria-label="Filtrar por categoría"
+            className="min-w-0 flex-1 rounded-lg border border-ink/10 bg-surface px-3 py-2.5 text-sm text-ink sm:flex-none"
+          >
+            <option value="todas">Todas las categorías ({published.length})</option>
+            {categories.map((c) => (
+              <option key={c.value} value={c.value}>
+                {c.label} ({published.filter((p) => p.category === c.value).length})
+                {c.hiddenStore ? " · oculta" : ""}
+              </option>
+            ))}
+          </select>
+          {selectedCategory && (
+            <button
+              type="button"
+              onClick={() => toggleCategoryStore(selectedCategory)}
+              className={`cursor-pointer touch-manipulation rounded-lg border px-3 py-2.5 text-xs font-semibold transition-all ${
+                selectedCategory.hiddenStore
+                  ? "border-red-500/40 bg-red-500/10 text-red-500"
+                  : "border-ink/15 bg-surface text-ink shadow-sm hover:shadow-md"
+              }`}
+            >
+              {selectedCategory.hiddenStore ? "Mostrar categoría en la tienda" : "Ocultar categoría de la tienda"}
+            </button>
+          )}
+        </div>
+
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {visible.map((product) => (
             <div
@@ -319,6 +375,11 @@ export default function AdminProductosPage() {
                 <span className="relative rounded bg-navy-950/70 px-2 py-0.5 text-[10px] font-semibold text-white">
                   {categories.find((c) => c.value === product.category)?.label}
                 </span>
+                {categories.find((c) => c.value === product.category)?.hiddenStore && (
+                  <span className="relative rounded bg-red-500 px-2 py-0.5 text-[10px] font-bold text-white">
+                    Categoría oculta
+                  </span>
+                )}
                 {product.stock <= 8 && (
                   <span className="relative rounded bg-gold-500 px-2 py-0.5 text-[10px] font-bold text-navy-950">
                     Stock: {product.stock}
@@ -361,6 +422,14 @@ export default function AdminProductosPage() {
                       className="flex-1 cursor-pointer touch-manipulation rounded-lg bg-cream-200 py-2 text-xs font-semibold text-ink"
                     >
                       Editar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => hideFromStore(product.id)}
+                      title="Se saca de la tienda pero queda en el inventario"
+                      className="flex-1 cursor-pointer touch-manipulation rounded-lg border border-ink/15 bg-background py-2 text-xs font-semibold text-ink"
+                    >
+                      Ocultar
                     </button>
                     <button
                       type="button"

@@ -1,13 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getProducts, getCategories, updateProduct, type Product, type Category } from "@/lib/products";
+import {
+  getProducts,
+  getCategories,
+  updateProduct,
+  setCategoryHidden,
+  type Product,
+  type Category,
+} from "@/lib/products";
 import { useAdminSettings } from "@/lib/admin-settings";
 import Chip from "@/components/admin/Chip";
 import StatusBadge from "@/components/admin/StatusBadge";
 import SectorEyebrow from "@/components/admin/SectorEyebrow";
 
-type Filter = "todos" | "publicados" | "internos" | "poco_stock";
+type Filter = "todos" | "publicados" | "internos" | "poco_stock" | "ocultos";
 
 export default function AdminStockPage() {
   const { settings } = useAdminSettings();
@@ -16,6 +23,7 @@ export default function AdminStockPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<Filter>("todos");
   const [query, setQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("todas");
 
   useEffect(() => {
     Promise.all([getProducts(), getCategories()])
@@ -28,8 +36,16 @@ export default function AdminStockPage() {
 
   const lowStock = (p: Product) => p.stock <= settings.lowStockThreshold;
 
+  const hiddenCats = new Set(categories.filter((c) => c.hiddenStock).map((c) => c.value));
+  const isHidden = (p: Product) => p.hiddenStock === true || hiddenCats.has(p.category);
+  const shown = products.filter((p) => !isHidden(p));
+  const selectedCategory = categories.find((c) => c.value === categoryFilter);
+
   const visible = products.filter((p) => {
     if (!p.name.toLowerCase().includes(query.toLowerCase())) return false;
+    if (categoryFilter !== "todas" && p.category !== categoryFilter) return false;
+    if (filter === "ocultos") return isHidden(p);
+    if (isHidden(p)) return false;
     if (filter === "publicados") return p.publishedOnline !== false;
     if (filter === "internos") return p.publishedOnline === false;
     if (filter === "poco_stock") return lowStock(p);
@@ -42,6 +58,30 @@ export default function AdminStockPage() {
     const newStock = Math.max(0, product.stock + delta);
     setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, stock: newStock } : p)));
     await updateProduct(id, { stock: newStock });
+  }
+
+  async function toggleHiddenStock(id: string) {
+    const product = products.find((p) => p.id === id);
+    if (!product) return;
+    const next = product.hiddenStock !== true;
+    setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, hiddenStock: next } : p)));
+    try {
+      await updateProduct(id, { hiddenStock: next });
+    } catch (e) {
+      console.error("Ocultar del stock:", e);
+      setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, hiddenStock: !next } : p)));
+    }
+  }
+
+  async function toggleCategoryStock(cat: Category) {
+    const next = !cat.hiddenStock;
+    setCategories((prev) => prev.map((c) => (c.value === cat.value ? { ...c, hiddenStock: next } : c)));
+    try {
+      await setCategoryHidden(cat.value, { hiddenStock: next });
+    } catch (e) {
+      console.error("Ocultar categoría:", e);
+      setCategories((prev) => prev.map((c) => (c.value === cat.value ? { ...c, hiddenStock: !next } : c)));
+    }
   }
 
   async function togglePublished(id: string) {
@@ -80,17 +120,50 @@ export default function AdminStockPage() {
 
         <div className="mt-4 flex flex-wrap gap-2">
           <Chip active={filter === "todos"} onClick={() => setFilter("todos")}>
-            Todos ({products.length})
+            Todos ({shown.length})
           </Chip>
           <Chip active={filter === "publicados"} onClick={() => setFilter("publicados")} tone="negocio">
-            Publicados ({products.filter((p) => p.publishedOnline !== false).length})
+            Publicados ({shown.filter((p) => p.publishedOnline !== false).length})
           </Chip>
           <Chip active={filter === "internos"} onClick={() => setFilter("internos")} tone="negocio">
-            Solo interno ({products.filter((p) => p.publishedOnline === false).length})
+            Solo interno ({shown.filter((p) => p.publishedOnline === false).length})
           </Chip>
           <Chip active={filter === "poco_stock"} onClick={() => setFilter("poco_stock")} tone="danger">
-            Poco stock ({products.filter(lowStock).length})
+            Poco stock ({shown.filter(lowStock).length})
           </Chip>
+          <Chip active={filter === "ocultos"} onClick={() => setFilter("ocultos")} title="Productos ocultados del stock">
+            Ocultos ({products.filter(isHidden).length})
+          </Chip>
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            aria-label="Filtrar por categoría"
+            className="min-w-0 flex-1 rounded-lg border border-ink/15 bg-surface px-3 py-2.5 text-sm text-ink shadow-sm sm:flex-none"
+          >
+            <option value="todas">Todas las categorías</option>
+            {categories.map((c) => (
+              <option key={c.value} value={c.value}>
+                {c.label} ({products.filter((p) => p.category === c.value).length})
+                {c.hiddenStock ? " · oculta" : ""}
+              </option>
+            ))}
+          </select>
+          {selectedCategory && (
+            <button
+              type="button"
+              onClick={() => toggleCategoryStock(selectedCategory)}
+              className={`cursor-pointer touch-manipulation rounded-lg border px-3 py-2.5 text-xs font-semibold transition-all ${
+                selectedCategory.hiddenStock
+                  ? "border-red-500/40 bg-red-500/10 text-red-500"
+                  : "border-ink/15 bg-surface text-ink shadow-sm hover:shadow-md"
+              }`}
+            >
+              {selectedCategory.hiddenStock ? "Mostrar categoría en el stock" : "Ocultar categoría del stock"}
+            </button>
+          )}
         </div>
 
         <div className="mt-5 flex flex-col gap-3">
@@ -130,7 +203,7 @@ export default function AdminStockPage() {
                 </div>
               </div>
 
-              <div className="flex shrink-0 items-center gap-4">
+              <div className="flex shrink-0 flex-wrap items-center gap-3 sm:gap-4">
                 <div className="flex items-center gap-2 rounded-xl border border-ink/15 bg-background px-2 py-1.5 shadow-sm">
                   <button
                     type="button"
@@ -157,6 +230,15 @@ export default function AdminStockPage() {
                   className="cursor-pointer touch-manipulation rounded-lg border border-ink/15 bg-background px-3 py-2 text-xs font-semibold text-ink shadow-sm hover:bg-cream-200"
                 >
                   {product.publishedOnline === false ? "Publicar en tienda" : "Quitar de tienda"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => toggleHiddenStock(product.id)}
+                  disabled={hiddenCats.has(product.category)}
+                  title={hiddenCats.has(product.category) ? "Su categoría está oculta" : undefined}
+                  className="cursor-pointer touch-manipulation rounded-lg border border-ink/15 bg-background px-3 py-2 text-xs font-semibold text-ink shadow-sm hover:bg-cream-200 disabled:opacity-50"
+                >
+                  {product.hiddenStock ? "Mostrar en stock" : "Ocultar del stock"}
                 </button>
               </div>
             </div>

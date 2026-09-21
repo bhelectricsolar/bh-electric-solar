@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Badge from "@/components/Badge";
 import GlowOrb from "@/components/GlowOrb";
 import StoreCatalog from "@/components/store/StoreCatalog";
-import { getPublishedProducts, getCategories } from "@/lib/products";
+import { getPublishedProducts, getPublicCategories } from "@/lib/products";
 import { getExchangeRate } from "@/lib/exchange-rate";
 
 export const metadata: Metadata = {
@@ -16,7 +16,7 @@ export const revalidate = 0;
 export default async function TiendaPage() {
   const [products, categories, exchangeRate] = await Promise.all([
     getPublishedProducts(),
-    getCategories(),
+    getPublicCategories(),
     getExchangeRate(),
   ]);
   return (

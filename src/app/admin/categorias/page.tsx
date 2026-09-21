@@ -7,11 +7,12 @@ import {
   createCategory,
   updateCategoryLabel,
   deleteCategory,
+  setCategoryHidden,
   type ProductCategory,
 } from "@/lib/products";
 import SectorEyebrow from "@/components/admin/SectorEyebrow";
 
-type CategoryRow = { value: string; label: string };
+type CategoryRow = { value: string; label: string; hiddenStore?: boolean; hiddenStock?: boolean };
 
 export default function AdminCategoriasPage() {
   const [categories, setCategories] = useState<CategoryRow[]>([]);
@@ -66,6 +67,17 @@ export default function AdminCategoriasPage() {
     setEditingValue(null);
   }
 
+  async function toggleHidden(cat: CategoryRow, field: "hiddenStore" | "hiddenStock") {
+    const next = !cat[field];
+    setCategories((prev) => prev.map((c) => (c.value === cat.value ? { ...c, [field]: next } : c)));
+    try {
+      await setCategoryHidden(cat.value, { [field]: next });
+    } catch (e) {
+      console.error("Ocultar categoría:", e);
+      setCategories((prev) => prev.map((c) => (c.value === cat.value ? { ...c, [field]: !next } : c)));
+    }
+  }
+
   async function handleDelete(value: string) {
     const inUse = countProducts(value);
     if (inUse > 0) {
@@ -116,7 +128,7 @@ export default function AdminCategoriasPage() {
           {categories.map((cat) => (
             <div
               key={cat.value}
-              className="flex items-center justify-between gap-4 rounded-xl border border-ink/10 bg-surface p-4 shadow-sm transition-shadow hover:shadow-md"
+              className="flex flex-col gap-3 rounded-xl border border-ink/10 bg-surface p-4 shadow-sm transition-shadow hover:shadow-md sm:flex-row sm:items-center sm:justify-between sm:gap-4"
             >
               {editingValue === cat.value ? (
                 <input
@@ -135,7 +147,21 @@ export default function AdminCategoriasPage() {
                 </div>
               )}
 
-              <div className="flex shrink-0 gap-3 text-xs font-semibold">
+              <div className="flex shrink-0 flex-wrap items-center gap-2 text-xs font-semibold">
+                {(["hiddenStore", "hiddenStock"] as const).map((field) => (
+                  <button
+                    key={field}
+                    type="button"
+                    onClick={() => toggleHidden(cat, field)}
+                    className={`cursor-pointer touch-manipulation rounded-full border px-3 py-1.5 transition-all ${
+                      cat[field]
+                        ? "border-red-500/40 bg-red-500/10 text-red-500"
+                        : "border-ink/15 bg-background text-ink hover:bg-cream-200"
+                    }`}
+                  >
+                    {field === "hiddenStore" ? "Tienda" : "Stock"}: {cat[field] ? "oculta" : "visible"}
+                  </button>
+                ))}
                 {editingValue === cat.value ? (
                   <button
                     type="button"

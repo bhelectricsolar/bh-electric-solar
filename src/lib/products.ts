@@ -37,9 +37,17 @@ export type Product = {
   images: string[];
   // false = existe en el inventario interno pero todavía no se publicó en /tienda.
   publishedOnline?: boolean;
+  // true = oculto de la lista de Stock del admin (sigue existiendo).
+  hiddenStock?: boolean;
 };
 
-export type Category = { value: ProductCategory; label: string };
+export type Category = {
+  value: ProductCategory;
+  label: string;
+  // Categoría oculta: no aparece en la tienda / no aparece en el Stock.
+  hiddenStore?: boolean;
+  hiddenStock?: boolean;
+};
 
 type ProductRow = {
   id: string;
@@ -56,6 +64,7 @@ type ProductRow = {
   gradient: string;
   images: string[] | null;
   published_online: boolean;
+  hidden_stock?: boolean | null;
 };
 
 function fromRow(row: ProductRow): Product {
@@ -74,6 +83,7 @@ function fromRow(row: ProductRow): Product {
     gradient: row.gradient ?? "",
     images: row.images ?? [],
     publishedOnline: row.published_online,
+    hiddenStock: row.hidden_stock ?? false,
   };
 }
 
@@ -92,13 +102,44 @@ function toRow(patch: Partial<Product>) {
   if (patch.gradient !== undefined) row.gradient = patch.gradient;
   if (patch.images !== undefined) row.images = patch.images;
   if (patch.publishedOnline !== undefined) row.published_online = patch.publishedOnline;
+  if (patch.hiddenStock !== undefined) row.hidden_stock = patch.hiddenStock;
   return row;
 }
 
 export async function getCategories(): Promise<Category[]> {
   const { data, error } = await supabase.from("categories").select("*").order("value");
   if (error) throw error;
-  return (data ?? []).map((c) => ({ value: c.value as ProductCategory, label: c.label as string }));
+  return (data ?? []).map((c) => ({
+    value: c.value as ProductCategory,
+    label: c.label as string,
+    hiddenStore: c.hidden_store ?? false,
+    hiddenStock: c.hidden_stock ?? false,
+  }));
+}
+
+// Lo que ve el público: sin las categorías ocultas de la tienda.
+export async function getPublicCategories(): Promise<Category[]> {
+  return (await getCategories()).filter((c) => !c.hiddenStore);
+}
+
+async function hiddenStoreCategories(): Promise<Set<string>> {
+  try {
+    const cats = await getCategories();
+    return new Set(cats.filter((c) => c.hiddenStore).map((c) => c.value));
+  } catch {
+    return new Set();
+  }
+}
+
+export async function setCategoryHidden(
+  value: string,
+  patch: { hiddenStore?: boolean; hiddenStock?: boolean },
+) {
+  const row: Record<string, boolean> = {};
+  if (patch.hiddenStore !== undefined) row.hidden_store = patch.hiddenStore;
+  if (patch.hiddenStock !== undefined) row.hidden_stock = patch.hiddenStock;
+  const { error } = await supabaseAuth.from("categories").update(row).eq("value", value);
+  if (error) throw error;
 }
 
 export async function createCategory(value: string, label: string) {
@@ -132,19 +173,24 @@ export async function getPublishedProducts(): Promise<Product[]> {
     .eq("published_online", true)
     .order("created_at", { ascending: false });
   if (error) throw error;
-  return (data ?? []).map(fromRow);
+  const hidden = await hiddenStoreCategories();
+  return (data ?? []).map(fromRow).filter((p) => !hidden.has(p.category));
 }
 
 export async function getProductBySlug(slug: string): Promise<Product | undefined> {
   const { data, error } = await supabase.from("products").select("*").eq("slug", slug).maybeSingle();
   if (error) throw error;
-  return data ? fromRow(data) : undefined;
+  if (!data) return undefined;
+  const product = fromRow(data);
+  if ((await hiddenStoreCategories()).has(product.category)) return undefined;
+  return product;
 }
 
 export async function getAllSlugs(): Promise<string[]> {
-  const { data, error } = await supabase.from("products").select("slug").eq("published_online", true);
+  const { data, error } = await supabase.from("products").select("slug,category").eq("published_online", true);
   if (error) throw error;
-  return (data ?? []).map((r) => r.slug as string);
+  const hidden = await hiddenStoreCategories();
+  return (data ?? []).filter((r) => !hidden.has(r.category as string)).map((r) => r.slug as string);
 }
 
 export async function getRelatedProducts(product: Product, limit = 3): Promise<Product[]> {
