@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import NumberField from "@/components/NumberField";
 import PrintDocument from "@/components/admin/PrintDocument";
@@ -11,11 +12,13 @@ import Chip from "@/components/admin/Chip";
 import { useAdminSettings } from "@/lib/admin-settings";
 import { useCurrentTeamMember } from "@/lib/current-user";
 import { getCustomers, type Customer } from "@/lib/customers";
-import { getProjects, type Project } from "@/lib/projects";
+import { createProject, getProjects, type Project } from "@/lib/projects";
 import {
   createSolarQuote,
   deleteSolarQuote,
   getSolarQuotes,
+  linkQuoteToProject,
+  uploadChartImage,
   type SolarQuote,
 } from "@/lib/solar-quotes";
 import {
@@ -176,7 +179,9 @@ function CotizadorInner() {
   const [savedId, setSavedId] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [sheet, setSheet] = useState<{ title: string; text: string } | null>(null);
+  const [sheet, setSheet] = useState<{ title: string; text: string; image?: string } | null>(null);
+  const [creatingProject, setCreatingProject] = useState<string | null>(null);
+  const [projectMsg, setProjectMsg] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
@@ -472,13 +477,24 @@ function CotizadorInner() {
     setSaving(true);
     setSaveError(null);
     try {
+      // La foto del gráfico se guarda con la cotización; si no se puede subir,
+      // la cotización se guarda igual.
+      let chartImageUrl: string | undefined;
+      if (chartRef?.startsWith("data:")) {
+        try {
+          chartImageUrl = await uploadChartImage(chartRef);
+          setChartRef(chartImageUrl);
+        } catch (e) {
+          console.error("Subir gráfico:", e);
+        }
+      } else if (chartRef) chartImageUrl = chartRef;
       const saved = await createSolarQuote({
         createdBy: member?.id ?? null,
         customerId: f.customerId || null,
         projectId: f.projectId || null,
         clientName: f.clientName.trim(),
         address: f.address.trim(),
-        inputs,
+        inputs: chartImageUrl ? { ...inputs, chartImageUrl } : inputs,
         results,
         summary,
         fromInvoicePhoto: fromPhoto,
@@ -490,6 +506,32 @@ function CotizadorInner() {
       setSaveError("No se pudo guardar la cotización. Reintentá.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  // Crea un proyecto real (etapa "Cotización enviada") con los datos de la cotización.
+  async function convertToProject(q: SolarQuote) {
+    setCreatingProject(q.id);
+    setProjectMsg(null);
+    try {
+      const customer = customers.find((c) => c.id === q.customerId);
+      const project = await createProject({
+        customerName: q.clientName || customer?.name || "Sin nombre",
+        customerPhone: customer?.phone ?? "",
+        city: q.address || customer?.city || "",
+        zone: q.province,
+        type: q.systemKwp > 15 ? "comercial" : "residencial",
+        systemKwp: Math.round(q.systemKwp * 100) / 100,
+        panelsCount: q.panels,
+        salespersonId: member?.id ?? null,
+      });
+      await linkQuoteToProject(q.id, project.id);
+      await reloadQuotes();
+    } catch (e) {
+      console.error("Crear proyecto:", e);
+      setProjectMsg("No se pudo crear el proyecto. Reintentá.");
+    } finally {
+      setCreatingProject(null);
     }
   }
 
@@ -508,6 +550,7 @@ function CotizadorInner() {
       projectId: q.projectId ?? "",
     });
     setHistory(q.inputs.history ?? []);
+    setChartRef(q.inputs.chartImageUrl ?? null);
     setBasisChoice(q.inputs.basis ?? "historial");
     setSetup(q.inputs.setup ?? DEFAULT_SETUP);
     setPanelId(q.inputs.panelId ?? "");
@@ -549,7 +592,7 @@ function CotizadorInner() {
   const visibleQuotes = customerFilter ? quotes.filter((q) => q.customerId === customerFilter) : quotes;
 
   return (
-    <section className="px-4 py-6 sm:px-8 sm:py-10">
+    <section className="px-4 py-6 pb-44 sm:px-8 sm:py-10 sm:pb-44 lg:pb-10">
       <div className="mx-auto max-w-6xl">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
@@ -1231,7 +1274,7 @@ function CotizadorInner() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setSheet({ title: "Cotización solar", text: summary })}
+                      onClick={() => setSheet({ title: "Cotización solar", text: summary, image: chartRef ?? undefined })}
                       className="rounded-lg border border-ink/15 bg-background px-3.5 py-2.5 text-xs font-semibold text-ink shadow-sm transition-all hover:shadow-md"
                     >
                       Ficha / PDF
@@ -1268,6 +1311,7 @@ function CotizadorInner() {
               </Chip>
             )}
           </div>
+          {projectMsg && <p className="mt-2 text-xs font-semibold text-red-500">{projectMsg}</p>}
           <div className="mt-3 grid gap-3 md:grid-cols-2">
             {visibleQuotes.map((q) => (
               <div key={q.id} className="flex flex-col rounded-xl border border-ink/10 bg-surface p-4 shadow-sm">
@@ -1328,7 +1372,7 @@ function CotizadorInner() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setSheet({ title: "Cotización solar", text: q.summary })}
+                      onClick={() => setSheet({ title: "Cotización solar", text: q.summary, image: q.inputs.chartImageUrl })}
                       className="flex-1 rounded-lg border border-ink/10 bg-cream-200 py-2 text-xs font-semibold text-ink shadow-sm hover:shadow-md"
                     >
                       Ficha
@@ -1340,6 +1384,27 @@ function CotizadorInner() {
                     >
                       Eliminar
                     </button>
+                  </div>
+                )}
+                {confirmDeleteId !== q.id && (
+                  <div className="mt-2">
+                    {q.projectId ? (
+                      <Link
+                        href="/admin/proyectos"
+                        className="flex items-center justify-center gap-1.5 rounded-lg border border-status-done/40 bg-status-done/10 py-2 text-xs font-bold text-status-done"
+                      >
+                        ✓ Ya es un proyecto — ver Proyectos
+                      </Link>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => convertToProject(q)}
+                        disabled={creatingProject === q.id}
+                        className="w-full rounded-lg bg-navy-900 py-2.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-navy-800 disabled:opacity-60"
+                      >
+                        {creatingProject === q.id ? "Creando proyecto…" : "Convertir en proyecto"}
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -1354,6 +1419,13 @@ function CotizadorInner() {
       {sheet && (
         <PrintDocument title={sheet.title} onClose={() => setSheet(null)}>
           <pre className="whitespace-pre-wrap text-[12px] leading-relaxed">{sheet.text}</pre>
+          {sheet.image && (
+            <div className="mt-4">
+              <p className="text-[11px] font-bold uppercase tracking-wide">Historial de consumo (gráfico de la factura)</p>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={sheet.image} alt="Gráfico de consumo" className="mt-2 w-full rounded border border-black/10" />
+            </div>
+          )}
         </PrintDocument>
       )}
     </section>

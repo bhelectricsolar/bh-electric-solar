@@ -119,6 +119,22 @@ export async function createSolarQuote(q: {
   return fromRow(data);
 }
 
+// Sube el recorte del gráfico (data URL) al almacenamiento y devuelve su URL pública.
+export async function uploadChartImage(dataUrl: string): Promise<string> {
+  const blob = await (await fetch(dataUrl)).blob();
+  const path = `cotizaciones/${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}.jpg`;
+  const { error } = await supabase.storage
+    .from("product-images")
+    .upload(path, blob, { contentType: "image/jpeg", upsert: false });
+  if (error) throw error;
+  return supabase.storage.from("product-images").getPublicUrl(path).data.publicUrl;
+}
+
+export async function linkQuoteToProject(id: string, projectId: string) {
+  const { error } = await supabase.from("solar_quotes").update({ project_id: projectId }).eq("id", id);
+  if (error) throw error;
+}
+
 export async function deleteSolarQuote(id: string) {
   const { error } = await supabase.from("solar_quotes").delete().eq("id", id);
   if (error) throw error;

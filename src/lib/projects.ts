@@ -110,6 +110,35 @@ export async function getProjects(): Promise<Project[]> {
   return (data ?? []).map(fromRow);
 }
 
+export async function createProject(p: {
+  customerName: string;
+  customerPhone: string;
+  city: string;
+  zone: string;
+  type: ProjectType;
+  systemKwp: number;
+  panelsCount: number;
+  salespersonId: string | null;
+}): Promise<Project> {
+  const { data, error } = await supabase
+    .from("projects")
+    .insert({
+      customer_name: p.customerName,
+      customer_phone: p.customerPhone,
+      city: p.city,
+      zone: p.zone,
+      type: p.type,
+      system_kwp: p.systemKwp,
+      panels_count: p.panelsCount,
+      status: "cotizacion",
+      salesperson_id: p.salespersonId,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return fromRow(data as ProjectRow);
+}
+
 export async function updateProject(id: string, patch: Partial<Project>) {
   const row: Record<string, unknown> = {};
   if (patch.status !== undefined) row.status = patch.status;
