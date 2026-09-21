@@ -568,8 +568,8 @@ function CotizadorInner() {
           </button>
         </div>
 
-        <div className="mt-6 grid gap-5 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
-          <div className="flex flex-col gap-5">
+        <div className="mt-6 grid gap-5 grid-cols-1 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:items-start">
+          <div className="flex min-w-0 flex-col gap-5">
             <Card title="1 · Factura de luz">
               <p className="text-xs text-body">
                 Cargá los datos a mano en los pasos siguientes, o sacale una foto a la factura para autocompletarlos.
@@ -818,7 +818,7 @@ function CotizadorInner() {
                       <p className="text-[11px] font-bold text-ink">Gráfico de la factura (para comparar)</p>
                       <div className="mt-1 max-h-60 overflow-auto rounded-lg border border-ink/10 bg-white">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={chartRef} alt="Gráfico de consumo" className="block min-w-[560px] max-w-none sm:w-full sm:min-w-0" />
+                        <img src={chartRef} alt="Gráfico de consumo" className="block w-[560px] max-w-none sm:w-full" />
                       </div>
                       <p className="mt-1 text-[11px] text-body">Deslizá para ver todo el gráfico.</p>
                     </div>
@@ -1356,7 +1356,7 @@ function CotizadorInner() {
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-ink/10 bg-surface p-5 shadow-sm">
+    <div className="min-w-0 rounded-2xl border border-ink/10 bg-surface p-5 shadow-sm">
       <h2 className="text-sm font-bold text-ink">{title}</h2>
       <div className="mt-3">{children}</div>
     </div>
