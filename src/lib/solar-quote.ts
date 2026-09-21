@@ -85,7 +85,18 @@ export function inferProvince(distribuidora: string | null, provincia?: string |
   return null;
 }
 
+// Un período del historial de consumo (una barra del gráfico de la factura).
+export type HistoryPeriod = {
+  label: string;
+  kwh: number;
+  days: number;
+  included: boolean;
+};
+
+export type SizingBasis = "historial" | "factura";
+
 export type QuoteInputs = {
+  // kWh y días con los que se dimensiona: el historial sumado, o la última factura.
   kwh: number;
   days: number;
   totalBill: number | null;
@@ -97,6 +108,10 @@ export type QuoteInputs = {
   coveragePct: number;
   costPerWp: number;
   exchangeRate: number;
+  history?: HistoryPeriod[];
+  basis?: SizingBasis;
+  billKwh?: number; // última factura, para comparar contra el promedio
+  billDays?: number;
 };
 
 export type QuoteResults = {
@@ -115,6 +130,53 @@ export type QuoteResults = {
   paybackYears: number | null;
   warnings: string[];
 };
+
+export type HistoryStats = {
+  periods: number;
+  totalKwh: number;
+  totalDays: number;
+  avgMonthlyKwh: number;
+  minMonthlyKwh: number;
+  maxMonthlyKwh: number;
+  minLabel: string;
+  maxLabel: string;
+  rows: { label: string; monthlyKwh: number }[];
+};
+
+// Consumo mensual equivalente (a 30 días) de cada período incluido.
+export function summarizeHistory(history: HistoryPeriod[] | undefined): HistoryStats | null {
+  const rows = (history ?? []).filter((h) => h.included && h.kwh > 0 && h.days > 0);
+  if (rows.length === 0) return null;
+  const mapped = rows.map((h) => ({ label: h.label, monthlyKwh: (h.kwh / h.days) * 30 }));
+  const totalKwh = rows.reduce((a, h) => a + h.kwh, 0);
+  const totalDays = rows.reduce((a, h) => a + h.days, 0);
+  const min = mapped.reduce((a, b) => (b.monthlyKwh < a.monthlyKwh ? b : a));
+  const max = mapped.reduce((a, b) => (b.monthlyKwh > a.monthlyKwh ? b : a));
+  return {
+    periods: rows.length,
+    totalKwh,
+    totalDays,
+    avgMonthlyKwh: (totalKwh / totalDays) * 30,
+    minMonthlyKwh: min.monthlyKwh,
+    maxMonthlyKwh: max.monthlyKwh,
+    minLabel: min.label,
+    maxLabel: max.label,
+    rows: mapped,
+  };
+}
+
+// Qué pasa mes a mes con el sistema elegido: cuánto del consumo cubre en
+// cada período y cuánto se ahorra usando la producción real de ese mes.
+export function historyCoverage(stats: HistoryStats, monthlyProduction: number, pricePerKwh: number) {
+  const used = stats.rows.map((r) => Math.min(monthlyProduction, r.monthlyKwh));
+  const totalCons = stats.rows.reduce((a, r) => a + r.monthlyKwh, 0);
+  const totalUsed = used.reduce((a, u) => a + u, 0);
+  return {
+    annualCoveragePct: totalCons > 0 ? (totalUsed / totalCons) * 100 : 0,
+    avgMonthlySavingsARS: (totalUsed / stats.rows.length) * pricePerKwh,
+    surplusPeriods: stats.rows.filter((r) => monthlyProduction > r.monthlyKwh).length,
+  };
+}
 
 export function validateInputs(i: QuoteInputs): string[] {
   const errors: string[] = [];
@@ -164,8 +226,23 @@ export function calculateQuote(i: QuoteInputs): QuoteResults | null {
   if (i.hsp < 2.5 || i.hsp > 7) {
     warnings.push("El valor de HSP es inusual para Argentina (lo normal va de 3 a 6). Revisalo.");
   }
-  if (i.days < 25 || i.days > 70) {
+  if (i.basis !== "historial" && (i.days < 25 || i.days > 70)) {
     warnings.push("Los días del período son inusuales (lo normal es ~30 o ~60). Revisalo.");
+  }
+  if (i.pricePerKwh > 350) {
+    warnings.push(
+      `El precio del kWh ($ ${i.pricePerKwh.toFixed(0)}) parece alto. Si salió del monto total de la factura, incluye impuestos, cuotas e intereses que los paneles no ahorran: revisalo y cargá el precio real de la energía.`,
+    );
+  }
+  const hist = summarizeHistory(i.history);
+  if (hist && hist.periods >= 3 && i.basis === "factura" && i.billKwh && i.billDays) {
+    const billMonthly = (i.billKwh / i.billDays) * 30;
+    const diff = ((billMonthly - hist.avgMonthlyKwh) / hist.avgMonthlyKwh) * 100;
+    if (Math.abs(diff) > 15) {
+      warnings.push(
+        `Estás dimensionando con la última factura (${billMonthly.toFixed(0)} kWh/mes), pero el promedio del historial es ${hist.avgMonthlyKwh.toFixed(0)} kWh/mes (${diff > 0 ? "+" : ""}${diff.toFixed(0)}%). Conviene dimensionar con el historial.`,
+      );
+    }
   }
 
   return {
@@ -189,6 +266,17 @@ export function calculateQuote(i: QuoteInputs): QuoteResults | null {
 const nf = (n: number, d = 0) =>
   new Intl.NumberFormat("es-AR", { minimumFractionDigits: d, maximumFractionDigits: d }).format(n);
 
+function historyLines(i: QuoteInputs, r: QuoteResults): string[] {
+  const h = summarizeHistory(i.history);
+  if (!h) return [];
+  const cov = historyCoverage(h, r.monthlyProduction, i.pricePerKwh);
+  return [
+    `- Dimensionado con: ${i.basis === "factura" ? "última factura" : "promedio del historial"}`,
+    `- Historial: ${h.periods} períodos, promedio ${nf(h.avgMonthlyKwh)} kWh/mes (mínimo ${nf(h.minMonthlyKwh)} en ${h.minLabel}, máximo ${nf(h.maxMonthlyKwh)} en ${h.maxLabel})`,
+    `- Cobertura considerando cada período del historial: ${nf(cov.annualCoveragePct)}% (ahorro mensual promedio $ ${nf(cov.avgMonthlySavingsARS)})`,
+  ];
+}
+
 export function buildQuoteSummary(args: {
   inputs: QuoteInputs;
   results: QuoteResults;
@@ -208,8 +296,9 @@ export function buildQuoteSummary(args: {
     `Zona: ${i.province} (HSP ${nf(i.hsp, 2)})`,
     "",
     "CONSUMO ACTUAL",
-    `- Facturado: ${nf(i.kwh)} kWh en ${nf(i.days)} días (${nf(r.dailyKwh, 1)} kWh/día, ${nf(r.monthlyKwh)} kWh/mes)`,
+    `- ${i.basis === "historial" ? "Consumo analizado (historial)" : "Facturado"}: ${nf(i.kwh)} kWh en ${nf(i.days)} días (${nf(r.dailyKwh, 1)} kWh/día, ${nf(r.monthlyKwh)} kWh/mes)`,
     `- Precio del kWh: $ ${nf(i.pricePerKwh, 2)}`,
+    ...historyLines(i, r),
     "",
     "SISTEMA RECOMENDADO",
     `- Potencia: ${nf(r.realKwp, 2)} kWp`,
@@ -243,12 +332,14 @@ export type ParsedInvoice = {
   kwh: number | null;
   days: number | null;
   total: number | null;
+  // Subtotal de "energía eléctrica" (sin impuestos, cuotas ni intereses), si la factura lo trae.
+  energyTotal: number | null;
   province: string | null;
   distribuidora: string | null;
 };
 
 // "1.234,56" → 1234.56 · "612" → 612 · "45.870,25" → 45870.25
-function parseArNumber(s: string): number | null {
+export function parseArNumber(s: string): number | null {
   const cleaned = s.replace(/[^\d.,]/g, "");
   if (!cleaned) return null;
   const n = cleaned.includes(",")
@@ -278,9 +369,26 @@ export function parseInvoiceText(raw: string): ParsedInvoice {
   if (near.length > 0) kwh = near[0].value;
   else if (kwhCandidates.length > 0) kwh = Math.max(...kwhCandidates.map((c) => c.value));
 
+  // Fila del medidor (lectura anterior y actual, consumo y días): es lo más
+  // confiable cuando la factura la trae, y se valida con la resta de lecturas.
+  let rowDays: number | null = null;
+  const reading = flat.match(
+    /(\d{1,2}[/-]\d{1,2}[/-]\d{4})\s+([\d.]+)\s+(\d{1,2}[/-]\d{1,2}[/-]\d{4})\s+([\d.]+)\s+(\d{1,5})\s+(\d{1,3})\b/,
+  );
+  if (reading) {
+    const prev = parseArNumber(reading[2]);
+    const curr = parseArNumber(reading[4]);
+    const consumo = Number(reading[5]);
+    if (prev != null && curr != null && Math.abs(curr - prev - consumo) <= 1 && consumo >= 10) {
+      kwh = consumo;
+      const d = Number(reading[6]);
+      if (d >= 5 && d <= 100) rowDays = d;
+    }
+  }
+
   // Días: "60 días" explícito, o la diferencia entre dos fechas seguidas.
-  let days: number | null = null;
-  const explicit = flat.match(/(\d{1,3})\s*d[ií]as/i);
+  let days: number | null = rowDays;
+  const explicit = days == null ? flat.match(/(\d{1,3})\s*d[ií]as/i) : null;
   if (explicit && Number(explicit[1]) >= 20 && Number(explicit[1]) <= 100) days = Number(explicit[1]);
   if (days == null) {
     const dates: Date[] = [];
@@ -307,15 +415,44 @@ export function parseInvoiceText(raw: string): ParsedInvoice {
   if (pay) total = pay.value;
   else if (totals.length > 0) total = Math.max(...totals.map((t) => t.value));
 
+  let energyTotal: number | null = null;
+  const energy = flat.match(/total\s*energ[ií]a\s*el[eé]ctrica[^\d]{0,15}(\d[\d.,]*)/i);
+  if (energy) {
+    const v = parseArNumber(energy[1]);
+    if (v != null && v >= 100) energyTotal = v;
+  }
+
   const cleanFlat = flat.replace(/\./g, "");
   const dist = DISTRIBUIDORAS.find((d) => d.pattern.test(cleanFlat));
-  const distName = dist ? (cleanFlat.match(dist.pattern)?.[0] ?? null) : null;
+  let distName = dist ? (cleanFlat.match(dist.pattern)?.[0] ?? null) : null;
+
+  // Cooperativas y otras distribuidoras: si no la reconocemos por nombre,
+  // buscamos el nombre de la provincia que más aparece en el texto.
+  let province = dist?.province ?? null;
+  if (!province) {
+    const norm = normalize(flat);
+    let best = 0;
+    for (const prov of PROVINCES) {
+      const n = normalize(prov);
+      const count = norm.split(new RegExp("\\b" + n.replace(/ /g, "\\s+") + "\\b")).length - 1;
+      if (count > best) {
+        best = count;
+        province = prov;
+      }
+    }
+    if (/capital federal|ciudad autonoma de buenos aires/.test(norm)) province = "CABA";
+  }
+  if (!distName) {
+    const coop = flat.match(/cooperativa de electricidad[^.]{0,50}/i);
+    distName = coop ? coop[0].trim() : null;
+  }
 
   return {
     kwh,
     days,
     total,
-    province: dist?.province ?? null,
+    energyTotal,
+    province,
     distribuidora: distName ? distName.toUpperCase() : null,
   };
 }

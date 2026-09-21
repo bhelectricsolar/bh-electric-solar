@@ -27,9 +27,14 @@ import {
   PROVINCES,
   buildQuoteSummary,
   calculateQuote,
+  historyCoverage,
+  parseArNumber,
   parseInvoiceText,
+  summarizeHistory,
   validateInputs,
+  type HistoryPeriod,
   type QuoteInputs,
+  type SizingBasis,
 } from "@/lib/solar-quote";
 
 const fmtARS = new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 });
@@ -126,6 +131,16 @@ function CotizadorInner() {
   const [ocrInfo, setOcrInfo] = useState<{ distribuidora: string | null; missing: string[] } | null>(null);
   const [needsConfirm, setNeedsConfirm] = useState(false);
   const [fromPhoto, setFromPhoto] = useState(false);
+  const [priceFromEnergy, setPriceFromEnergy] = useState(false);
+
+  const [history, setHistory] = useState<HistoryPeriod[]>([]);
+  const [basisChoice, setBasisChoice] = useState<SizingBasis>("historial");
+  const [histText, setHistText] = useState("");
+  const [histDays, setHistDays] = useState("30");
+  const [histEnd, setHistEnd] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  });
 
   const [saving, setSaving] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
@@ -171,10 +186,18 @@ function CotizadorInner() {
   const costStr = costOverride ?? String(settings.installCostPerWp);
   const rateStr = rateOverride ?? String(settings.exchangeRate);
 
+  const histStats = useMemo(() => summarizeHistory(history), [history]);
+  const useHistory = basisChoice === "historial" && !!histStats;
+
   const inputs: QuoteInputs = useMemo(
     () => ({
-      kwh: kwhNum,
-      days: Number(f.days) || 0,
+      // Con historial se dimensiona con el promedio de todos los períodos;
+      // si no, con la última factura.
+      kwh: useHistory ? histStats!.totalKwh : kwhNum,
+      days: useHistory ? histStats!.totalDays : Number(f.days) || 0,
+      ...(histStats
+        ? { history, basis: (useHistory ? "historial" : "factura") as SizingBasis, billKwh: kwhNum, billDays: Number(f.days) || 0 }
+        : {}),
       totalBill: billNum > 0 ? billNum : null,
       pricePerKwh: Number(priceStr) || 0,
       province: f.province,
@@ -185,7 +208,7 @@ function CotizadorInner() {
       costPerWp: Number(costStr) || 0,
       exchangeRate: Number(rateStr) || 0,
     }),
-    [kwhNum, billNum, f.days, priceStr, f.province, hspStr, f.panelW, f.pr, f.coverage, costStr, rateStr],
+    [kwhNum, billNum, f.days, priceStr, f.province, hspStr, f.panelW, f.pr, f.coverage, costStr, rateStr, history, histStats, useHistory],
   );
 
   const errors = useMemo(() => validateInputs(inputs), [inputs]);
@@ -230,10 +253,17 @@ function CotizadorInner() {
       else missing.push("kWh");
       if (parsed.days) patch.days = String(parsed.days);
       else missing.push("días del período");
-      if (parsed.total) {
-        patch.totalBill = String(parsed.total);
+      if (parsed.total) patch.totalBill = String(parsed.total);
+      else missing.push("monto total");
+      // Si la factura trae el subtotal de energía, con eso se calcula el precio
+      // del kWh (el total suele incluir impuestos, cuotas e intereses).
+      if (parsed.energyTotal && parsed.kwh) {
+        setPriceOverride(String(Math.round((parsed.energyTotal / parsed.kwh) * 100) / 100));
+        setPriceFromEnergy(true);
+      } else {
         setPriceOverride(null);
-      } else missing.push("monto total");
+        setPriceFromEnergy(false);
+      }
       if (parsed.province) {
         patch.province = parsed.province;
         setHspOverride(null);
@@ -253,6 +283,37 @@ function CotizadorInner() {
       if (fileRef.current) fileRef.current.value = "";
       if (cameraRef.current) cameraRef.current.value = "";
     }
+  }
+
+  // Pega los kWh del gráfico de la factura (del más viejo al más nuevo).
+  function applyPaste() {
+    const nums = (histText.match(/\d[\d.,]*/g) ?? [])
+      .map(parseArNumber)
+      .filter((n): n is number => n != null && n > 0 && n < 100000);
+    if (nums.length === 0) return;
+    const [y, m] = histEnd.split("-").map(Number);
+    const perDays = Number(histDays) || 30;
+    const rows: HistoryPeriod[] = nums.map((kwh, idx) => {
+      const d = new Date(y, m - 1 - (nums.length - 1 - idx), 1);
+      return {
+        label: `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getFullYear()).slice(2)}`,
+        kwh,
+        days: perDays,
+        included: true,
+      };
+    });
+    // Si el último dato es el de la factura y es un período parcial, usa sus días reales.
+    const last = rows[rows.length - 1];
+    const billDays = Number(f.days) || 0;
+    if (last.kwh === kwhNum && billDays > 0 && billDays < perDays) last.days = billDays;
+    setHistory(rows);
+    setBasisChoice("historial");
+    setSavedId(null);
+  }
+
+  function updateRow(idx: number, patch: Partial<HistoryPeriod>) {
+    setHistory((prev) => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
+    setSavedId(null);
   }
 
   async function copySummary() {
@@ -293,8 +354,8 @@ function CotizadorInner() {
 
   function loadQuote(q: SolarQuote) {
     setF({
-      kwh: String(q.inputs.kwh),
-      days: String(q.inputs.days),
+      kwh: String(q.inputs.billKwh ?? q.inputs.kwh),
+      days: String(q.inputs.billDays ?? q.inputs.days),
       totalBill: q.inputs.totalBill ? String(q.inputs.totalBill) : "",
       province: q.inputs.province,
       panelW: String(q.inputs.panelW),
@@ -305,6 +366,8 @@ function CotizadorInner() {
       customerId: q.customerId ?? "",
       projectId: q.projectId ?? "",
     });
+    setHistory(q.inputs.history ?? []);
+    setBasisChoice(q.inputs.basis ?? "historial");
     setPriceOverride(String(q.inputs.pricePerKwh));
     setHspOverride(String(q.inputs.hsp));
     setCostOverride(String(q.inputs.costPerWp));
@@ -317,6 +380,9 @@ function CotizadorInner() {
 
   function newQuote() {
     setF(EMPTY_FORM);
+    setHistory([]);
+    setHistText("");
+    setBasisChoice("historial");
     setPriceOverride(null);
     setHspOverride(null);
     setCostOverride(null);
@@ -417,7 +483,7 @@ function CotizadorInner() {
               )}
             </Card>
 
-            <Card title="2 · Consumo">
+            <Card title="2 · Última factura">
               <div className="grid grid-cols-2 gap-4">
                 <Field label="Consumo facturado (kWh)">
                   <NumberField
@@ -439,6 +505,7 @@ function CotizadorInner() {
                     onValueChange={(v) => {
                       setField({ totalBill: v });
                       setPriceOverride(null);
+                      setPriceFromEnergy(false);
                     }}
                     placeholder="$ 0"
                     className={INPUT}
@@ -451,6 +518,7 @@ function CotizadorInner() {
                     value={priceStr}
                     onValueChange={(v) => {
                       setPriceOverride(v);
+                      setPriceFromEnergy(false);
                       setSavedId(null);
                     }}
                     className={INPUT}
@@ -458,15 +526,114 @@ function CotizadorInner() {
                 </Field>
               </div>
               <p className="mt-2 text-[11px] text-body">
-                {priceOverride == null && billNum > 0 && kwhNum > 0
-                  ? "El precio del kWh se calcula solo con el monto total (incluye impuestos y cargos fijos)."
+                {priceFromEnergy
+                  ? "Precio calculado con el subtotal de energía eléctrica de la factura (sin cuotas, intereses ni tasas)."
+                  : priceOverride == null && billNum > 0 && kwhNum > 0
+                  ? "El precio del kWh se calcula solo con el monto total (incluye impuestos, cuotas e intereses: revisalo)."
                   : priceOverride == null
                     ? "Valor de referencia hasta cargar la factura — ajustalo."
                     : "Precio cargado a mano."}
               </p>
             </Card>
 
-            <Card title="3 · Zona y sistema">
+            <Card title="3 · Historial de consumo (recomendado)">
+              <p className="text-xs text-body">
+                Los ingenieros dimensionan con el consumo promedio, no con una sola factura. Copiá los kWh del gráfico
+                de la factura (del más viejo al más nuevo) y pegalos acá.
+              </p>
+              <textarea
+                value={histText}
+                onChange={(e) => setHistText(e.target.value)}
+                rows={2}
+                placeholder="Ej: 548 753 510 464 447 412 561 574 654 564 669 770 1122 1048 287"
+                className={`${INPUT} mt-3 resize-none`}
+              />
+              <div className="mt-3 grid grid-cols-2 gap-4">
+                <Field label="Mes del último dato">
+                  <input type="month" value={histEnd} onChange={(e) => setHistEnd(e.target.value)} className={INPUT} />
+                </Field>
+                <Field label="Días por período">
+                  <NumberField suffix=" días" value={histDays} onValueChange={setHistDays} className={INPUT} />
+                </Field>
+              </div>
+              <p className="mt-1 text-[11px] text-body">30 días si la factura es mensual, 60 si es bimestral.</p>
+              <button
+                type="button"
+                onClick={applyPaste}
+                disabled={!histText.trim()}
+                className="mt-3 rounded-lg border border-ink/15 bg-background px-4 py-2.5 text-xs font-semibold text-ink shadow-sm transition-all hover:shadow-md disabled:opacity-50"
+              >
+                Cargar historial
+              </button>
+
+              {history.length > 0 && (
+                <>
+                  <div className="mt-4 flex items-center justify-between">
+                    <p className="text-xs font-bold uppercase tracking-wide text-body">
+                      {history.filter((h) => h.included).length} de {history.length} períodos incluidos
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setHistory([]);
+                        setSavedId(null);
+                      }}
+                      className="text-xs font-semibold text-red-500 hover:underline"
+                    >
+                      Borrar historial
+                    </button>
+                  </div>
+                  <div className="mt-2 max-h-72 overflow-y-auto rounded-lg border border-ink/10">
+                    {history.map((row, idx) => (
+                      <div
+                        key={idx}
+                        className={`flex items-center gap-2 border-b border-ink/10 px-2.5 py-1.5 last:border-0 ${row.included ? "" : "opacity-45"}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={row.included}
+                          onChange={(e) => updateRow(idx, { included: e.target.checked })}
+                          aria-label={`Incluir ${row.label}`}
+                          className="h-4 w-4 shrink-0"
+                        />
+                        <span className="font-data w-12 shrink-0 text-xs text-body">{row.label}</span>
+                        <NumberField
+                          suffix=" kWh"
+                          value={row.kwh}
+                          onValueChange={(v) => updateRow(idx, { kwh: Number(v) || 0 })}
+                          className="w-full min-w-0 rounded-md border border-ink/10 bg-background px-2 py-1.5 text-xs text-ink"
+                        />
+                        <NumberField
+                          suffix=" d"
+                          value={row.days}
+                          onValueChange={(v) => updateRow(idx, { days: Number(v) || 0 })}
+                          className="w-16 shrink-0 rounded-md border border-ink/10 bg-background px-2 py-1.5 text-xs text-ink"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-1.5 text-[11px] text-body">
+                    Tildá o destildá cada período (ej: sacá uno incompleto o atípico) y corregí los días si alguno es
+                    parcial.
+                  </p>
+                  <Field label="Dimensionar según">
+                    <select
+                      value={basisChoice}
+                      onChange={(e) => {
+                        setBasisChoice(e.target.value as SizingBasis);
+                        setSavedId(null);
+                      }}
+                      className={INPUT}
+                    >
+                      <option value="historial">Promedio del historial (recomendado)</option>
+                      <option value="factura">Solo la última factura</option>
+                    </select>
+                  </Field>
+                </>
+              )}
+            </Card>
+
+            <Card title="4 · Zona y sistema">
               <div className="grid grid-cols-2 gap-4">
                 <Field label="Provincia / zona">
                   <select
@@ -534,7 +701,7 @@ function CotizadorInner() {
               </p>
             </Card>
 
-            <Card title="4 · Cliente y proyecto (opcional)">
+            <Card title="5 · Cliente y proyecto (opcional)">
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Cliente o lead">
                   <select
@@ -638,6 +805,10 @@ function CotizadorInner() {
                       wide
                     />
                   </div>
+
+                  {histStats && (
+                    <HistoryBlock stats={histStats} monthlyProduction={results.monthlyProduction} price={inputs.pricePerKwh} />
+                  )}
 
                   {results.warnings.map((w) => (
                     <p key={w} className="mt-3 rounded-lg border border-gold-500/40 bg-gold-500/10 px-3 py-2 text-xs text-gold-600">
@@ -834,6 +1005,60 @@ function Mini({ label, value }: { label: string; value: string }) {
     <div className="rounded-lg bg-background px-2 py-2">
       <p className="text-[10px] uppercase tracking-wide text-body">{label}</p>
       <p className="font-data mt-0.5 text-sm font-semibold text-ink">{value}</p>
+    </div>
+  );
+}
+
+function HistoryBlock({
+  stats,
+  monthlyProduction,
+  price,
+}: {
+  stats: NonNullable<ReturnType<typeof summarizeHistory>>;
+  monthlyProduction: number;
+  price: number;
+}) {
+  const cov = historyCoverage(stats, monthlyProduction, price);
+  const top = Math.max(stats.maxMonthlyKwh, monthlyProduction) * 1.08;
+  return (
+    <div className="mt-4 rounded-xl border border-ink/10 bg-background p-3">
+      <p className="text-[11px] font-bold uppercase tracking-wide text-body">Consumo histórico vs. producción</p>
+      <div className="relative mt-3 h-32">
+        <div className="absolute inset-x-0 flex h-full items-end gap-[3px]">
+          {stats.rows.map((r, i) => (
+            <div key={i} className="flex h-full flex-1 items-end" title={`${r.label}: ${nf(r.monthlyKwh)} kWh/mes`}>
+              <div
+                className={`w-full rounded-t-sm ${r.monthlyKwh > monthlyProduction ? "bg-negocio/70" : "bg-green-500/70"}`}
+                style={{ height: `${(r.monthlyKwh / top) * 100}%` }}
+              />
+            </div>
+          ))}
+        </div>
+        <div
+          className="absolute inset-x-0 border-t-2 border-dashed border-gold-500"
+          style={{ bottom: `${(monthlyProduction / top) * 100}%` }}
+        />
+        <span
+          className="absolute right-0 rounded bg-gold-500 px-1 text-[9px] font-bold text-navy-950"
+          style={{ bottom: `calc(${(monthlyProduction / top) * 100}% + 2px)` }}
+        >
+          Sistema {nf(monthlyProduction)} kWh
+        </span>
+      </div>
+      <div className="mt-1 flex justify-between text-[10px] text-body">
+        <span>{stats.rows[0].label}</span>
+        <span>{stats.rows[stats.rows.length - 1].label}</span>
+      </div>
+      <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+        <Mini label="Promedio" value={`${nf(stats.avgMonthlyKwh)} kWh`} />
+        <Mini label={`Mín. ${stats.minLabel}`} value={`${nf(stats.minMonthlyKwh)} kWh`} />
+        <Mini label={`Máx. ${stats.maxLabel}`} value={`${nf(stats.maxMonthlyKwh)} kWh`} />
+      </div>
+      <p className="mt-2.5 text-[11px] text-body">
+        Mes a mes el sistema cubre <b className="text-ink">{nf(cov.annualCoveragePct)}%</b> del consumo del
+        historial y ahorra en promedio <b className="text-ink">{fmtARS.format(cov.avgMonthlySavingsARS)}</b> por mes.
+        {cov.surplusPeriods > 0 && ` En ${cov.surplusPeriods} de ${stats.periods} períodos produce más de lo que se consume (excedente).`}
+      </p>
     </div>
   );
 }
