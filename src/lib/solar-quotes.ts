@@ -143,6 +143,7 @@ export async function createProjectFromQuote(
   q: SolarQuote,
   customer: Customer | undefined,
   salespersonId: string | null,
+  phoneOverride?: string,
 ): Promise<Project> {
   const r = q.results;
   const parts = [
@@ -157,7 +158,7 @@ export async function createProjectFromQuote(
     description,
     budgetUSD: q.costUSD || null,
     customerName: q.clientName || customer?.name || "Sin nombre",
-    customerPhone: customer?.phone ?? "",
+    customerPhone: (phoneOverride || q.inputs.clientPhone || customer?.phone || "").trim(),
     city: q.address || customer?.city || "",
     zone: q.province,
     type: q.systemKwp > 15 ? "comercial" : "residencial",

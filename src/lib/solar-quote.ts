@@ -151,6 +151,8 @@ export type SizingBasis = "historial" | "factura";
 export type QuoteInputs = {
   // Foto del gráfico de historial de la factura, guardada con la cotización.
   chartImageUrl?: string;
+  // WhatsApp / teléfono del cliente, para avisarle cuando se convierte en proyecto.
+  clientPhone?: string;
   // kWh y días con los que se dimensiona: el historial sumado, o la última factura.
   kwh: number;
   days: number;

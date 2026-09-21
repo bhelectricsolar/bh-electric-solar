@@ -77,8 +77,55 @@ export default function AdminProyectosPage() {
     await updateProject(id, patch);
   }
 
-  async function addFromQuote(q: SolarQuote) {
-    const project = await createProjectFromQuote(q, customers.find((c) => c.id === q.customerId), member?.id ?? null);
+  const [pdfBusy, setPdfBusy] = useState<string | null>(null);
+
+  // Genera el PDF completo del proyecto; en celular se comparte como archivo.
+  async function openPdf(project: Project, mode: "download" | "share") {
+    setPdfBusy(project.id);
+    try {
+      const { buildProjectPdf } = await import("@/lib/project-pdf");
+      const blob = await buildProjectPdf({
+        project,
+        quote: quotes.find((q) => q.projectId === project.id),
+        store: { name: settings.storeName, whatsapp: settings.whatsapp, email: settings.email },
+        exchangeRate: settings.exchangeRate,
+        salesperson: personName(project.salespersonId),
+        technician: personName(project.technicianId),
+      });
+      const fileName = `Proyecto solar - ${project.customerName}.pdf`.replace(/[\\/:*?"<>|]/g, "");
+      const file = new File([blob], fileName, { type: "application/pdf" });
+      if (mode === "share" && navigator.canShare?.({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: fileName, text: `Proyecto solar de ${settings.storeName}` });
+          return;
+        } catch (e) {
+          if ((e as Error).name === "AbortError") return;
+        }
+      }
+      const url = URL.createObjectURL(file);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 10000);
+      if (mode === "share" && project.customerPhone.trim()) {
+        openWhatsApp(
+          project.customerPhone,
+          `Hola ${project.customerName.split(" ")[0]}! Te comparto el PDF de tu proyecto solar (te lo adjunto en este chat).`,
+        );
+      }
+    } catch (e) {
+      console.error("PDF del proyecto:", e);
+      alert("No se pudo generar el PDF. Reintentá.");
+    } finally {
+      setPdfBusy(null);
+    }
+  }
+
+  async function addFromQuote(q: SolarQuote, phone?: string) {
+    const project = await createProjectFromQuote(q, customers.find((c) => c.id === q.customerId), member?.id ?? null, phone);
     setProjects((prev) => [project, ...prev]);
     setQuotes((prev) => prev.map((x) => (x.id === q.id ? { ...x, projectId: project.id } : x)));
     setNewOpen(false);
@@ -244,19 +291,40 @@ export default function AdminProyectosPage() {
                     <div className="mt-4 flex flex-wrap gap-2 border-t border-ink/10 pt-4">
                       <button
                         type="button"
+                        onClick={() => openPdf(project, "download")}
+                        disabled={pdfBusy === project.id}
+                        className="flex cursor-pointer touch-manipulation items-center gap-2 rounded-lg bg-navy-900 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition-all hover:bg-navy-800 hover:shadow-md disabled:opacity-60"
+                      >
+                        {pdfBusy === project.id ? "Generando PDF…" : "Descargar PDF completo"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openPdf(project, "share")}
+                        disabled={pdfBusy === project.id}
+                        className="cursor-pointer touch-manipulation rounded-lg border border-ink/15 bg-background px-3 py-2 text-xs font-semibold text-ink shadow-sm transition-all hover:shadow-md disabled:opacity-60"
+                      >
+                        Compartir PDF
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!project.customerPhone.trim()}
                         onClick={() =>
                           openWhatsApp(
                             project.customerPhone,
                             projectStatusMessage(project, settings.storeName),
                           )
                         }
-                        title={`Avisar por WhatsApp a ${project.customerPhone}`}
-                        className="flex cursor-pointer touch-manipulation items-center gap-2 rounded-lg border border-green-500/20 bg-green-500/10 px-3 py-2 text-xs font-semibold text-green-600 shadow-sm transition-all hover:shadow-md"
+                        title={
+                          project.customerPhone.trim()
+                            ? `Avisar por WhatsApp a ${project.customerPhone}`
+                            : "Cargá el WhatsApp del cliente para poder avisarle"
+                        }
+                        className="flex cursor-pointer touch-manipulation items-center gap-2 rounded-lg border border-green-500/20 bg-green-500/10 px-3 py-2 text-xs font-semibold text-green-600 shadow-sm transition-all hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor">
                           <path d="M12.01 2C6.48 2 2 6.48 2 12c0 1.85.5 3.58 1.36 5.07L2 22l5.06-1.33A9.94 9.94 0 0 0 12.01 22C17.53 22 22 17.52 22 12S17.53 2 12.01 2Zm5.4 14.27c-.23.64-1.13 1.18-1.85 1.33-.49.1-1.13.18-3.29-.7-2.76-1.14-4.53-3.92-4.67-4.1-.14-.18-1.12-1.49-1.12-2.84 0-1.35.7-2.01.96-2.28.23-.24.5-.3.66-.3h.48c.16 0 .37-.06.58.44l.7 1.68c.06.14.1.3.02.48-.08.18-.12.3-.24.46-.12.16-.26.35-.37.47-.12.13-.25.27-.11.53.14.26.64 1.05 1.37 1.7.94.84 1.73 1.1 1.99 1.23.26.12.42.1.57-.06.16-.16.65-.75.83-1.01.18-.26.36-.22.6-.13.25.09 1.58.75 1.85.88.27.13.45.2.52.31.07.12.07.66-.16 1.31Z" />
                         </svg>
-                        Avisar por WhatsApp
+                        {project.customerPhone.trim() ? "Avisar por WhatsApp" : "Falta el WhatsApp del cliente"}
                       </button>
                       <button
                         type="button"
@@ -380,6 +448,8 @@ function ProjectDetail({
   onSave: (patch: Partial<Project>) => void;
 }) {
   const [desc, setDesc] = useState(project.description);
+  const [name, setName] = useState(project.customerName);
+  const [phone, setPhone] = useState(project.customerPhone);
   const [budget, setBudget] = useState(project.budgetUSD != null ? String(project.budgetUSD) : "");
   const [sheet, setSheet] = useState(false);
   const [cur, setCur] = useState<Cur>("USD");
@@ -393,6 +463,44 @@ function ProjectDetail({
 
   return (
     <div className="flex flex-col gap-4">
+      <div className="rounded-xl border border-ink/10 bg-background p-4">
+        <p className="text-[11px] font-bold uppercase tracking-wide text-body">Cliente</p>
+        {!project.customerPhone.trim() && (
+          <p className="mt-2 rounded-lg border border-red-500/30 bg-red-500/10 p-2.5 text-xs font-semibold text-red-500">
+            Falta el WhatsApp del cliente. Cargalo acá para poder avisarle cómo avanza su proyecto y enviarle el PDF.
+          </p>
+        )}
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <label className="block min-w-0">
+            <span className="text-xs font-semibold text-ink">Nombre</span>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="mt-1.5 w-full rounded-lg border border-ink/10 bg-surface px-3 py-2.5 text-sm text-ink"
+            />
+          </label>
+          <label className="block min-w-0">
+            <span className="text-xs font-semibold text-ink">WhatsApp / teléfono</span>
+            <input
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              inputMode="tel"
+              placeholder="Ej: +54 9 3754 123456"
+              className="mt-1.5 w-full rounded-lg border border-ink/10 bg-surface px-3 py-2.5 text-sm text-ink"
+            />
+          </label>
+        </div>
+        {(name !== project.customerName || phone !== project.customerPhone) && (
+          <button
+            type="button"
+            onClick={() => onSave({ customerName: name.trim() || project.customerName, customerPhone: phone.trim() })}
+            className="mt-3 rounded-lg bg-navy-900 px-4 py-2 text-xs font-bold text-white"
+          >
+            Guardar
+          </button>
+        )}
+      </div>
+
       <div className="rounded-xl border border-ink/10 bg-background p-4">
         <p className="text-[11px] font-bold uppercase tracking-wide text-body">Alcance y presupuesto</p>
         <label className="mt-3 block">
@@ -555,10 +663,11 @@ function NewProjectSheet({
   customers: Customer[];
   team: TeamMember[];
   defaultSalesperson: string;
-  onFromQuote: (q: SolarQuote) => Promise<void>;
+  onFromQuote: (q: SolarQuote, phone?: string) => Promise<void>;
   onManual: (d: Parameters<typeof createProject>[0]) => Promise<void>;
 }) {
   const [tab, setTab] = useState<"cotizacion" | "manual">(quotes.length > 0 ? "cotizacion" : "manual");
+  const [askPhone, setAskPhone] = useState<{ q: SolarQuote; value: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
@@ -610,7 +719,35 @@ function NewProjectSheet({
 
         <div className="mt-4 min-h-0 flex-1 overflow-y-auto">
           {tab === "cotizacion" ? (
-            quotes.length === 0 ? (
+            askPhone ? (
+              <div className="rounded-xl border border-gold-500/40 bg-gold-500/10 p-4">
+                <p className="text-sm font-bold text-ink">
+                  ¿A qué WhatsApp le avisamos a {askPhone.q.clientName || "el cliente"}?
+                </p>
+                <p className="mt-1 text-xs text-body">Lo usamos para informarle cómo avanza su proyecto y enviarle el PDF.</p>
+                <input
+                  value={askPhone.value}
+                  onChange={(e) => setAskPhone({ q: askPhone.q, value: e.target.value })}
+                  inputMode="tel"
+                  autoFocus
+                  placeholder="Ej: +54 9 3754 123456"
+                  className={SHEET_INPUT}
+                />
+                <div className="mt-3 flex gap-2">
+                  <button
+                    type="button"
+                    disabled={busy != null || askPhone.value.replace(/\D/g, "").length < 8}
+                    onClick={() => run(askPhone.q.id, () => onFromQuote(askPhone.q, askPhone.value))}
+                    className="flex-1 rounded-lg bg-navy-900 px-4 py-3 text-sm font-bold text-white disabled:opacity-50"
+                  >
+                    {busy ? "Creando…" : "Crear proyecto"}
+                  </button>
+                  <button type="button" onClick={() => setAskPhone(null)} className="rounded-lg border border-ink/15 px-4 py-3 text-xs font-semibold text-body">
+                    Volver
+                  </button>
+                </div>
+              </div>
+            ) : quotes.length === 0 ? (
               <p className="py-8 text-center text-sm text-body">
                 No hay cotizaciones solares sin proyecto. Armá una en Cotizador solar o cargá el proyecto a mano.
               </p>
@@ -621,7 +758,11 @@ function NewProjectSheet({
                     key={q.id}
                     type="button"
                     disabled={busy != null}
-                    onClick={() => run(q.id, () => onFromQuote(q))}
+                    onClick={() => {
+                      const known = q.inputs.clientPhone || customers.find((c) => c.id === q.customerId)?.phone || "";
+                      if (known) run(q.id, () => onFromQuote(q));
+                      else setAskPhone({ q, value: "" });
+                    }}
                     className="flex cursor-pointer flex-col rounded-xl border border-ink/10 bg-background p-3 text-left shadow-sm transition-all hover:shadow-md disabled:opacity-60"
                   >
                     <span className="font-semibold text-ink">{q.clientName || "Sin nombre"}</span>
@@ -640,7 +781,7 @@ function NewProjectSheet({
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                if (!form.name.trim()) return;
+                if (!form.name.trim() || form.phone.replace(/\D/g, "").length < 8) return;
                 run("manual", () =>
                   onManual({
                     customerName: form.name.trim(),
@@ -684,8 +825,15 @@ function NewProjectSheet({
               </label>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <label className="block min-w-0">
-                  <span className="text-xs font-semibold text-ink">Teléfono</span>
-                  <input value={form.phone} onChange={(e) => set({ phone: e.target.value })} inputMode="tel" className={SHEET_INPUT} />
+                  <span className="text-xs font-semibold text-ink">WhatsApp / teléfono *</span>
+                  <input
+                    value={form.phone}
+                    onChange={(e) => set({ phone: e.target.value })}
+                    inputMode="tel"
+                    required
+                    placeholder="Para avisarle por WhatsApp"
+                    className={SHEET_INPUT}
+                  />
                 </label>
                 <label className="block min-w-0">
                   <span className="text-xs font-semibold text-ink">Ciudad / dirección</span>
@@ -744,7 +892,7 @@ function NewProjectSheet({
               </label>
               <button
                 type="submit"
-                disabled={busy != null || !form.name.trim()}
+                disabled={busy != null || !form.name.trim() || form.phone.replace(/\D/g, "").length < 8}
                 className="rounded-lg bg-navy-900 px-4 py-3 text-sm font-bold text-white shadow-sm disabled:opacity-60"
               >
                 {busy === "manual" ? "Creando…" : "Crear proyecto"}

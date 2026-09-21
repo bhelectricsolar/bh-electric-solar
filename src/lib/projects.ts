@@ -159,6 +159,9 @@ export async function updateProject(id: string, patch: Partial<Project>) {
   if (patch.salespersonId !== undefined) row.salesperson_id = patch.salespersonId;
   if (patch.technicianId !== undefined) row.technician_id = patch.technicianId;
   if (patch.description !== undefined) row.description = patch.description;
+  if (patch.customerPhone !== undefined) row.customer_phone = patch.customerPhone;
+  if (patch.customerName !== undefined) row.customer_name = patch.customerName;
+  if (patch.city !== undefined) row.city = patch.city;
   if (patch.budgetUSD !== undefined) row.budget_usd = patch.budgetUSD;
   const { error } = await supabase.from("projects").update(row).eq("id", id);
   if (error) throw error;

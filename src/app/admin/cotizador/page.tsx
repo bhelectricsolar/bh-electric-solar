@@ -69,6 +69,7 @@ type Form = {
   pr: string;
   coverage: string;
   clientName: string;
+  clientPhone: string;
   address: string;
   customerId: string;
   projectId: string;
@@ -83,6 +84,7 @@ const EMPTY_FORM: Form = {
   pr: String(DEFAULT_PERFORMANCE_RATIO),
   coverage: String(DEFAULT_COVERAGE_PCT),
   clientName: "",
+  clientPhone: "",
   address: "",
   customerId: "",
   projectId: "",
@@ -181,6 +183,7 @@ function CotizadorInner() {
   const [copied, setCopied] = useState(false);
   const [sheet, setSheet] = useState<{ title: string; text: string; image?: string } | null>(null);
   const [creatingProject, setCreatingProject] = useState<string | null>(null);
+  const [phoneFor, setPhoneFor] = useState<{ id: string; value: string } | null>(null);
   const [projectMsg, setProjectMsg] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -203,7 +206,7 @@ function CotizadorInner() {
     if (!c) return;
     appliedParam.current = true;
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setF((prev) => ({ ...prev, customerId: c.id, clientName: c.name, address: c.city }));
+    setF((prev) => ({ ...prev, customerId: c.id, clientName: c.name, clientPhone: c.phone, address: c.city }));
     if (c.kwhMonthly) setF((prev) => ({ ...prev, kwh: String(Math.round(c.kwhMonthly! * 2)), days: "60" }));
   }, [customerParam, customers]);
 
@@ -494,7 +497,11 @@ function CotizadorInner() {
         projectId: f.projectId || null,
         clientName: f.clientName.trim(),
         address: f.address.trim(),
-        inputs: chartImageUrl ? { ...inputs, chartImageUrl } : inputs,
+        inputs: {
+          ...inputs,
+          ...(chartImageUrl ? { chartImageUrl } : {}),
+          ...(f.clientPhone.trim() ? { clientPhone: f.clientPhone.trim() } : {}),
+        },
         results,
         summary,
         fromInvoicePhoto: fromPhoto,
@@ -510,12 +517,13 @@ function CotizadorInner() {
   }
 
   // Crea un proyecto real (etapa "Cotización enviada") con los datos de la cotización.
-  async function convertToProject(q: SolarQuote) {
+  async function convertToProject(q: SolarQuote, phone?: string) {
     setCreatingProject(q.id);
     setProjectMsg(null);
     try {
       const customer = customers.find((c) => c.id === q.customerId);
-      await createProjectFromQuote(q, customer, member?.id ?? null);
+      await createProjectFromQuote(q, customer, member?.id ?? null, phone);
+      setPhoneFor(null);
       await reloadQuotes();
     } catch (e) {
       console.error("Crear proyecto:", e);
@@ -535,6 +543,7 @@ function CotizadorInner() {
       pr: String(q.inputs.performanceRatio),
       coverage: String(q.inputs.coveragePct),
       clientName: q.clientName,
+      clientPhone: q.inputs.clientPhone ?? customers.find((c) => c.id === q.customerId)?.phone ?? "",
       address: q.address,
       customerId: q.customerId ?? "",
       projectId: q.projectId ?? "",
@@ -1116,7 +1125,7 @@ function CotizadorInner() {
                       const c = customers.find((x) => x.id === e.target.value);
                       setField({
                         customerId: e.target.value,
-                        ...(c ? { clientName: c.name, address: f.address || c.city } : {}),
+                        ...(c ? { clientName: c.name, clientPhone: f.clientPhone || c.phone, address: f.address || c.city } : {}),
                       });
                     }}
                     className={INPUT}
@@ -1156,6 +1165,15 @@ function CotizadorInner() {
                 </Field>
                 <Field label="Nombre del cliente">
                   <input value={f.clientName} onChange={(e) => setField({ clientName: e.target.value })} className={INPUT} />
+                </Field>
+                <Field label="WhatsApp / teléfono del cliente">
+                  <input
+                    value={f.clientPhone}
+                    onChange={(e) => setField({ clientPhone: e.target.value })}
+                    inputMode="tel"
+                    placeholder="Ej: +54 9 3754 123456"
+                    className={INPUT}
+                  />
                 </Field>
                 <Field label="Dirección">
                   <input value={f.address} onChange={(e) => setField({ address: e.target.value })} className={INPUT} />
@@ -1393,14 +1411,51 @@ function CotizadorInner() {
                         ✓ Ya es un proyecto — ver Proyectos
                       </Link>
                     ) : (
-                      <button
-                        type="button"
-                        onClick={() => convertToProject(q)}
-                        disabled={creatingProject === q.id}
-                        className="w-full rounded-lg bg-navy-900 py-2.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-navy-800 disabled:opacity-60"
-                      >
-                        {creatingProject === q.id ? "Creando proyecto…" : "Convertir en proyecto"}
-                      </button>
+                      (() => {
+                        const knownPhone = q.inputs.clientPhone || customers.find((c) => c.id === q.customerId)?.phone || "";
+                        if (phoneFor?.id === q.id) {
+                          return (
+                            <div className="rounded-lg border border-gold-500/40 bg-gold-500/10 p-3">
+                              <p className="text-xs font-bold text-ink">¿A qué WhatsApp le avisamos al cliente?</p>
+                              <input
+                                value={phoneFor.value}
+                                onChange={(e) => setPhoneFor({ id: q.id, value: e.target.value })}
+                                inputMode="tel"
+                                placeholder="Ej: +54 9 3754 123456"
+                                autoFocus
+                                className="mt-2 w-full rounded-lg border border-ink/10 bg-background px-3 py-2.5 text-sm text-ink"
+                              />
+                              <div className="mt-2 flex gap-2">
+                                <button
+                                  type="button"
+                                  disabled={creatingProject === q.id || phoneFor.value.replace(/\D/g, "").length < 8}
+                                  onClick={() => convertToProject(q, phoneFor.value)}
+                                  className="flex-1 rounded-lg bg-navy-900 py-2.5 text-xs font-bold text-white disabled:opacity-50"
+                                >
+                                  {creatingProject === q.id ? "Creando…" : "Crear proyecto"}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => convertToProject(q, "")}
+                                  className="rounded-lg border border-ink/15 px-3 py-2.5 text-[11px] font-semibold text-body"
+                                >
+                                  Sin número
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        }
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => (knownPhone ? convertToProject(q) : setPhoneFor({ id: q.id, value: "" }))}
+                            disabled={creatingProject === q.id}
+                            className="w-full rounded-lg bg-navy-900 py-2.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-navy-800 disabled:opacity-60"
+                          >
+                            {creatingProject === q.id ? "Creando proyecto…" : "Convertir en proyecto"}
+                          </button>
+                        );
+                      })()
                     )}
                   </div>
                 )}
