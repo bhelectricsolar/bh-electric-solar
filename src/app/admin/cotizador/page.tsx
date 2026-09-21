@@ -1482,6 +1482,10 @@ function RegionPicker({
   const [rect, setRect] = useState<Frac>({ x: 0.06, y: 0.06, w: 0.88, h: 0.88 });
   const url = useMemo(() => canvas.toDataURL("image/jpeg", 0.8), [canvas]);
   const boxRef = useRef<HTMLDivElement>(null);
+  const areaRef = useRef<HTMLDivElement>(null);
+  // Tamaño real (px) de la foto ajustada al espacio disponible: no depende de
+  // porcentajes ni de aspect-ratio, que en celulares terminan desbordando.
+  const [fit, setFit] = useState<{ w: number; h: number } | null>(null);
   const drag = useRef<{ mode: Drag; p0: { x: number; y: number }; r0: Frac } | null>(null);
 
   useEffect(() => {
@@ -1491,6 +1495,22 @@ function RegionPicker({
       document.body.style.overflow = prev;
     };
   }, []);
+
+  useEffect(() => {
+    const el = areaRef.current;
+    if (!el) return;
+    const measure = () => {
+      const aw = el.clientWidth - 16;
+      const ah = el.clientHeight - 16;
+      if (aw <= 0 || ah <= 0) return;
+      const k = Math.min(aw / canvas.width, ah / canvas.height);
+      setFit({ w: Math.floor(canvas.width * k), h: Math.floor(canvas.height * k) });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [canvas]);
 
   const pointAt = (e: React.PointerEvent) => {
     const r = boxRef.current!.getBoundingClientRect();
@@ -1551,26 +1571,21 @@ function RegionPicker({
   );
 
   return (
-    <div className="fixed inset-0 z-[120] flex flex-col bg-black text-white">
+    <div className="fixed inset-0 z-[120] flex h-[100dvh] w-full max-w-full flex-col overflow-hidden bg-black text-white">
       <div className="flex items-center justify-between gap-2 px-4 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))]">
         <p className="text-sm font-bold">Encerrá el gráfico de barras</p>
         <button type="button" onClick={onClose} className="rounded-lg bg-white/15 px-3 py-1.5 text-xs font-bold">
           Cerrar
         </button>
       </div>
-      <p className="px-4 text-[11px] text-white/70">
-        Movelo desde adentro y ajustá las esquinas naranjas. Incluí las barras con sus números; sin el eje ni los
-        meses queda más preciso.
+      <p className="px-4 text-[11px] leading-snug text-white/70">
+        Movelo desde adentro y ajustá las esquinas naranjas. Incluí las barras con sus números.
       </p>
-      <div className="flex min-h-0 flex-1 items-center justify-center p-3">
+      <div ref={areaRef} className="flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden p-2">
         <div
           ref={boxRef}
-          className="relative max-h-full max-w-full touch-none select-none"
-          style={{
-            aspectRatio: `${canvas.width} / ${canvas.height}`,
-            height: canvas.height >= canvas.width ? "100%" : undefined,
-            width: canvas.height >= canvas.width ? undefined : "100%",
-          }}
+          className="relative shrink-0 touch-none select-none"
+          style={{ width: fit?.w ?? 0, height: fit?.h ?? 0 }}
           onPointerDown={(e) => begin(e, "new")}
           onPointerMove={move}
           onPointerUp={() => (drag.current = null)}
@@ -1589,7 +1604,7 @@ function RegionPicker({
           {corner("se", { left: `${(rect.x + rect.w) * 100}%`, top: `${(rect.y + rect.h) * 100}%` })}
         </div>
       </div>
-      <div className="flex flex-col gap-2 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2">
+      <div className="flex shrink-0 flex-col gap-2 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2">
         <button
           type="button"
           disabled={busy || tooSmall}
@@ -1598,18 +1613,18 @@ function RegionPicker({
         >
           {busy ? `Leyendo el gráfico… ${Math.round(progress * 100)}%` : "Leer el gráfico marcado"}
         </button>
-        <div className="grid grid-cols-3 gap-2 text-center text-[11px] font-bold">
+        <div className="grid grid-cols-2 gap-2 text-center text-xs font-bold">
           <button
             type="button"
             disabled={busy || tooSmall}
             onClick={() => onReference(toRegion())}
-            className="rounded-lg bg-white/15 px-2 py-2.5 disabled:opacity-50"
+            className="col-span-2 rounded-lg bg-white/15 px-3 py-2.5 disabled:opacity-50"
           >
             Cargar a mano mirando la foto
           </button>
           {(["cam", "gal"] as const).map((k) => (
-            <label key={k} className="grid cursor-pointer place-items-center rounded-lg bg-white/15 px-2 py-2.5">
-              {k === "cam" ? "Sacar otra foto" : "Elegir otra imagen"}
+            <label key={k} className="grid cursor-pointer place-items-center rounded-lg bg-white/15 px-3 py-2.5">
+              {k === "cam" ? "Sacar otra foto" : "Elegir otra"}
               <input
                 type="file"
                 accept="image/*"
