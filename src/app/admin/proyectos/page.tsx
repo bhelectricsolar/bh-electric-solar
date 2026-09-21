@@ -17,6 +17,7 @@ import { getCustomers, type Customer } from "@/lib/customers";
 import { useCurrentTeamMember } from "@/lib/current-user";
 import { PROVINCES } from "@/lib/solar-quote";
 import NumberField from "@/components/NumberField";
+import ConsumptionHistory, { CurrencyToggle, formatMoney, type Cur } from "@/components/admin/ConsumptionHistory";
 import { getTeam, type TeamMember } from "@/lib/team";
 import { downloadCSV } from "@/lib/csv-export";
 import { openWhatsApp } from "@/lib/whatsapp";
@@ -381,7 +382,11 @@ function ProjectDetail({
   const [desc, setDesc] = useState(project.description);
   const [budget, setBudget] = useState(project.budgetUSD != null ? String(project.budgetUSD) : "");
   const [sheet, setSheet] = useState(false);
+  const [cur, setCur] = useState<Cur>("USD");
   const r = quote?.results;
+  const { settings } = useAdminSettings();
+  const rate = quote?.inputs.exchangeRate ?? settings.exchangeRate ?? 1450;
+  const money = (usd: number) => formatMoney(usd, cur, rate);
   const bom = (r?.bom ?? []).filter((l) => l.included);
   const dirty =
     desc !== project.description || (budget === "" ? null : Number(budget)) !== project.budgetUSD;
@@ -409,6 +414,11 @@ function ProjectDetail({
             onValueChange={setBudget}
             className="mt-1.5 w-full rounded-lg border border-ink/10 bg-surface px-3 py-2.5 text-sm text-ink"
           />
+          {Number(budget) > 0 && (
+            <span className="font-data mt-1 block text-[11px] text-body">
+              ≈ {formatMoney(Number(budget), "ARS", rate)} (dólar a {new Intl.NumberFormat("es-AR").format(rate)})
+            </span>
+          )}
         </label>
         {dirty && (
           <button
@@ -425,6 +435,7 @@ function ProjectDetail({
         <div className="rounded-xl border border-ink/10 bg-background p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-[11px] font-bold uppercase tracking-wide text-body">Sistema cotizado</p>
+            <CurrencyToggle cur={cur} onChange={setCur} />
             <button
               type="button"
               onClick={() => setSheet(true)}
@@ -443,7 +454,7 @@ function ProjectDetail({
             <SpecItem label="Cobertura" value={`${Math.round(quote.coveragePct)} %`} />
             <SpecItem
               label="Ahorro mensual"
-              value={new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 }).format(quote.monthlySavings)}
+              value={new Intl.NumberFormat("es-AR", { style: "currency", currency: cur, maximumFractionDigits: 0 }).format(cur === "ARS" ? quote.monthlySavings : quote.monthlySavings / rate)}
             />
             <SpecItem label="Retorno" value={quote.paybackYears != null ? `${nf1.format(quote.paybackYears)} años` : "—"} />
           </dl>
@@ -466,28 +477,38 @@ function ProjectDetail({
                       <tr key={l.id} className="border-b border-ink/5 last:border-0">
                         <td className="px-3 py-2 text-ink">{l.name}</td>
                         <td className="font-data px-3 py-2 text-right text-ink">{l.qty}</td>
-                        <td className="font-data px-3 py-2 text-right text-body">{fmtUSD.format(l.unitPriceUSD)}</td>
-                        <td className="font-data px-3 py-2 text-right text-ink">{fmtUSD.format(l.qty * l.unitPriceUSD)}</td>
+                        <td className="font-data px-3 py-2 text-right text-body">{money(l.unitPriceUSD)}</td>
+                        <td className="font-data px-3 py-2 text-right text-ink">{money(l.qty * l.unitPriceUSD)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-              <p className="mt-1.5 text-right text-xs font-bold text-ink">Total: {fmtUSD.format(quote.costUSD)}</p>
+              <p className="mt-1.5 text-right text-xs font-bold text-ink">Total: {money(quote.costUSD)}</p>
             </div>
           )}
 
-          {quote.inputs.chartImageUrl && (
-            <div className="mt-4">
-              <p className="text-xs font-bold text-ink">Historial de consumo de la factura</p>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={quote.inputs.chartImageUrl}
-                alt="Gráfico de consumo"
-                className="mt-2 max-h-64 w-full rounded-lg border border-ink/10 bg-white object-contain"
-              />
-            </div>
-          )}
+          <div className="mt-4">
+            <ConsumptionHistory
+              history={quote.inputs.history}
+              monthlyProduction={quote.monthlyProduction}
+              pricePerKwh={quote.inputs.pricePerKwh}
+              exchangeRate={rate}
+              cur={cur}
+              onCurChange={setCur}
+            />
+            {quote.inputs.chartImageUrl && (
+              <details className="mt-3 rounded-lg border border-ink/10 bg-surface p-3">
+                <summary className="cursor-pointer text-xs font-semibold text-ink">Ver el gráfico original de la factura</summary>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={quote.inputs.chartImageUrl}
+                  alt="Gráfico de consumo"
+                  className="mt-2 max-h-64 w-full rounded-lg border border-ink/10 bg-white object-contain"
+                />
+              </details>
+            )}
+          </div>
         </div>
       ) : (
         <p className="rounded-xl border border-dashed border-ink/15 p-3 text-xs text-body">

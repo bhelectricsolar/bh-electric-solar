@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import NumberField from "@/components/NumberField";
 import PrintDocument from "@/components/admin/PrintDocument";
+import ConsumptionHistory from "@/components/admin/ConsumptionHistory";
 import { readBarChart, type Region } from "@/lib/chart-ocr";
 import SectorEyebrow from "@/components/admin/SectorEyebrow";
 import StatusBadge from "@/components/admin/StatusBadge";
@@ -31,7 +32,6 @@ import {
   PROVINCES,
   buildQuoteSummary,
   calculateQuote,
-  historyCoverage,
   parseArNumber,
   parseInvoiceText,
   summarizeHistory,
@@ -1240,7 +1240,14 @@ function CotizadorInner() {
                   )}
 
                   {histStats && (
-                    <HistoryBlock stats={histStats} monthlyProduction={results.monthlyProduction} price={inputs.pricePerKwh} />
+                    <div className="mt-4">
+                      <ConsumptionHistory
+                        history={history}
+                        monthlyProduction={results.monthlyProduction}
+                        pricePerKwh={inputs.pricePerKwh}
+                        exchangeRate={inputs.exchangeRate}
+                      />
+                    </div>
                   )}
 
                   {results.warnings.map((w) => (
@@ -1467,60 +1474,6 @@ function Mini({ label, value }: { label: string; value: string }) {
     <div className="rounded-lg bg-background px-2 py-2">
       <p className="text-[10px] uppercase tracking-wide text-body">{label}</p>
       <p className="font-data mt-0.5 text-sm font-semibold text-ink">{value}</p>
-    </div>
-  );
-}
-
-function HistoryBlock({
-  stats,
-  monthlyProduction,
-  price,
-}: {
-  stats: NonNullable<ReturnType<typeof summarizeHistory>>;
-  monthlyProduction: number;
-  price: number;
-}) {
-  const cov = historyCoverage(stats, monthlyProduction, price);
-  const top = Math.max(stats.maxMonthlyKwh, monthlyProduction) * 1.08;
-  return (
-    <div className="mt-4 rounded-xl border border-ink/10 bg-background p-3">
-      <p className="text-[11px] font-bold uppercase tracking-wide text-body">Consumo histórico vs. producción</p>
-      <div className="relative mt-3 h-32">
-        <div className="absolute inset-x-0 flex h-full items-end gap-[3px]">
-          {stats.rows.map((r, i) => (
-            <div key={i} className="flex h-full flex-1 items-end" title={`${r.label}: ${nf(r.monthlyKwh)} kWh/mes`}>
-              <div
-                className={`w-full rounded-t-sm ${r.monthlyKwh > monthlyProduction ? "bg-negocio/70" : "bg-green-500/70"}`}
-                style={{ height: `${(r.monthlyKwh / top) * 100}%` }}
-              />
-            </div>
-          ))}
-        </div>
-        <div
-          className="absolute inset-x-0 border-t-2 border-dashed border-gold-500"
-          style={{ bottom: `${(monthlyProduction / top) * 100}%` }}
-        />
-        <span
-          className="absolute right-0 rounded bg-gold-500 px-1 text-[9px] font-bold text-navy-950"
-          style={{ bottom: `calc(${(monthlyProduction / top) * 100}% + 2px)` }}
-        >
-          Sistema {nf(monthlyProduction)} kWh
-        </span>
-      </div>
-      <div className="mt-1 flex justify-between text-[10px] text-body">
-        <span>{stats.rows[0].label}</span>
-        <span>{stats.rows[stats.rows.length - 1].label}</span>
-      </div>
-      <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-        <Mini label="Promedio" value={`${nf(stats.avgMonthlyKwh)} kWh`} />
-        <Mini label={`Mín. ${stats.minLabel}`} value={`${nf(stats.minMonthlyKwh)} kWh`} />
-        <Mini label={`Máx. ${stats.maxLabel}`} value={`${nf(stats.maxMonthlyKwh)} kWh`} />
-      </div>
-      <p className="mt-2.5 text-[11px] text-body">
-        Mes a mes el sistema cubre <b className="text-ink">{nf(cov.annualCoveragePct)}%</b> del consumo del
-        historial y ahorra en promedio <b className="text-ink">{fmtARS.format(cov.avgMonthlySavingsARS)}</b> por mes.
-        {cov.surplusPeriods > 0 && ` En ${cov.surplusPeriods} de ${stats.periods} períodos produce más de lo que se consume (excedente).`}
-      </p>
     </div>
   );
 }
