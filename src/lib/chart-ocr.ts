@@ -7,8 +7,10 @@
 // leer queda como null, para que el ingeniero lo complete sin desalinear
 // los meses.
 
+import { darkMask, detectBars, resolveValues } from "./chart-bars";
+
 export type Region = { x: number; y: number; w: number; h: number };
-export type ChartReading = { values: (number | null)[]; read: number; total: number };
+export type ChartReading = { values: (number | null)[]; read: number; total: number; estimated?: number };
 export type Detection = { v: number; x: number; conf: number };
 
 const MIN_VALUE = 20;
@@ -29,16 +31,15 @@ export function mergeDetections(dets: Detection[], cropWidth: number): (number |
     else groups.push([d]);
   }
 
-  // Precisión antes que cantidad: un valor mal leído es peor que un "?".
-  // Solo se acepta si al menos dos pasadas coinciden (o una con confianza muy alta).
+  // Valor más votado de cada barra (desempata por confianza).
   const pick = (g: Detection[]): number | null => {
     const votes = new Map<number, { n: number; conf: number }>();
     for (const d of g) {
       const cur = votes.get(d.v) ?? { n: 0, conf: 0 };
       votes.set(d.v, { n: cur.n + 1, conf: Math.max(cur.conf, d.conf) });
     }
-    const [v, info] = [...votes.entries()].sort((a, b) => b[1].n - a[1].n || b[1].conf - a[1].conf)[0];
-    return info.n >= 2 || info.conf >= 90 ? v : null;
+    const [v] = [...votes.entries()].sort((a, b) => b[1].n - a[1].n || b[1].conf - a[1].conf)[0];
+    return v;
   };
   const centers = groups.map((g) => g.reduce((s, d) => s + d.x, 0) / g.length);
   const values: (number | null)[] = groups.map(pick);
@@ -103,7 +104,174 @@ const PASSES: Pass[] = [
   { lang: "eng", scale: 5, psm: "11" },
 ];
 
+// Recorta un rectángulo, lo gira, lo agranda y le agrega margen blanco (el OCR
+// lo necesita). Con "stretch" estira el contraste para fotos apagadas.
+function labelImage(
+  src: HTMLCanvasElement,
+  rect: { x: number; y: number; w: number; h: number },
+  rot: 0 | 90 | 270,
+  scale: number,
+  stretch: boolean,
+): HTMLCanvasElement {
+  const w = Math.max(1, Math.round(rect.w * scale));
+  const h = Math.max(1, Math.round(rect.h * scale));
+  const pad = 24;
+  const cw = rot === 0 ? w : h;
+  const ch = rot === 0 ? h : w;
+  const c = document.createElement("canvas");
+  c.width = cw + pad * 2;
+  c.height = ch + pad * 2;
+  const ctx = c.getContext("2d", { willReadFrequently: true })!;
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, c.width, c.height);
+  ctx.imageSmoothingQuality = "high";
+  ctx.save();
+  if (rot === 90) {
+    ctx.translate(pad + h, pad);
+    ctx.rotate(Math.PI / 2);
+  } else if (rot === 270) {
+    ctx.translate(pad, pad + w);
+    ctx.rotate(-Math.PI / 2);
+  } else ctx.translate(pad, pad);
+  ctx.drawImage(src, rect.x, rect.y, rect.w, rect.h, 0, 0, w, h);
+  ctx.restore();
+  if (stretch) {
+    const img = ctx.getImageData(pad, pad, cw, ch);
+    const d = img.data;
+    let lo = 255;
+    let hi = 0;
+    for (let i = 0; i < d.length; i += 4) {
+      const g = (d[i] * 3 + d[i + 1] * 6 + d[i + 2]) / 10;
+      d[i] = g;
+      if (g < lo) lo = g;
+      if (g > hi) hi = g;
+    }
+    const range = Math.max(30, hi - lo);
+    for (let i = 0; i < d.length; i += 4) {
+      const v = Math.max(0, Math.min(255, ((d[i] - lo) / range) * 255));
+      d[i] = d[i + 1] = d[i + 2] = v;
+    }
+    ctx.putImageData(img, pad, pad);
+  }
+  return c;
+}
+
+// Lectura por barras: se detectan las barras por su forma, se lee el número
+// que está sobre cada una y se valida contra la altura de la barra. Cada mes
+// queda alineado con su barra y lo que el OCR no acierta se estima por altura.
+async function readByBars(
+  source: HTMLCanvasElement,
+  region: Region,
+  onProgress?: (fraction: number) => void,
+): Promise<ChartReading | null> {
+  // Recorte chico para detectar barras (rápido y estable ante el tamaño de la foto)
+  const f = region.w > 480 ? 480 / region.w : 1;
+  const det = document.createElement("canvas");
+  det.width = Math.max(1, Math.round(region.w * f));
+  det.height = Math.max(1, Math.round(region.h * f));
+  const dctx = det.getContext("2d", { willReadFrequently: true })!;
+  dctx.drawImage(source, region.x, region.y, region.w, region.h, 0, 0, det.width, det.height);
+  const px = dctx.getImageData(0, 0, det.width, det.height).data;
+  const gray = new Uint8Array(det.width * det.height);
+  for (let i = 0; i < gray.length; i++) gray[i] = (px[i * 4] * 3 + px[i * 4 + 1] * 6 + px[i * 4 + 2]) / 10;
+  const mask = darkMask(gray, det.width, det.height);
+  const bars = detectBars(mask, det.width, det.height);
+  if (bars.length < 4 || bars.length > 40) return null;
+
+  // Imagen en blanco y negro (fondo parejo) para usar como segunda variante
+  const mcv = document.createElement("canvas");
+  mcv.width = det.width;
+  mcv.height = det.height;
+  const mctx = mcv.getContext("2d")!;
+  const mimg = mctx.createImageData(det.width, det.height);
+  for (let i = 0; i < mask.length; i++) {
+    const v = mask[i] ? 0 : 255;
+    mimg.data[i * 4] = mimg.data[i * 4 + 1] = mimg.data[i * 4 + 2] = v;
+    mimg.data[i * 4 + 3] = 255;
+  }
+  mctx.putImageData(mimg, 0, 0);
+
+  type B = (typeof bars)[number];
+  const pitch = (bars[bars.length - 1].cx - bars[0].cx) / (bars.length - 1);
+  const labelH = (b: B) => Math.min(b.top, det.height * 0.26);
+  const rectFor = (b: B) => {
+    const x = Math.max(0, b.cx - pitch / 2);
+    return { x, y: b.top - labelH(b), w: Math.min(det.width - x, pitch), h: labelH(b) };
+  };
+
+  const { createWorker } = await import("tesseract.js");
+  const worker = await createWorker("eng");
+  try {
+    const readOne = async (b: B, rot: 0 | 90 | 270, useMask: boolean, target: number, psm: string) => {
+      const r = rectFor(b);
+      if (r.h < 5 || r.w < 4) return null;
+      // el lado corto del recorte (alto de los números) llevado a ~target px
+      const short = rot === 0 ? r.h : r.w;
+      const scale = target / Math.max(4, short);
+      let cnv: HTMLCanvasElement;
+      if (useMask) cnv = labelImage(mcv, r, rot, scale, false);
+      else {
+        const s = { x: region.x + r.x / f, y: region.y + r.y / f, w: r.w / f, h: r.h / f };
+        cnv = labelImage(source, s, rot, scale * f, true);
+      }
+      await worker.setParameters({ tessedit_pageseg_mode: psm as never, tessedit_char_whitelist: "0123456789" });
+      const { data } = await worker.recognize(cnv);
+      const t = data.text.replace(/\D/g, "");
+      return t.length >= 2 && t.length <= 5 ? Number(t) : null;
+    };
+
+    // ¿Hacia dónde están girados los números? Se prueba con las primeras barras.
+    const score: Record<number, number> = { 0: 0, 90: 0, 270: 0 };
+    const rots = [90, 270, 0] as const;
+    for (const rot of rots)
+      for (const b of bars.slice(0, 5)) if ((await readOne(b, rot, false, 60, "7")) != null) score[rot]++;
+    const rot = rots.reduce<0 | 90 | 270>((best, r) => (score[r] > score[best] ? r : best), 90);
+
+    const variants = [
+      [false, 60, "7"],
+      [false, 90, "7"],
+      [false, 90, "8"],
+      [true, 60, "7"],
+      [true, 90, "8"],
+    ] as const;
+    const candidates: number[][] = [];
+    for (let i = 0; i < bars.length; i++) {
+      const c: number[] = [];
+      for (const [useMask, target, psm] of variants) {
+        const v = await readOne(bars[i], rot, useMask, target, psm);
+        if (v != null) c.push(v);
+      }
+      candidates.push(c);
+      onProgress?.((i + 1) / bars.length);
+    }
+    if (candidates.filter((c) => c.length > 0).length < 3) return null;
+    const r = resolveValues(bars, candidates);
+    return {
+      values: r.values,
+      read: r.values.length,
+      total: r.values.length,
+      estimated: r.estimated.filter(Boolean).length,
+    };
+  } finally {
+    await worker.terminate();
+  }
+}
+
 export async function readBarChart(
+  source: HTMLCanvasElement,
+  region: Region,
+  onProgress?: (fraction: number) => void,
+): Promise<ChartReading> {
+  try {
+    const byBars = await readByBars(source, region, onProgress);
+    if (byBars) return byBars;
+  } catch (e) {
+    console.error("Lectura por barras:", e);
+  }
+  return readWholeImage(source, region, onProgress);
+}
+
+async function readWholeImage(
   source: HTMLCanvasElement,
   region: Region,
   onProgress?: (fraction: number) => void,

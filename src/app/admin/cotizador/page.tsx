@@ -442,7 +442,7 @@ function CotizadorInner() {
       applyPaste(text, true);
       showReference(region);
       setChartMsg(
-        `Leí ${r.read} de ${r.total} períodos${r.read < r.total ? ": los marcados en rojo no se pudieron leer, completalos mirando el gráfico" : ""}. Los valores en ámbar los leyó la foto: verificalos contra el recorte de abajo.`,
+        `Detecté ${r.total} barras y leí ${r.read} valores${r.estimated ? ` (${r.estimated} se estimaron por la altura de la barra)` : ""}${r.read < r.total ? "; los marcados en rojo hay que completarlos mirando el gráfico" : ""}. Los valores en ámbar los leyó la foto: verificalos contra el recorte de abajo y revisá que los meses coincidan.`,
       );
     } catch (e) {
       console.error("Gráfico:", e);
