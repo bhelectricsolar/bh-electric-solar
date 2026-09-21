@@ -185,14 +185,24 @@ export default function AdminProyectosPage() {
                     <p className="font-semibold text-ink">{project.customerName}</p>
                     <p className="text-xs text-body">
                       {project.city} · {project.systemKwp} kWp · {project.panelsCount} paneles
+                      {project.budgetUSD ? ` · ${fmtUSD.format(project.budgetUSD)}` : ""}
                     </p>
+                    {project.description && (
+                      <p className="mt-1 line-clamp-2 max-w-xl text-xs text-body/80">{project.description}</p>
+                    )}
                   </div>
                   <StatusBadge tone={PROJECT_STAGE_TONE[project.status]}>{stage?.label}</StatusBadge>
                 </button>
 
                 {isOpen && (
                   <div className="border-t border-ink/10 p-5">
-                    <div className="grid grid-cols-2 gap-4 text-sm">
+                    <ProjectDetail
+                      project={project}
+                      quote={quotes.find((q) => q.projectId === project.id)}
+                      onSave={(patch) => updateField(project.id, patch)}
+                    />
+
+                    <div className="mt-5 grid grid-cols-2 gap-4 text-sm">
                       <InfoField label="Tipo" value={project.type === "residencial" ? "Residencial" : "Comercial"} />
                       <InfoField label="Zona" value={project.zone} />
                       <InfoField label="Vendedor" value={personName(project.salespersonId)} />
@@ -354,6 +364,160 @@ export default function AdminProyectosPage() {
   );
 }
 
+const fmtUSD = new Intl.NumberFormat("es-AR", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+const nf1 = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 1 });
+
+// Detalle entendible del proyecto: alcance, presupuesto y, si viene de una
+// cotización solar, los equipos, la producción y el gráfico de consumo.
+function ProjectDetail({
+  project,
+  quote,
+  onSave,
+}: {
+  project: Project;
+  quote: SolarQuote | undefined;
+  onSave: (patch: Partial<Project>) => void;
+}) {
+  const [desc, setDesc] = useState(project.description);
+  const [budget, setBudget] = useState(project.budgetUSD != null ? String(project.budgetUSD) : "");
+  const [sheet, setSheet] = useState(false);
+  const r = quote?.results;
+  const bom = (r?.bom ?? []).filter((l) => l.included);
+  const dirty =
+    desc !== project.description || (budget === "" ? null : Number(budget)) !== project.budgetUSD;
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="rounded-xl border border-ink/10 bg-background p-4">
+        <p className="text-[11px] font-bold uppercase tracking-wide text-body">Alcance y presupuesto</p>
+        <label className="mt-3 block">
+          <span className="text-xs font-semibold text-ink">Descripción del proyecto</span>
+          <textarea
+            value={desc}
+            onChange={(e) => setDesc(e.target.value)}
+            rows={3}
+            placeholder="Qué se va a instalar, dónde y con qué equipos."
+            className="mt-1.5 w-full rounded-lg border border-ink/10 bg-surface px-3 py-2.5 text-sm text-ink"
+          />
+        </label>
+        <label className="mt-3 block">
+          <span className="text-xs font-semibold text-ink">Presupuesto total (USD)</span>
+          <NumberField
+            decimals
+            prefix="US$ "
+            value={budget}
+            onValueChange={setBudget}
+            className="mt-1.5 w-full rounded-lg border border-ink/10 bg-surface px-3 py-2.5 text-sm text-ink"
+          />
+        </label>
+        {dirty && (
+          <button
+            type="button"
+            onClick={() => onSave({ description: desc, budgetUSD: budget === "" ? null : Number(budget) })}
+            className="mt-3 rounded-lg bg-navy-900 px-4 py-2 text-xs font-bold text-white"
+          >
+            Guardar
+          </button>
+        )}
+      </div>
+
+      {quote && r ? (
+        <div className="rounded-xl border border-ink/10 bg-background p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-body">Sistema cotizado</p>
+            <button
+              type="button"
+              onClick={() => setSheet(true)}
+              className="rounded-lg border border-ink/15 bg-surface px-3 py-1.5 text-xs font-semibold text-ink shadow-sm"
+            >
+              Ver la cotización completa
+            </button>
+          </div>
+          <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs sm:grid-cols-3">
+            <SpecItem label="Tipo de sistema" value={r.systemType ? { ongrid: "On-grid", hibrido: "Híbrido", offgrid: "Off-grid" }[r.systemType] : "—"} />
+            <SpecItem label="Potencia" value={`${nf1.format(quote.systemKwp)} kWp`} />
+            <SpecItem label="Paneles" value={`${quote.panels} × ${quote.inputs.panelW} W`} />
+            {r.inverterKw ? <SpecItem label="Inversor" value={`${r.inverterKw} kW`} /> : null}
+            {r.batteryKwh ? <SpecItem label="Baterías" value={`${nf1.format(r.batteryKwh)} kWh`} /> : null}
+            <SpecItem label="Producción" value={`${Math.round(quote.monthlyProduction)} kWh/mes`} />
+            <SpecItem label="Cobertura" value={`${Math.round(quote.coveragePct)} %`} />
+            <SpecItem
+              label="Ahorro mensual"
+              value={new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 }).format(quote.monthlySavings)}
+            />
+            <SpecItem label="Retorno" value={quote.paybackYears != null ? `${nf1.format(quote.paybackYears)} años` : "—"} />
+          </dl>
+
+          {bom.length > 0 && (
+            <div className="mt-4">
+              <p className="text-xs font-bold text-ink">Equipos y materiales</p>
+              <div className="mt-2 overflow-x-auto rounded-lg border border-ink/10 bg-surface">
+                <table className="w-full min-w-[420px] text-xs">
+                  <thead>
+                    <tr className="border-b border-ink/10 text-left text-[10px] uppercase tracking-wide text-body">
+                      <th className="px-3 py-2 font-semibold">Ítem</th>
+                      <th className="px-3 py-2 text-right font-semibold">Cant.</th>
+                      <th className="px-3 py-2 text-right font-semibold">Precio</th>
+                      <th className="px-3 py-2 text-right font-semibold">Subtotal</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bom.map((l) => (
+                      <tr key={l.id} className="border-b border-ink/5 last:border-0">
+                        <td className="px-3 py-2 text-ink">{l.name}</td>
+                        <td className="font-data px-3 py-2 text-right text-ink">{l.qty}</td>
+                        <td className="font-data px-3 py-2 text-right text-body">{fmtUSD.format(l.unitPriceUSD)}</td>
+                        <td className="font-data px-3 py-2 text-right text-ink">{fmtUSD.format(l.qty * l.unitPriceUSD)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="mt-1.5 text-right text-xs font-bold text-ink">Total: {fmtUSD.format(quote.costUSD)}</p>
+            </div>
+          )}
+
+          {quote.inputs.chartImageUrl && (
+            <div className="mt-4">
+              <p className="text-xs font-bold text-ink">Historial de consumo de la factura</p>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={quote.inputs.chartImageUrl}
+                alt="Gráfico de consumo"
+                className="mt-2 max-h-64 w-full rounded-lg border border-ink/10 bg-white object-contain"
+              />
+            </div>
+          )}
+        </div>
+      ) : (
+        <p className="rounded-xl border border-dashed border-ink/15 p-3 text-xs text-body">
+          Este proyecto no tiene una cotización solar asociada. Si querés ver los equipos y la producción estimada,
+          armá la cotización en Cotizador solar y convertila en proyecto.
+        </p>
+      )}
+
+      {sheet && quote && (
+        <PrintDocument title="Cotización solar" onClose={() => setSheet(false)}>
+          <pre className="whitespace-pre-wrap text-[12px] leading-relaxed">{quote.summary}</pre>
+          {quote.inputs.chartImageUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={quote.inputs.chartImageUrl} alt="Gráfico de consumo" className="mt-4 w-full rounded border border-black/10" />
+          )}
+        </PrintDocument>
+      )}
+    </div>
+  );
+}
+
+function SpecItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-[10px] font-medium uppercase tracking-wide text-body">{label}</dt>
+      <dd className="font-data mt-0.5 text-sm font-semibold text-ink">{value}</dd>
+    </div>
+  );
+}
+
 const SHEET_INPUT = "mt-1.5 w-full rounded-lg border border-ink/10 bg-background px-3 py-2.5 text-sm text-ink";
 
 function NewProjectSheet({
@@ -384,6 +548,8 @@ function NewProjectSheet({
     type: "residencial" as ProjectType,
     kwp: "",
     panels: "",
+    budget: "",
+    description: "",
     salesperson: defaultSalesperson,
   });
   const set = (patch: Partial<typeof form>) => setForm((f) => ({ ...f, ...patch }));
@@ -464,6 +630,8 @@ function NewProjectSheet({
                     systemKwp: Number(form.kwp) || 0,
                     panelsCount: Number(form.panels) || 0,
                     salespersonId: form.salesperson || null,
+                    budgetUSD: form.budget ? Number(form.budget) : null,
+                    description: form.description.trim(),
                   }),
                 );
               }}
@@ -528,6 +696,20 @@ function NewProjectSheet({
                   <NumberField value={form.panels} onValueChange={(v) => set({ panels: v })} className={SHEET_INPUT} />
                 </label>
               </div>
+              <label className="block">
+                <span className="text-xs font-semibold text-ink">Presupuesto (USD)</span>
+                <NumberField decimals prefix="US$ " value={form.budget} onValueChange={(v) => set({ budget: v })} className={SHEET_INPUT} />
+              </label>
+              <label className="block">
+                <span className="text-xs font-semibold text-ink">Descripción / alcance</span>
+                <textarea
+                  value={form.description}
+                  onChange={(e) => set({ description: e.target.value })}
+                  rows={3}
+                  placeholder="Ej: Sistema on-grid de 5 kWp para vivienda, techo de chapa, 10 paneles de 550 W."
+                  className={SHEET_INPUT}
+                />
+              </label>
               <label className="block">
                 <span className="text-xs font-semibold text-ink">Vendedor</span>
                 <select value={form.salesperson} onChange={(e) => set({ salesperson: e.target.value })} className={SHEET_INPUT}>

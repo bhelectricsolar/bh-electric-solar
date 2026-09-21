@@ -45,6 +45,9 @@ export type Project = {
   scheduledDate: string | null;
   createdAt: string;
   notes?: string;
+  // Alcance del proyecto y presupuesto (USD), para que se entienda de un vistazo.
+  description: string;
+  budgetUSD: number | null;
 };
 
 type ProjectRow = {
@@ -61,6 +64,8 @@ type ProjectRow = {
   technician_id: string | null;
   scheduled_date: string | null;
   created_at: string;
+  description?: string | null;
+  budget_usd?: number | null;
 };
 
 function fromRow(row: ProjectRow): Project {
@@ -78,6 +83,8 @@ function fromRow(row: ProjectRow): Project {
     technicianId: row.technician_id,
     scheduledDate: row.scheduled_date,
     createdAt: row.created_at,
+    description: row.description ?? "",
+    budgetUSD: row.budget_usd != null ? Number(row.budget_usd) : null,
   };
 }
 
@@ -119,10 +126,16 @@ export async function createProject(p: {
   systemKwp: number;
   panelsCount: number;
   salespersonId: string | null;
+  description?: string;
+  budgetUSD?: number | null;
 }): Promise<Project> {
+  const extra: Record<string, unknown> = {};
+  if (p.description) extra.description = p.description;
+  if (p.budgetUSD != null) extra.budget_usd = p.budgetUSD;
   const { data, error } = await supabase
     .from("projects")
     .insert({
+      ...extra,
       customer_name: p.customerName,
       customer_phone: p.customerPhone,
       city: p.city,
@@ -145,6 +158,8 @@ export async function updateProject(id: string, patch: Partial<Project>) {
   if (patch.scheduledDate !== undefined) row.scheduled_date = patch.scheduledDate;
   if (patch.salespersonId !== undefined) row.salesperson_id = patch.salespersonId;
   if (patch.technicianId !== undefined) row.technician_id = patch.technicianId;
+  if (patch.description !== undefined) row.description = patch.description;
+  if (patch.budgetUSD !== undefined) row.budget_usd = patch.budgetUSD;
   const { error } = await supabase.from("projects").update(row).eq("id", id);
   if (error) throw error;
 }

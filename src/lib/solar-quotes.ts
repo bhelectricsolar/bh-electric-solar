@@ -1,6 +1,7 @@
 import { createClient } from "./supabase/client";
 import { createProject, type Project } from "./projects";
 import type { Customer } from "./customers";
+import { SYSTEM_LABELS } from "./solar-system";
 import type { QuoteInputs, QuoteResults } from "./solar-quote";
 
 const supabase = createClient();
@@ -143,7 +144,18 @@ export async function createProjectFromQuote(
   customer: Customer | undefined,
   salespersonId: string | null,
 ): Promise<Project> {
+  const r = q.results;
+  const parts = [
+    `Sistema ${SYSTEM_LABELS[r.systemType ?? "ongrid"]} de ${Math.round(q.systemKwp * 100) / 100} kWp: ${q.panels} paneles de ${q.inputs.panelW} W`,
+    r.inverterKw ? `inversor de ${r.inverterKw} kW` : "",
+    r.batteryKwh ? `baterías por ${Math.round(r.batteryKwh * 10) / 10} kWh` : "",
+  ].filter(Boolean);
+  const description =
+    parts.join(", ") +
+    `. Producción estimada ${Math.round(q.monthlyProduction)} kWh/mes (cobertura ${Math.round(q.coveragePct)}%).`;
   const project = await createProject({
+    description,
+    budgetUSD: q.costUSD || null,
     customerName: q.clientName || customer?.name || "Sin nombre",
     customerPhone: customer?.phone ?? "",
     city: q.address || customer?.city || "",
