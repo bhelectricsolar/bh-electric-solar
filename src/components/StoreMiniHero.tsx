@@ -17,7 +17,7 @@ export default async function StoreMiniHero() {
     const all = await getPublishedProducts();
     const kits = all.filter((p) => p.category === "kits" && p.images?.[0]);
     const rest = all.filter((p) => p.category !== "kits" && p.images?.[0] && ["paneles", "inversores", "baterias"].includes(p.category));
-    featured = [...kits.slice(0, 2), ...rest.slice(0, 1)].slice(0, 3);
+    featured = [...kits.slice(0, 2), ...rest.slice(0, 1), ...kits.slice(2)].slice(0, 3);
   } catch {
     featured = [];
   }
