@@ -119,6 +119,12 @@ function LoginForm() {
             {loading ? "Ingresando…" : "Ingresar"}
           </button>
         </form>
+        <p className="mt-5 text-center text-xs text-white/60">
+          ¿Querés la app en tu PC, Mac o celular?{" "}
+          <a href="/descargar" className="font-semibold text-[#ffb648] underline-offset-2 hover:underline">
+            Descargala acá
+          </a>
+        </p>
       </div>
     </div>
   );

@@ -50,6 +50,16 @@ export type Order = {
   origin: OrderOrigin;
   soldBy: string | null;
   createdAt: string;
+  // Datos que deja el cliente en el checkout de la tienda online.
+  customerEmail?: string;
+  customerDoc?: string;
+  customerProvince?: string;
+  customerAddress?: string;
+  customerPostal?: string;
+  shippingMethod?: "retiro" | "envio";
+  shippingCostUSD?: number;
+  totalUSD?: number;
+  notes?: string;
 };
 
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
@@ -111,6 +121,15 @@ type OrderRow = {
   origin: OrderOrigin;
   sold_by: string | null;
   created_at: string;
+  customer_email?: string | null;
+  customer_doc?: string | null;
+  customer_province?: string | null;
+  customer_address?: string | null;
+  customer_postal?: string | null;
+  shipping_method?: "retiro" | "envio" | null;
+  shipping_cost_usd?: number | null;
+  total_usd?: number | null;
+  notes?: string | null;
 };
 
 type OrderItemRow = { order_id: string; product_id: string; qty: number };
@@ -157,6 +176,15 @@ function fromRows(order: OrderRow, items: OrderItemRow[], payments: OrderPayment
     origin: order.origin,
     soldBy: order.sold_by,
     createdAt: order.created_at,
+    customerEmail: order.customer_email ?? undefined,
+    customerDoc: order.customer_doc ?? undefined,
+    customerProvince: order.customer_province ?? undefined,
+    customerAddress: order.customer_address ?? undefined,
+    customerPostal: order.customer_postal ?? undefined,
+    shippingMethod: order.shipping_method ?? undefined,
+    shippingCostUSD: order.shipping_cost_usd != null ? Number(order.shipping_cost_usd) : undefined,
+    totalUSD: order.total_usd != null ? Number(order.total_usd) : undefined,
+    notes: order.notes ?? undefined,
   };
 }
 

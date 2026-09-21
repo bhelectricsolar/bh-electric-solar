@@ -1,121 +1,45 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import { BENEFIT_CARDS } from "@/lib/benefitsData";
 
-const CYCLE_MS = 3200;
-
+// Tarjetas fijas: cada una muestra a la vez el problema de hoy y lo que se
+// resuelve con energía solar. Sin rotación automática ni elementos que
+// cambien solos.
 export default function BenefitCards() {
-  const [activeIndex, setActiveIndex] = useState(0);
-  const [paused, setPaused] = useState(false);
-
-  useEffect(() => {
-    const prefersReducedMotion = window.matchMedia(
-      "(prefers-reduced-motion: reduce)",
-    ).matches;
-    if (prefersReducedMotion || paused) return;
-
-    const timer = window.setInterval(() => {
-      setActiveIndex((current) => (current + 1) % BENEFIT_CARDS.length);
-    }, CYCLE_MS);
-
-    return () => window.clearInterval(timer);
-  }, [paused]);
-
   return (
-    <div
-      className="grid gap-5 sm:grid-cols-2"
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
-    >
-      {BENEFIT_CARDS.map((card, index) => {
-        const isActive = index === activeIndex;
-        return (
-          <button
-            key={card.title}
-            type="button"
-            onClick={() => setActiveIndex(index)}
-            className={`premium-card group relative block cursor-pointer touch-manipulation rounded-2xl border bg-white p-6 text-left transition-colors ${
-              isActive ? "border-navy-900" : "border-ink/10 hover:border-navy-900/30"
-            }`}
-          >
-            <div className="grid h-11 w-11">
-              <span
-                className={`col-start-1 row-start-1 grid h-11 w-11 place-items-center rounded-full bg-red-50 text-red-500 transition-opacity duration-500 ${
-                  isActive ? "opacity-0" : "opacity-100"
-                }`}
-              >
-                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" d="M6 6l12 12M18 6 6 18" />
-                </svg>
-              </span>
-              <span
-                className={`col-start-1 row-start-1 grid h-11 w-11 place-items-center rounded-full bg-navy-900 text-gold-400 transition-opacity duration-500 ${
-                  isActive ? "opacity-100" : "opacity-0"
-                }`}
-              >
-                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="m5 13 4 4L19 7" />
-                </svg>
-              </span>
+    <div className="grid gap-5 sm:grid-cols-2">
+      {BENEFIT_CARDS.map((card) => (
+        <article
+          key={card.title}
+          className="premium-card flex flex-col rounded-2xl border border-ink/10 bg-white p-6 shadow-[0_18px_40px_-28px_rgba(12,26,56,0.35)]"
+        >
+          <h3 className="text-lg font-extrabold text-ink">{card.title}</h3>
+
+          <div className="mt-4 flex gap-3">
+            <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-red-50 text-red-500">
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.4}>
+                <path strokeLinecap="round" d="M6 6l12 12M18 6 6 18" />
+              </svg>
+            </span>
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-wide text-red-500">Sin energía solar</p>
+              <p className="mt-0.5 text-sm leading-relaxed text-body">{card.problem}</p>
             </div>
+          </div>
 
-            <h3 className="mt-3 text-base font-bold text-ink">{card.title}</h3>
+          <div className="my-4 h-px bg-gradient-to-r from-transparent via-ink/15 to-transparent" />
 
-            <div className="mt-1.5 grid">
-              <p
-                className={`col-start-1 row-start-1 text-sm leading-relaxed text-body transition-opacity duration-500 ${
-                  isActive ? "opacity-0" : "opacity-100"
-                }`}
-              >
-                {card.problem}
-              </p>
-              <p
-                className={`col-start-1 row-start-1 text-sm leading-relaxed text-body transition-opacity duration-500 ${
-                  isActive ? "opacity-100" : "opacity-0"
-                }`}
-              >
-                {card.solution}
-              </p>
+          <div className="flex gap-3">
+            <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-navy-900 text-gold-400">
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.4}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="m5 13 4 4L19 7" />
+              </svg>
+            </span>
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-wide text-gold-600">Con BH Electric Solar</p>
+              <p className="mt-0.5 text-sm leading-relaxed text-ink">{card.solution}</p>
             </div>
-
-            <div className="mt-4 grid">
-              <span
-                className={`col-start-1 row-start-1 text-xs font-semibold text-gold-600 transition-opacity duration-500 ${
-                  isActive ? "opacity-0" : "opacity-100"
-                }`}
-              >
-                Ver beneficio →
-              </span>
-              <span
-                className={`col-start-1 row-start-1 text-xs font-semibold text-gold-600 transition-opacity duration-500 ${
-                  isActive ? "opacity-100" : "opacity-0"
-                }`}
-              >
-                Ver costo
-              </span>
-            </div>
-
-            {isActive && (
-              <ProgressBar key={activeIndex} paused={paused} duration={CYCLE_MS} />
-            )}
-          </button>
-        );
-      })}
+          </div>
+        </article>
+      ))}
     </div>
-  );
-}
-
-function ProgressBar({ paused, duration }: { paused: boolean; duration: number }) {
-  return (
-    <span className="absolute inset-x-6 bottom-2 block h-0.5 overflow-hidden rounded-full bg-ink/10">
-      <span
-        className="bh-progress-fill block h-full origin-left bg-gold-500"
-        style={{
-          animationDuration: `${duration}ms`,
-          animationPlayState: paused ? "paused" : "running",
-        }}
-      />
-    </span>
   );
 }

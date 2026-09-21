@@ -131,13 +131,20 @@ export default function CartDrawer({ exchangeRate }: { exchangeRate: number }) {
               <p className="mt-2 text-xs text-body">
                 El pago y el envío se coordinan directamente con nuestro equipo.
               </p>
+              <Link
+                href="/tienda/checkout"
+                onClick={closeCart}
+                className="mt-4 flex items-center justify-center gap-2 rounded-lg bg-navy-900 px-5 py-3.5 text-sm font-bold text-white shadow-[0_15px_35px_-15px_rgba(12,26,56,0.7)] transition-transform hover:scale-[1.02]"
+              >
+                Continuar con el pedido →
+              </Link>
               <a
                 href={whatsappCheckoutUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-4 flex items-center justify-center gap-2 rounded-lg bg-[#25D366] px-5 py-3.5 text-sm font-semibold text-white shadow-[0_15px_35px_-15px_rgba(37,211,102,0.6)] transition-transform hover:scale-[1.02]"
+                className="mt-2.5 flex items-center justify-center gap-2 rounded-lg border border-[#25D366]/50 px-5 py-3 text-sm font-semibold text-[#128C4A] transition-colors hover:bg-[#25D366]/10"
               >
-                Finalizar pedido por WhatsApp
+                Consultar por WhatsApp
               </a>
             </div>
           </>

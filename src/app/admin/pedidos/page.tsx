@@ -235,6 +235,31 @@ export default function AdminPedidosPage() {
 
                 {isOpen && (
                   <div className="border-t border-ink/10 p-5">
+                    {(order.customerEmail || order.customerAddress || order.notes || order.customerPhone) && (
+                      <div className="mb-4 rounded-xl border border-ink/10 bg-background p-4 text-sm">
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-body">Datos del cliente</p>
+                        <dl className="mt-2 grid grid-cols-1 gap-x-4 gap-y-1.5 sm:grid-cols-2">
+                          <div><dt className="text-[11px] text-body">Nombre</dt><dd className="font-semibold text-ink">{order.customerName}</dd></div>
+                          {order.customerPhone && <div><dt className="text-[11px] text-body">WhatsApp / teléfono</dt><dd className="font-semibold text-ink">{order.customerPhone}</dd></div>}
+                          {order.customerEmail && <div><dt className="text-[11px] text-body">Email</dt><dd className="break-all font-semibold text-ink">{order.customerEmail}</dd></div>}
+                          {order.customerDoc && <div><dt className="text-[11px] text-body">DNI / CUIT</dt><dd className="font-semibold text-ink">{order.customerDoc}</dd></div>}
+                          {order.shippingMethod && (
+                            <div><dt className="text-[11px] text-body">Entrega</dt><dd className="font-semibold text-ink">{order.shippingMethod === "envio" ? "Envío a domicilio" : "Retiro en el local"}</dd></div>
+                          )}
+                          {order.customerAddress && (
+                            <div className="sm:col-span-2">
+                              <dt className="text-[11px] text-body">Dirección de entrega</dt>
+                              <dd className="font-semibold text-ink">
+                                {[order.customerAddress, order.customerCity, order.customerProvince, order.customerPostal && `CP ${order.customerPostal}`].filter(Boolean).join(", ")}
+                              </dd>
+                            </div>
+                          )}
+                          {order.notes && (
+                            <div className="sm:col-span-2"><dt className="text-[11px] text-body">Notas del cliente</dt><dd className="text-ink">{order.notes}</dd></div>
+                          )}
+                        </dl>
+                      </div>
+                    )}
                     <ul className="flex flex-col gap-2 text-sm">
                       {items.map((item) => (
                         <li

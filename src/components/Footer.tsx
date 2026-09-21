@@ -16,6 +16,7 @@ const LEGAL_LINKS = [
   { label: "Términos y condiciones", href: "/terminos-y-condiciones" },
   { label: "Política de cookies", href: "/politica-de-cookies" },
   { label: "Aviso legal", href: "/aviso-legal" },
+  { label: "App de gestión (equipo)", href: "/descargar" },
 ];
 
 const SOCIALS: { label: string; href: string; icon: React.ReactNode }[] = [
