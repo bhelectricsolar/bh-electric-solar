@@ -128,7 +128,12 @@ function CotizadorInner() {
   const [reading, setReading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [ocrError, setOcrError] = useState<string | null>(null);
-  const [ocrInfo, setOcrInfo] = useState<{ distribuidora: string | null; missing: string[] } | null>(null);
+  const [ocrInfo, setOcrInfo] = useState<{
+    distribuidora: string | null;
+    missing: string[];
+    financing: boolean;
+    energyPrice: number | null;
+  } | null>(null);
   const [needsConfirm, setNeedsConfirm] = useState(false);
   const [fromPhoto, setFromPhoto] = useState(false);
   const [priceFromEnergy, setPriceFromEnergy] = useState(false);
@@ -255,15 +260,10 @@ function CotizadorInner() {
       else missing.push("días del período");
       if (parsed.total) patch.totalBill = String(parsed.total);
       else missing.push("monto total");
-      // Si la factura trae el subtotal de energía, con eso se calcula el precio
-      // del kWh (el total suele incluir impuestos, cuotas e intereses).
-      if (parsed.energyTotal && parsed.kwh) {
-        setPriceOverride(String(Math.round((parsed.energyTotal / parsed.kwh) * 100) / 100));
-        setPriceFromEnergy(true);
-      } else {
-        setPriceOverride(null);
-        setPriceFromEnergy(false);
-      }
+      // El precio del kWh sale del monto total, como siempre. Si la factura
+      // trae financiación, solo avisamos (y ofrecemos el precio de energía).
+      setPriceOverride(null);
+      setPriceFromEnergy(false);
       if (parsed.province) {
         patch.province = parsed.province;
         setHspOverride(null);
@@ -271,7 +271,13 @@ function CotizadorInner() {
       setField(patch);
       setFromPhoto(true);
       setNeedsConfirm(true);
-      setOcrInfo({ distribuidora: parsed.distribuidora, missing });
+      setOcrInfo({
+        distribuidora: parsed.distribuidora,
+        missing,
+        financing: parsed.hasFinancing,
+        energyPrice:
+          parsed.energyTotal && parsed.kwh ? Math.round((parsed.energyTotal / parsed.kwh) * 100) / 100 : null,
+      });
     } catch (e) {
       setOcrError(
         (e as Error).message.startsWith("No se pudo abrir")
@@ -480,6 +486,28 @@ function CotizadorInner() {
                   {ocrInfo.missing.length > 0 && <> No se detectó: {ocrInfo.missing.join(", ")}.</>} Revisalos antes
                   de calcular.
                 </p>
+              )}
+              {ocrInfo?.financing && (
+                <div className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-600">
+                  <p className="font-bold">⚠ Esta factura incluye cuotas, intereses o planes de financiación.</p>
+                  <p className="mt-1">
+                    El monto total los suma, y eso infla el precio del kWh (y el ahorro estimado), porque los paneles
+                    no ahorran esos conceptos. Revisá el precio del kWh en el paso 2.
+                  </p>
+                  {ocrInfo.energyPrice != null && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPriceOverride(String(ocrInfo.energyPrice));
+                        setPriceFromEnergy(true);
+                        setSavedId(null);
+                      }}
+                      className="mt-2 rounded-md border border-red-500/40 bg-background px-3 py-1.5 font-semibold text-red-600 hover:bg-red-500/10"
+                    >
+                      Usar el precio de la energía sola (≈ $ {nf(ocrInfo.energyPrice, 2)}/kWh)
+                    </button>
+                  )}
+                </div>
               )}
             </Card>
 

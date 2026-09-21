@@ -229,11 +229,6 @@ export function calculateQuote(i: QuoteInputs): QuoteResults | null {
   if (i.basis !== "historial" && (i.days < 25 || i.days > 70)) {
     warnings.push("Los días del período son inusuales (lo normal es ~30 o ~60). Revisalo.");
   }
-  if (i.pricePerKwh > 350) {
-    warnings.push(
-      `El precio del kWh ($ ${i.pricePerKwh.toFixed(0)}) parece alto. Si salió del monto total de la factura, incluye impuestos, cuotas e intereses que los paneles no ahorran: revisalo y cargá el precio real de la energía.`,
-    );
-  }
   const hist = summarizeHistory(i.history);
   if (hist && hist.periods >= 3 && i.basis === "factura" && i.billKwh && i.billDays) {
     const billMonthly = (i.billKwh / i.billDays) * 30;
@@ -334,6 +329,8 @@ export type ParsedInvoice = {
   total: number | null;
   // Subtotal de "energía eléctrica" (sin impuestos, cuotas ni intereses), si la factura lo trae.
   energyTotal: number | null;
+  // La factura incluye cuotas de financiación, intereses o planes de pago dentro del total.
+  hasFinancing: boolean;
   province: string | null;
   distribuidora: string | null;
 };
@@ -422,6 +419,8 @@ export function parseInvoiceText(raw: string): ParsedInvoice {
     if (v != null && v >= 100) energyTotal = v;
   }
 
+  const hasFinancing = /financiaci[oó]n|inter[eé]s(?:es)?\s+(?:por\s+)?(?:mora|financ|punitorio)|plan\s+de\s+pagos?/i.test(flat);
+
   const cleanFlat = flat.replace(/\./g, "");
   const dist = DISTRIBUIDORAS.find((d) => d.pattern.test(cleanFlat));
   let distName = dist ? (cleanFlat.match(dist.pattern)?.[0] ?? null) : null;
@@ -452,6 +451,7 @@ export function parseInvoiceText(raw: string): ParsedInvoice {
     days,
     total,
     energyTotal,
+    hasFinancing,
     province,
     distribuidora: distName ? distName.toUpperCase() : null,
   };
