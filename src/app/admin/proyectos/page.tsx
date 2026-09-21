@@ -91,6 +91,7 @@ export default function AdminProyectosPage() {
         exchangeRate: settings.exchangeRate,
         salesperson: personName(project.salespersonId),
         technician: personName(project.technicianId),
+        logoUrl: `${window.location.origin}/logo-mark.png`,
       });
       const fileName = `Proyecto solar - ${project.customerName}.pdf`.replace(/[\\/:*?"<>|]/g, "");
       const file = new File([blob], fileName, { type: "application/pdf" });

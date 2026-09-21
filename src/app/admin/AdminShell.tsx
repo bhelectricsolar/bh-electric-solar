@@ -66,11 +66,9 @@ function RestrictedShell({
     <div className="flex min-h-dvh flex-col bg-background">
       <header className="flex items-center justify-between border-b border-ink/10 bg-surface px-4 py-3">
         <div className="flex items-center gap-2.5">
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-navy-900">
-            <svg viewBox="0 0 32 32" className="h-5 w-5">
-              <path d="M16 2 29 9v14L16 30 3 23V9Z" fill="none" stroke="#ffb648" strokeWidth="1.6" />
-              <circle cx="16" cy="16" r="3.4" fill="#ffb648" />
-            </svg>
+          <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg bg-navy-900">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-mark.png" alt="BH Electric Solar" className="h-full w-full object-contain p-1.5" />
           </span>
           <div className="flex flex-col leading-none">
             <span className="text-sm font-bold text-ink">{member.name}</span>
@@ -184,11 +182,9 @@ function FullAdminShell({
           de la ventana. */}
       <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-ink/10 bg-surface lg:flex">
         <Link href="/admin" className="flex shrink-0 items-center gap-2.5 px-5 pt-5">
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-navy-900">
-            <svg viewBox="0 0 32 32" className="h-5 w-5">
-              <path d="M16 2 29 9v14L16 30 3 23V9Z" fill="none" stroke="#ffb648" strokeWidth="1.6" />
-              <circle cx="16" cy="16" r="3.4" fill="#ffb648" />
-            </svg>
+          <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg bg-navy-900">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-mark.png" alt="BH Electric Solar" className="h-full w-full object-contain p-1.5" />
           </span>
           <span className="text-sm font-bold text-ink">BH Electric Solar</span>
         </Link>
@@ -325,11 +321,9 @@ function FullAdminShell({
       {/* Mobile top bar */}
       <header className="flex items-center justify-between border-b border-ink/10 bg-surface px-4 py-3 lg:hidden">
         <Link href="/admin" className="flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-navy-900">
-            <svg viewBox="0 0 32 32" className="h-4 w-4">
-              <path d="M16 2 29 9v14L16 30 3 23V9Z" fill="none" stroke="#ffb648" strokeWidth="1.8" />
-              <circle cx="16" cy="16" r="3.6" fill="#ffb648" />
-            </svg>
+          <span className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg bg-navy-900">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-mark.png" alt="BH Electric Solar" className="h-full w-full object-contain p-1.5" />
           </span>
           <div className="flex flex-col leading-none">
             <span className="text-sm font-bold text-ink">BH Admin</span>

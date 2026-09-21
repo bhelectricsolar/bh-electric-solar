@@ -56,12 +56,8 @@ function LoginForm() {
       `}</style>
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center text-center">
-          <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10">
-            <svg viewBox="0 0 32 32" className="h-8 w-8">
-              <path d="M16 2 29 9v14L16 30 3 23V9Z" fill="none" stroke="#ffb648" strokeWidth="1.6" />
-              <circle cx="16" cy="16" r="3.4" fill="#ffb648" />
-            </svg>
-          </span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt="BH Electric Solar" className="h-28 w-auto" />
           <h1 className="mt-4 text-xl font-extrabold text-white">BH Admin</h1>
           <p className="mt-1 text-sm text-white/70">Ingresá con tu usuario y contraseña.</p>
         </div>

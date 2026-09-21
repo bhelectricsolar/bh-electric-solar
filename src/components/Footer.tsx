@@ -93,7 +93,11 @@ export default function Footer() {
 
         <div className="grid gap-10 py-12 text-center sm:grid-cols-2 sm:text-left lg:grid-cols-4">
           <div>
-            <h3 className="text-sm font-bold uppercase tracking-wide text-white">
+            <Link href="/" aria-label="BH Electric Solar" className="inline-block">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo.png" alt="BH Electric Solar" className="mx-auto h-28 w-auto sm:mx-0" />
+            </Link>
+            <h3 className="mt-4 text-sm font-bold uppercase tracking-wide text-white">
               Empresa
             </h3>
             <p className="mt-4 text-sm leading-relaxed">

@@ -20,12 +20,9 @@ export default function Header() {
     <header className="sticky top-4 z-50 px-4">
       <div className="premium-outline mx-auto flex max-w-6xl items-center justify-between gap-6 rounded-2xl px-5 py-3 shadow-[0_10px_30px_-12px_rgba(16,28,61,0.25)] backdrop-blur">
         <Link href="/" className="flex items-center gap-3">
-          <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-navy-900">
-            <svg viewBox="0 0 32 32" className="h-6 w-6">
-              <path d="M16 2 29 9v14L16 30 3 23V9Z" fill="none" stroke="#ffb648" strokeWidth="1.4" />
-              <path d="M16 2v28M3 9l13 7 13-7M3 23l13-7 13 7" stroke="#ffb648" strokeWidth="1.1" opacity="0.55" />
-              <circle cx="16" cy="16" r="3.2" fill="#ffb648" />
-            </svg>
+          <span className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl bg-navy-900 shadow-[0_6px_18px_-6px_rgba(12,26,56,0.6)]">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-mark.png" alt="BH Electric Solar" className="h-full w-full object-contain p-1.5" />
           </span>
           <span className="leading-tight">
             <span className="block text-base font-bold text-navy-900">

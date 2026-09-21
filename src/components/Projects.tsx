@@ -8,6 +8,8 @@ type Project = {
   title: string;
   description: string;
   gradient: string;
+  image: string;
+  alt: string;
 };
 
 const PROJECTS: Project[] = [
@@ -17,6 +19,8 @@ const PROJECTS: Project[] = [
     description:
       "Sistemas diseñados para reducir el consumo eléctrico y aumentar la independencia energética del hogar.",
     gradient: "from-[#37507c] to-[#0f1f45]",
+    image: "/proyectos/residencial.jpg",
+    alt: "Instalador colocando paneles solares sobre el techo de una casa",
   },
   {
     tag: "COMERCIAL",
@@ -24,6 +28,8 @@ const PROJECTS: Project[] = [
     description:
       "Instalaciones pensadas para optimizar costos operativos y mejorar la eficiencia energética.",
     gradient: "from-[#5c6e46] to-[#1e2a1a]",
+    image: "/proyectos/comercial.jpg",
+    alt: "Paneles solares instalados en un local comercial",
   },
   {
     tag: "INDUSTRIAL",
@@ -31,6 +37,8 @@ const PROJECTS: Project[] = [
     description:
       "Sistemas escalables preparados para responder a grandes demandas energéticas.",
     gradient: "from-[#6b5a3a] to-[#241d0f]",
+    image: "/proyectos/industrial.jpg",
+    alt: "Campo de paneles solares sobre el techo de una planta industrial",
   },
   {
     tag: "A MEDIDA",
@@ -38,6 +46,8 @@ const PROJECTS: Project[] = [
     description:
       "Diseñamos propuestas adaptadas a las necesidades específicas de cada cliente.",
     gradient: "from-[#4a4f63] to-[#171b2c]",
+    image: "/proyectos/a-medida.jpg",
+    alt: "Instalación solar personalizada",
   },
 ];
 
@@ -66,10 +76,15 @@ export default function Projects() {
               key={project.title}
               className="premium-card group overflow-hidden rounded-2xl border border-ink/10 bg-white transition-all hover:-translate-y-1 hover:shadow-[0_30px_60px_-25px_rgba(245,154,31,0.3)]"
             >
-              <div
-                className={`flex h-48 items-end overflow-hidden bg-gradient-to-br p-4 text-[11px] font-medium uppercase tracking-wide text-white/70 transition-transform duration-500 group-hover:scale-105 ${project.gradient}`}
-              >
-                foto de instalación — reemplazar por imagen real
+              <div className={`relative h-52 overflow-hidden bg-gradient-to-br sm:h-56 ${project.gradient}`}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={project.image}
+                  alt={project.alt}
+                  loading="lazy"
+                  className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+                />
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/35 to-transparent" />
               </div>
               <div className="p-6">
                 <span className="inline-flex rounded-full bg-gold-500 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-navy-950">

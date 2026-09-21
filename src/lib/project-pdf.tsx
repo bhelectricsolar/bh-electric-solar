@@ -1,6 +1,6 @@
 // PDF del proyecto (documento real, con texto y gráfico vectorial) para
 // imprimir o compartir con el cliente. Se carga solo al tocar el botón.
-import { Document, G, Line, Page, Rect, StyleSheet, Svg, Text, View, pdf } from "@react-pdf/renderer";
+import { Document, G, Image, Line, Page, Rect, StyleSheet, Svg, Text, View, pdf } from "@react-pdf/renderer";
 import type { Project } from "./projects";
 import { PROJECT_STAGES } from "./projects";
 import type { SolarQuote } from "./solar-quotes";
@@ -13,6 +13,7 @@ export type ProjectPdfData = {
   exchangeRate: number;
   salesperson: string;
   technician: string;
+  logoUrl?: string; // URL del emblema (misma web), para el encabezado
 };
 
 const NAVY = "#0c1a38";
@@ -135,9 +136,12 @@ function ProjectDoc({ data }: { data: ProjectPdfData }) {
   const header = (
     <View fixed>
       <View style={s.band}>
-        <View>
-          <Text style={s.bandStore}>{store.name}</Text>
-          <Text style={s.bandSub}>ENERGÍA SOLAR · INGENIERÍA</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          {data.logoUrl ? <Image src={data.logoUrl} style={{ width: 40, height: 34, objectFit: "contain" }} /> : null}
+          <View>
+            <Text style={s.bandStore}>{store.name}</Text>
+            <Text style={s.bandSub}>ENERGÍA SOLAR · INGENIERÍA</Text>
+          </View>
         </View>
         <View style={s.bandRight}>
           <Text style={s.bandDoc}>PROYECTO SOLAR</Text>
