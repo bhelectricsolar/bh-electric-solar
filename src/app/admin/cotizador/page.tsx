@@ -33,10 +33,22 @@ import {
   parseInvoiceText,
   summarizeHistory,
   validateInputs,
+  type BomLine,
+  type BomOverride,
   type HistoryPeriod,
   type QuoteInputs,
   type SizingBasis,
+  type SystemSetup,
+  type SystemType,
 } from "@/lib/solar-quote";
+import {
+  DEFAULT_SETUP,
+  KIND_LABELS,
+  SYSTEM_LABELS,
+  buildBom,
+  recommendSystemType,
+  withCost,
+} from "@/lib/solar-system";
 
 const fmtARS = new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 });
 const fmtUSD = new Intl.NumberFormat("es-AR", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
@@ -139,6 +151,12 @@ function CotizadorInner() {
   const [fromPhoto, setFromPhoto] = useState(false);
   const [priceFromEnergy, setPriceFromEnergy] = useState(false);
 
+  const [setup, setSetup] = useState<SystemSetup>(DEFAULT_SETUP);
+  const [panelId, setPanelId] = useState("");
+  const [batteryId, setBatteryId] = useState("");
+  const [costMode, setCostMode] = useState<"lista" | "wp">("lista");
+  const [bomOv, setBomOv] = useState<Record<string, BomOverride>>({});
+  const [manualLines, setManualLines] = useState<BomLine[]>([]);
   const [chartCanvas, setChartCanvas] = useState<HTMLCanvasElement | null>(null);
   const [selectingChart, setSelectingChart] = useState(false);
   const [chartReading, setChartReading] = useState(false);
@@ -197,6 +215,18 @@ function CotizadorInner() {
   const costStr = costOverride ?? String(settings.installCostPerWp);
   const rateStr = rateOverride ?? String(settings.exchangeRate);
 
+  const components = settings.solarComponents;
+  const panelList = components.filter((c) => c.kind === "panel");
+  const selectedPanel = panelList.find((c) => c.id === panelId) ?? panelList[0];
+  const batteryList = components.filter((c) => c.kind === "bateria");
+  const rec = useMemo(() => recommendSystemType(setup), [setup]);
+  const systemType: SystemType = setup.mode === "auto" ? rec.type : setup.mode;
+  const systemReason = setup.mode === "auto" ? rec.reason : "elegido manualmente por el ingeniero.";
+  const patchSetup = (patch: Partial<SystemSetup>) => {
+    setSetup((prev) => ({ ...prev, ...patch }));
+    setSavedId(null);
+  };
+
   const histStats = useMemo(() => summarizeHistory(history), [history]);
   const useHistory = basisChoice === "historial" && !!histStats;
 
@@ -213,17 +243,64 @@ function CotizadorInner() {
       pricePerKwh: Number(priceStr) || 0,
       province: f.province,
       hsp: Number(hspStr) || 0,
-      panelW: Number(f.panelW) || 0,
+      panelW: selectedPanel ? selectedPanel.spec : Number(f.panelW) || 0,
       performanceRatio: Number(f.pr) || 0,
       coveragePct: Number(f.coverage) || 0,
       costPerWp: Number(costStr) || 0,
       exchangeRate: Number(rateStr) || 0,
+      systemType,
+      setup,
+      panelId: selectedPanel?.id,
+      costMode,
+      bomOverrides: bomOv,
+      manualLines,
     }),
-    [kwhNum, billNum, f.days, priceStr, f.province, hspStr, f.panelW, f.pr, f.coverage, costStr, rateStr, history, histStats, useHistory],
+    [kwhNum, billNum, f.days, priceStr, f.province, hspStr, f.panelW, f.pr, f.coverage, costStr, rateStr, history, histStats, useHistory, selectedPanel, systemType, setup, costMode, bomOv, manualLines],
   );
 
   const errors = useMemo(() => validateInputs(inputs), [inputs]);
-  const results = useMemo(() => calculateQuote(inputs), [inputs]);
+  const baseResults = useMemo(() => calculateQuote(inputs), [inputs]);
+  const bom = useMemo(
+    () =>
+      baseResults
+        ? buildBom({
+            type: systemType,
+            components,
+            panelId: selectedPanel?.id,
+            batteryId,
+            panels: baseResults.panels,
+            realKwp: baseResults.realKwp,
+            dailyKwh: baseResults.dailyKwh,
+            setup,
+            overrides: bomOv,
+            manualLines,
+          })
+        : null,
+    [baseResults, systemType, components, selectedPanel, batteryId, setup, bomOv, manualLines],
+  );
+  const useList = costMode === "lista" && !!bom && bom.missing.length === 0;
+  const results = useMemo(() => {
+    if (!baseResults || !bom) return null;
+    const extraWarnings: string[] = [];
+    if (costMode === "lista" && bom.missing.length > 0) {
+      extraWarnings.push(
+        `No se pudo usar la lista de precios: falta cargar ${bom.missing.join(", ")} en Configuración → Equipos y precios. Se usa el costo por Wp.`,
+      );
+    }
+    if (!useList && systemType !== "ongrid") {
+      extraWarnings.push("El costo por Wp no incluye las baterías: para híbrido u off-grid usá la lista de precios.");
+    }
+    return withCost(baseResults, inputs, {
+      costUSD: useList ? bom.totalUSD : baseResults.costUSD,
+      source: useList ? "lista" : "wp",
+      type: systemType,
+      reason: systemReason,
+      bom: useList ? bom.lines : undefined,
+      inverterKw: bom.inverterKw || undefined,
+      batteryKwh: bom.batteryKwh || undefined,
+      extraWarnings,
+    });
+  }, [baseResults, bom, inputs, costMode, useList, systemType, systemReason]);
   const summary = useMemo(
     () => (results ? buildQuoteSummary({ inputs, results, clientName: f.clientName, address: f.address }) : ""),
     [inputs, results, f.clientName, f.address],
@@ -418,6 +495,11 @@ function CotizadorInner() {
     });
     setHistory(q.inputs.history ?? []);
     setBasisChoice(q.inputs.basis ?? "historial");
+    setSetup(q.inputs.setup ?? DEFAULT_SETUP);
+    setPanelId(q.inputs.panelId ?? "");
+    setCostMode(q.inputs.costMode ?? "wp");
+    setBomOv(q.inputs.bomOverrides ?? {});
+    setManualLines(q.inputs.manualLines ?? []);
     setPriceOverride(String(q.inputs.pricePerKwh));
     setHspOverride(String(q.inputs.hsp));
     setCostOverride(String(q.inputs.costPerWp));
@@ -430,6 +512,12 @@ function CotizadorInner() {
 
   function newQuote() {
     setF(EMPTY_FORM);
+    setSetup(DEFAULT_SETUP);
+    setPanelId("");
+    setBatteryId("");
+    setCostMode("lista");
+    setBomOv({});
+    setManualLines([]);
     setHistory([]);
     setHistText("");
     setBasisChoice("historial");
@@ -785,9 +873,28 @@ function CotizadorInner() {
                     className={INPUT}
                   />
                 </Field>
-                <Field label="Potencia del panel (W)">
-                  <NumberField suffix=" W" value={f.panelW} onValueChange={(v) => setField({ panelW: v })} className={INPUT} />
-                </Field>
+                {panelList.length > 0 ? (
+                  <Field label="Panel (de tu lista de precios)">
+                    <select
+                      value={selectedPanel?.id ?? ""}
+                      onChange={(e) => {
+                        setPanelId(e.target.value);
+                        setSavedId(null);
+                      }}
+                      className={INPUT}
+                    >
+                      {panelList.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} · US$ {c.priceUSD}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                ) : (
+                  <Field label="Potencia del panel (W)">
+                    <NumberField suffix=" W" value={f.panelW} onValueChange={(v) => setField({ panelW: v })} className={INPUT} />
+                  </Field>
+                )}
                 <Field label="Performance ratio">
                   <NumberField decimals value={f.pr} onValueChange={(v) => setField({ pr: v })} className={INPUT} />
                 </Field>
@@ -824,7 +931,108 @@ function CotizadorInner() {
               </p>
             </Card>
 
-            <Card title="5 · Cliente y proyecto (opcional)">
+            <Card title="5 · Tipo de sistema">
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="¿Hay red eléctrica en el lugar?">
+                  <select
+                    value={setup.gridAvailable ? "si" : "no"}
+                    onChange={(e) => patchSetup({ gridAvailable: e.target.value === "si" })}
+                    className={INPUT}
+                  >
+                    <option value="si">Sí, tiene red</option>
+                    <option value="no">No, es un lugar sin red</option>
+                  </select>
+                </Field>
+                <Field label="¿Necesita respaldo ante cortes?">
+                  <select
+                    value={setup.backupNeeded ? "si" : "no"}
+                    onChange={(e) => patchSetup({ backupNeeded: e.target.value === "si" })}
+                    disabled={!setup.gridAvailable}
+                    className={`${INPUT} disabled:opacity-50`}
+                  >
+                    <option value="no">No</option>
+                    <option value="si">Sí, quiere baterías</option>
+                  </select>
+                </Field>
+              </div>
+              <div className="mt-3 rounded-lg border border-gold-500/30 bg-gold-500/10 px-3 py-2.5 text-xs">
+                <p className="font-bold text-gold-600">Recomendado: {SYSTEM_LABELS[rec.type]}</p>
+                <p className="mt-0.5 text-body">{rec.reason}</p>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-4">
+                <Field label="Tipo de sistema">
+                  <select
+                    value={setup.mode}
+                    onChange={(e) => patchSetup({ mode: e.target.value as SystemSetup["mode"] })}
+                    className={INPUT}
+                  >
+                    <option value="auto">Automático (recomendado)</option>
+                    <option value="ongrid">On-grid</option>
+                    <option value="hibrido">Híbrido</option>
+                    <option value="offgrid">Off-grid</option>
+                  </select>
+                </Field>
+                {systemType !== "ongrid" && batteryList.length > 1 && (
+                  <Field label="Batería">
+                    <select value={batteryId || batteryList[0].id} onChange={(e) => setBatteryId(e.target.value)} className={INPUT}>
+                      {batteryList.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} · US$ {c.priceUSD}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                )}
+              </div>
+
+              {systemType === "hibrido" && (
+                <div className="mt-3 grid grid-cols-2 gap-4">
+                  <Field label="Consumo a respaldar (%)">
+                    <NumberField suffix=" %" value={setup.backupPct} onValueChange={(v) => patchSetup({ backupPct: Number(v) || 0 })} className={INPUT} />
+                  </Field>
+                  <Field label="Horas de corte a cubrir">
+                    <NumberField suffix=" h" value={setup.backupHours} onValueChange={(v) => patchSetup({ backupHours: Number(v) || 0 })} className={INPUT} />
+                  </Field>
+                </div>
+              )}
+              {systemType === "offgrid" && (
+                <div className="mt-3 grid grid-cols-2 gap-4">
+                  <Field label="Días de autonomía">
+                    <NumberField decimals suffix=" días" value={setup.autonomyDays} onValueChange={(v) => patchSetup({ autonomyDays: Number(v) || 0 })} className={INPUT} />
+                  </Field>
+                </div>
+              )}
+              {systemType !== "ongrid" && (
+                <div className="mt-3 grid grid-cols-2 gap-4">
+                  <Field label="Descarga útil de la batería (%)">
+                    <NumberField suffix=" %" value={setup.dodPct} onValueChange={(v) => patchSetup({ dodPct: Number(v) || 0 })} className={INPUT} />
+                  </Field>
+                  <Field label="Potencia pico de las cargas (kW)">
+                    <NumberField decimals suffix=" kW" value={setup.peakKw || ""} placeholder="opcional" onValueChange={(v) => patchSetup({ peakKw: Number(v) || 0 })} className={INPUT} />
+                  </Field>
+                </div>
+              )}
+
+              <div className="mt-4">
+                <p className="text-xs font-semibold text-ink">Cómo se calcula el costo</p>
+                <div className="mt-1.5 flex flex-wrap gap-2">
+                  <Chip active={costMode === "lista"} onClick={() => setCostMode("lista")}>
+                    Según mi lista de precios
+                  </Chip>
+                  <Chip active={costMode === "wp"} onClick={() => setCostMode("wp")}>
+                    Por Wp instalado
+                  </Chip>
+                </div>
+                {components.length === 0 && (
+                  <p className="mt-2 text-[11px] text-body">
+                    Todavía no cargaste equipos: hacelo en Configuración → Equipos y precios para cotizar con tus
+                    precios reales.
+                  </p>
+                )}
+              </div>
+            </Card>
+
+            <Card title="6 · Cliente y proyecto (opcional)">
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Cliente o lead">
                   <select
@@ -922,12 +1130,39 @@ function CotizadorInner() {
                     <Tile label="Ahorro mensual" value={fmtARS.format(results.monthlySavingsARS)} />
                     <Tile label="Costo instalado" value={fmtUSD.format(results.costUSD)} sub={`≈ ${fmtARS.format(results.costUSD * inputs.exchangeRate)}`} />
                     <Tile
+                      label="Tipo de sistema"
+                      value={SYSTEM_LABELS[results.systemType ?? systemType]}
+                      sub={[
+                        results.inverterKw ? `inversor ${nf(results.inverterKw, 1)} kW` : null,
+                        results.batteryKwh ? `baterías ${nf(results.batteryKwh, 1)} kWh` : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ") || undefined}
+                      wide
+                    />
+                    <Tile
                       label="Retorno de la inversión"
                       value={results.paybackYears != null ? `${nf(results.paybackYears, 1)} años` : "—"}
                       sub={results.paybackMonths != null ? `${nf(results.paybackMonths)} meses` : undefined}
                       wide
                     />
                   </div>
+
+                  {results.costSource === "lista" && bom && (
+                    <BomCard
+                      lines={bom.lines}
+                      total={bom.totalUSD}
+                      onOverride={(id, patch) => {
+                        setBomOv((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }));
+                        setSavedId(null);
+                      }}
+                      onManual={(next) => {
+                        setManualLines(next);
+                        setSavedId(null);
+                      }}
+                      manualLines={manualLines}
+                    />
+                  )}
 
                   {histStats && (
                     <HistoryBlock stats={histStats} monthlyProduction={results.monthlyProduction} price={inputs.pricePerKwh} />
@@ -1257,6 +1492,107 @@ function RegionPicker({
       >
         {busy ? `Leyendo el gráfico… ${Math.round(progress * 100)}%` : "Leer el gráfico marcado"}
       </button>
+    </div>
+  );
+}
+
+// Lista de materiales con precios: todo se puede corregir en cada cotización.
+function BomCard({
+  lines,
+  total,
+  onOverride,
+  onManual,
+  manualLines,
+}: {
+  lines: BomLine[];
+  total: number;
+  onOverride: (id: string, patch: BomOverride) => void;
+  onManual: (next: BomLine[]) => void;
+  manualLines: BomLine[];
+}) {
+  const setManual = (id: string, patch: Partial<BomLine>) =>
+    onManual(manualLines.map((l) => (l.id === id ? { ...l, ...patch } : l)));
+
+  return (
+    <div className="mt-4 rounded-xl border border-ink/10 bg-background p-3">
+      <p className="text-[11px] font-bold uppercase tracking-wide text-body">Lista de materiales (USD)</p>
+      <div className="mt-2 flex flex-col gap-2">
+        {lines.map((l) => (
+          <div
+            key={l.id}
+            className={`rounded-lg border p-2.5 ${l.missing ? "border-red-500/40 bg-red-500/5" : "border-ink/10 bg-surface"} ${l.included ? "" : "opacity-50"}`}
+          >
+            <div className="flex items-start gap-2">
+              <input
+                type="checkbox"
+                checked={l.included}
+                onChange={(e) => (l.manual ? setManual(l.id, { included: e.target.checked }) : onOverride(l.id, { included: e.target.checked }))}
+                aria-label={`Incluir ${l.name}`}
+                className="mt-0.5 h-4 w-4 shrink-0"
+              />
+              <div className="min-w-0 flex-1">
+                {l.manual ? (
+                  <input
+                    value={l.name}
+                    onChange={(e) => setManual(l.id, { name: e.target.value })}
+                    className="w-full rounded-md border border-ink/10 bg-background px-2 py-1 text-xs text-ink"
+                    aria-label="Nombre del ítem"
+                  />
+                ) : (
+                  <p className="text-xs font-semibold text-ink">{l.name}</p>
+                )}
+                <p className="text-[10px] text-body">
+                  {l.kind === "manual" ? "Ítem manual" : KIND_LABELS[l.kind]}
+                  {l.note ? ` · ${l.note}` : ""}
+                </p>
+              </div>
+              <p className="font-data shrink-0 text-xs font-semibold text-ink">{fmtUSD.format(l.qty * l.unitPriceUSD)}</p>
+              {l.manual && (
+                <button
+                  type="button"
+                  onClick={() => onManual(manualLines.filter((x) => x.id !== l.id))}
+                  className="shrink-0 text-xs font-semibold text-red-500"
+                  aria-label="Quitar ítem"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+            <div className="mt-2 flex gap-2">
+              <NumberField
+                decimals
+                suffix={` ${l.unitLabel}`}
+                value={l.qty}
+                onValueChange={(v) => (l.manual ? setManual(l.id, { qty: Number(v) || 0 }) : onOverride(l.id, { qty: Number(v) || 0 }))}
+                className="w-full min-w-0 rounded-md border border-ink/10 bg-background px-2 py-1.5 text-xs text-ink"
+              />
+              <NumberField
+                decimals
+                prefix="US$ "
+                value={l.unitPriceUSD}
+                onValueChange={(v) => (l.manual ? setManual(l.id, { unitPriceUSD: Number(v) || 0 }) : onOverride(l.id, { price: Number(v) || 0 }))}
+                className="w-full min-w-0 rounded-md border border-ink/10 bg-background px-2 py-1.5 text-xs text-ink"
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={() =>
+          onManual([
+            ...manualLines,
+            { id: "m-" + Date.now().toString(36), kind: "manual", name: "Ítem", qty: 1, unitPriceUSD: 0, unitLabel: "u.", included: true, manual: true },
+          ])
+        }
+        className="mt-2 rounded-lg border border-ink/15 bg-surface px-3 py-2 text-xs font-semibold text-ink shadow-sm hover:shadow-md"
+      >
+        + Agregar ítem
+      </button>
+      <div className="mt-3 flex items-center justify-between border-t border-ink/10 pt-3">
+        <span className="text-xs font-bold uppercase tracking-wide text-body">Total instalado</span>
+        <span className="font-data text-lg font-semibold text-gold-600">{fmtUSD.format(total)}</span>
+      </div>
     </div>
   );
 }

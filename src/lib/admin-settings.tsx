@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { createClient } from "./supabase/client";
-import { DEFAULT_HSP, DEFAULT_INSTALL_COST_PER_WP } from "./solar-quote";
+import { DEFAULT_HSP, DEFAULT_INSTALL_COST_PER_WP, type SolarComponent } from "./solar-quote";
 
 const supabase = createClient();
 
@@ -45,6 +45,7 @@ export type StoreSettings = {
   installmentPlans: InstallmentPlan[];
   hspTable: Record<string, number>; // horas sol pico por provincia (cotizador solar)
   installCostPerWp: number; // USD por Wp instalado (cotizador solar)
+  solarComponents: SolarComponent[]; // equipos y precios manuales (cotizador solar)
 };
 
 const DEFAULT_SETTINGS: StoreSettings = {
@@ -62,6 +63,7 @@ const DEFAULT_SETTINGS: StoreSettings = {
   installmentPlans: [],
   hspTable: DEFAULT_HSP,
   installCostPerWp: DEFAULT_INSTALL_COST_PER_WP,
+  solarComponents: [],
 };
 
 // Dólar blue (precio de venta) en tiempo real — API pública argentina, sin
@@ -87,6 +89,7 @@ type SettingsRow = {
   installment_plans: InstallmentPlan[] | null;
   hsp_table: Record<string, number> | null;
   install_cost_per_wp: number | null;
+  solar_components: SolarComponent[] | null;
 };
 
 function fromRow(row: SettingsRow): StoreSettings {
@@ -106,6 +109,7 @@ function fromRow(row: SettingsRow): StoreSettings {
     hspTable: { ...DEFAULT_HSP, ...(row.hsp_table ?? {}) },
     installCostPerWp:
       row.install_cost_per_wp != null ? Number(row.install_cost_per_wp) : DEFAULT_INSTALL_COST_PER_WP,
+    solarComponents: row.solar_components ?? [],
   };
 }
 
@@ -124,6 +128,7 @@ function toRow(patch: Partial<StoreSettings>) {
   if (patch.installmentPlans !== undefined) row.installment_plans = patch.installmentPlans;
   if (patch.hspTable !== undefined) row.hsp_table = patch.hspTable;
   if (patch.installCostPerWp !== undefined) row.install_cost_per_wp = patch.installCostPerWp;
+  if (patch.solarComponents !== undefined) row.solar_components = patch.solarComponents;
   return row;
 }
 

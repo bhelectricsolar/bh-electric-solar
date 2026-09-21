@@ -18,7 +18,8 @@ import { getProducts, getCategories } from "@/lib/products";
 import { getCustomers } from "@/lib/customers";
 import { getOrders } from "@/lib/orders";
 import { downloadCSV } from "@/lib/csv-export";
-import { DEFAULT_HSP, PROVINCES } from "@/lib/solar-quote";
+import { DEFAULT_HSP, PROVINCES, type ComponentKind, type PriceUnit, type SolarComponent } from "@/lib/solar-quote";
+import { ALL_KINDS, FIXED_KINDS, KIND_LABELS, KIND_SPEC_UNIT, exampleComponents } from "@/lib/solar-system";
 
 export default function AdminConfiguracionPage() {
   const { settings, updateSettings, formatPrice, refreshExchangeRate, exchangeRateStatus } =
@@ -368,6 +369,51 @@ export default function AdminConfiguracionPage() {
           </button>
         </SettingsCard>
 
+        {/* Equipos y precios del cotizador */}
+        <SettingsCard title="Equipos y precios (cotizador solar)">
+          <p className="text-xs text-body">
+            Cargá tus equipos con sus precios en dólares. El cotizador elige solo el inversor y las baterías que
+            hagan falta y suma la estructura, protecciones e instalación. Todo se puede corregir en cada cotización.
+          </p>
+          {settings.solarComponents.length === 0 && (
+            <button
+              type="button"
+              onClick={() => updateSettings({ solarComponents: exampleComponents() })}
+              className="mt-3 rounded-lg border border-gold-500/50 bg-gold-500/10 px-4 py-2 text-xs font-bold text-gold-600 transition-all hover:bg-gold-500/15"
+            >
+              Cargar lista de ejemplo (precios a reemplazar por los tuyos)
+            </button>
+          )}
+          {ALL_KINDS.map((kind) => {
+            const rows = settings.solarComponents.filter((c) => c.kind === kind);
+            if (rows.length === 0) return null;
+            return (
+              <div key={kind} className="mt-4">
+                <p className="text-xs font-bold uppercase tracking-wide text-body">{KIND_LABELS[kind]}</p>
+                <div className="mt-2 flex flex-col gap-2">
+                  {rows.map((c) => (
+                    <ComponentRow
+                      key={c.id}
+                      component={c}
+                      onSave={(next) =>
+                        updateSettings({
+                          solarComponents: settings.solarComponents.map((x) => (x.id === c.id ? next : x)),
+                        })
+                      }
+                      onRemove={() =>
+                        updateSettings({ solarComponents: settings.solarComponents.filter((x) => x.id !== c.id) })
+                      }
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+          <NewComponentForm
+            onAdd={(c) => updateSettings({ solarComponents: [...settings.solarComponents, c] })}
+          />
+        </SettingsCard>
+
         {/* Exportar datos */}
         <SettingsCard title="Exportar datos">
           <p className="text-xs text-body">
@@ -528,5 +574,192 @@ function ExportButton({ label, onClick }: { label: string; onClick: () => void }
     >
       {label} (.csv)
     </button>
+  );
+}
+
+const INPUT_SM = "w-full rounded-md border border-ink/10 bg-background px-2 py-1.5 text-xs text-ink";
+
+function ComponentRow({
+  component,
+  onSave,
+  onRemove,
+}: {
+  component: SolarComponent;
+  onSave: (c: SolarComponent) => void;
+  onRemove: () => void;
+}) {
+  const [draft, setDraft] = useState(component);
+  const [confirming, setConfirming] = useState(false);
+  useEffect(() => {
+    setDraft(component);
+  }, [component]);
+  const dirty = JSON.stringify(draft) !== JSON.stringify(component);
+  const specUnit = KIND_SPEC_UNIT[component.kind];
+  const fixed = FIXED_KINDS.includes(component.kind);
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-ink/10 bg-background p-2.5">
+      <input
+        value={draft.name}
+        onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+        className={`${INPUT_SM} min-w-[9rem] flex-1`}
+        aria-label="Nombre"
+      />
+      {specUnit && (
+        <div className="w-24">
+          <NumberField
+            decimals
+            suffix={` ${specUnit}`}
+            value={draft.spec || ""}
+            onValueChange={(v) => setDraft({ ...draft, spec: Number(v) || 0 })}
+            className={INPUT_SM}
+          />
+        </div>
+      )}
+      <div className="w-28">
+        <NumberField
+          decimals
+          prefix="US$ "
+          value={draft.priceUSD || ""}
+          onValueChange={(v) => setDraft({ ...draft, priceUSD: Number(v) || 0 })}
+          className={INPUT_SM}
+        />
+      </div>
+      {fixed && (
+        <select
+          value={draft.unit}
+          onChange={(e) => setDraft({ ...draft, unit: e.target.value as PriceUnit })}
+          className="rounded-md border border-ink/10 bg-background px-2 py-1.5 text-xs text-ink"
+        >
+          <option value="por_panel">por panel</option>
+          <option value="por_kwp">por kWp</option>
+          <option value="unidad">fijo</option>
+        </select>
+      )}
+      {dirty && (
+        <button
+          type="button"
+          onClick={() => onSave(draft)}
+          className="rounded-md bg-navy-900 px-3 py-1.5 text-xs font-semibold text-white"
+        >
+          Guardar
+        </button>
+      )}
+      {confirming ? (
+        <span className="flex items-center gap-1.5 text-xs">
+          <span className="font-semibold text-red-500">¿Quitar?</span>
+          <button type="button" onClick={onRemove} className="rounded bg-red-500 px-2 py-1 font-bold text-white">
+            Sí
+          </button>
+          <button type="button" onClick={() => setConfirming(false)} className="rounded bg-cream-200 px-2 py-1 font-semibold text-ink">
+            No
+          </button>
+        </span>
+      ) : (
+        <button type="button" onClick={() => setConfirming(true)} className="text-xs font-semibold text-red-500 hover:underline">
+          Quitar
+        </button>
+      )}
+    </div>
+  );
+}
+
+function NewComponentForm({ onAdd }: { onAdd: (c: SolarComponent) => void }) {
+  const [kind, setKind] = useState<ComponentKind>("panel");
+  const [name, setName] = useState("");
+  const [spec, setSpec] = useState("");
+  const [price, setPrice] = useState("");
+  const [unit, setUnit] = useState<PriceUnit>("por_kwp");
+  const specUnit = KIND_SPEC_UNIT[kind];
+  const fixed = FIXED_KINDS.includes(kind);
+
+  function add() {
+    if (!name.trim()) return;
+    onAdd({
+      id: Date.now().toString(36),
+      kind,
+      name: name.trim(),
+      spec: specUnit ? Number(spec) || 0 : 0,
+      priceUSD: Number(price) || 0,
+      unit: fixed ? unit : "unidad",
+    });
+    setName("");
+    setSpec("");
+    setPrice("");
+  }
+
+  return (
+    <div className="mt-5 border-t border-ink/10 pt-4">
+      <p className="text-xs font-bold uppercase tracking-wide text-body">Agregar equipo o rubro</p>
+      <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <label className="col-span-2 block sm:col-span-1">
+          <span className="text-xs font-semibold text-ink">Tipo</span>
+          <select
+            value={kind}
+            onChange={(e) => setKind(e.target.value as ComponentKind)}
+            className="mt-1.5 w-full rounded-lg border border-ink/10 bg-background px-2.5 py-2 text-sm text-ink"
+          >
+            {ALL_KINDS.map((k) => (
+              <option key={k} value={k}>
+                {KIND_LABELS[k]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="col-span-2 block">
+          <span className="text-xs font-semibold text-ink">Nombre / modelo</span>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Ej: Panel Jinko 550 W"
+            className="mt-1.5 w-full rounded-lg border border-ink/10 bg-background px-3 py-2 text-sm text-ink"
+          />
+        </label>
+        {specUnit && (
+          <label className="block">
+            <span className="text-xs font-semibold text-ink">Capacidad ({specUnit})</span>
+            <NumberField
+              decimals
+              suffix={` ${specUnit}`}
+              value={spec}
+              onValueChange={setSpec}
+              className="mt-1.5 w-full rounded-lg border border-ink/10 bg-background px-3 py-2 text-sm text-ink"
+            />
+          </label>
+        )}
+        <label className="block">
+          <span className="text-xs font-semibold text-ink">Precio (USD)</span>
+          <NumberField
+            decimals
+            prefix="US$ "
+            value={price}
+            onValueChange={setPrice}
+            className="mt-1.5 w-full rounded-lg border border-ink/10 bg-background px-3 py-2 text-sm text-ink"
+          />
+        </label>
+        {fixed && (
+          <label className="block">
+            <span className="text-xs font-semibold text-ink">Se cobra</span>
+            <select
+              value={unit}
+              onChange={(e) => setUnit(e.target.value as PriceUnit)}
+              className="mt-1.5 w-full rounded-lg border border-ink/10 bg-background px-2.5 py-2 text-sm text-ink"
+            >
+              <option value="por_panel">por panel</option>
+              <option value="por_kwp">por kWp</option>
+              <option value="unidad">monto fijo</option>
+            </select>
+          </label>
+        )}
+      </div>
+      <button
+        type="button"
+        onClick={add}
+        disabled={!name.trim()}
+        className="mt-3 rounded-lg border border-ink/15 bg-background px-4 py-2 text-xs font-semibold text-ink shadow-sm transition-all hover:shadow-md disabled:opacity-50"
+      >
+        + Agregar
+      </button>
+    </div>
   );
 }

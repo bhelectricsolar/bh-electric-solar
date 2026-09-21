@@ -31,6 +31,7 @@ export const DEFAULT_HSP: Record<string, number> = {
 };
 
 export const DEFAULT_INSTALL_COST_PER_WP = 1.2; // USD por Wp instalado
+export const OFFGRID_EFFICIENCY = 0.85; // rendimiento del ciclo de batería
 export const DEFAULT_PANEL_W = 450;
 export const DEFAULT_PERFORMANCE_RATIO = 0.78;
 export const DEFAULT_COVERAGE_PCT = 90;
@@ -85,6 +86,57 @@ export function inferProvince(distribuidora: string | null, provincia?: string |
   return null;
 }
 
+export type SystemType = "ongrid" | "hibrido" | "offgrid";
+
+export type ComponentKind =
+  | "panel"
+  | "inversor_ongrid"
+  | "inversor_hibrido"
+  | "inversor_offgrid"
+  | "bateria"
+  | "estructura"
+  | "proteccion"
+  | "instalacion"
+  | "otro";
+export type PriceUnit = "unidad" | "por_panel" | "por_kwp";
+
+// Equipo o rubro con precio manual (Configuración → Equipos y precios).
+// spec: potencia del panel (W), del inversor (kW) o capacidad de la batería (kWh).
+export type SolarComponent = {
+  id: string;
+  kind: ComponentKind;
+  name: string;
+  spec: number;
+  priceUSD: number;
+  unit: PriceUnit;
+};
+
+// Datos para decidir qué tipo de sistema hace falta y cómo respaldarlo.
+export type SystemSetup = {
+  mode: "auto" | SystemType;
+  gridAvailable: boolean;
+  backupNeeded: boolean;
+  backupPct: number; // % del consumo diario a respaldar en un corte
+  backupHours: number; // horas de corte a cubrir
+  autonomyDays: number; // días de autonomía (off-grid)
+  dodPct: number; // profundidad de descarga útil de la batería
+  peakKw: number; // potencia pico de las cargas a respaldar (0 = no informada)
+};
+
+export type BomLine = {
+  id: string;
+  kind: ComponentKind | "manual";
+  name: string;
+  qty: number;
+  unitPriceUSD: number;
+  unitLabel: string;
+  included: boolean;
+  missing?: boolean;
+  note?: string;
+  manual?: boolean;
+};
+export type BomOverride = { qty?: number; price?: number; included?: boolean };
+
 // Un período del historial de consumo (una barra del gráfico de la factura).
 export type HistoryPeriod = {
   label: string;
@@ -112,6 +164,13 @@ export type QuoteInputs = {
   basis?: SizingBasis;
   billKwh?: number; // última factura, para comparar contra el promedio
   billDays?: number;
+  // Tipo de sistema y lista de precios (se guardan para poder reabrir la cotización).
+  systemType?: SystemType;
+  setup?: SystemSetup;
+  panelId?: string;
+  costMode?: "lista" | "wp";
+  bomOverrides?: Record<string, BomOverride>;
+  manualLines?: BomLine[];
 };
 
 export type QuoteResults = {
@@ -129,6 +188,12 @@ export type QuoteResults = {
   paybackMonths: number | null;
   paybackYears: number | null;
   warnings: string[];
+  systemType?: SystemType;
+  systemReason?: string;
+  inverterKw?: number;
+  batteryKwh?: number;
+  bom?: BomLine[];
+  costSource?: "lista" | "wp";
 };
 
 export type HistoryStats = {
@@ -198,13 +263,19 @@ export function calculateQuote(i: QuoteInputs): QuoteResults | null {
 
   const dailyKwh = i.kwh / i.days;
   const monthlyKwh = dailyKwh * 30;
-  const targetDailyProduction = dailyKwh * (i.coveragePct / 100);
+  // Sistema aislado: tiene que cubrir todo el consumo y además las pérdidas
+  // de ida y vuelta de la batería.
+  const offgrid = i.systemType === "offgrid";
+  const targetDailyProduction = offgrid
+    ? dailyKwh / OFFGRID_EFFICIENCY
+    : dailyKwh * (i.coveragePct / 100);
   const idealKwp = targetDailyProduction / (i.hsp * i.performanceRatio);
   const panels = Math.max(1, Math.ceil((idealKwp * 1000) / i.panelW));
   const realW = panels * i.panelW;
   const monthlyProduction = (realW / 1000) * i.hsp * i.performanceRatio * 30;
   const realCoveragePct = (monthlyProduction / monthlyKwh) * 100;
-  const monthlySavingsARS = Math.min(monthlyProduction, monthlyKwh) * i.pricePerKwh;
+  // En un sistema aislado no hay factura que ahorrar: el retorno no aplica.
+  const monthlySavingsARS = offgrid ? 0 : Math.min(monthlyProduction, monthlyKwh) * i.pricePerKwh;
   const costUSD = realW * i.costPerWp;
   const savingsUSD = monthlySavingsARS / i.exchangeRate;
   const paybackMonths = savingsUSD > 0 ? costUSD / savingsUSD : null;
@@ -215,7 +286,12 @@ export function calculateQuote(i: QuoteInputs): QuoteResults | null {
       `El sistema queda sobredimensionado (${realCoveragePct.toFixed(0)}% del consumo) por el redondeo a paneles enteros. Conviene revisar cómo compensa los excedentes la distribuidora (Ley 27.424) antes de ofrecerlo así.`,
     );
   }
-  if (i.coveragePct > 100) {
+  if (offgrid) {
+    warnings.push(
+      "Sistema aislado (off-grid): se dimensiona para cubrir todo el consumo más las pérdidas de la batería. No hay ahorro de factura, así que el retorno de la inversión no aplica.",
+    );
+  }
+  if (i.coveragePct > 100 && !offgrid) {
     warnings.push(
       "La cobertura objetivo supera el 100%: no dimensionar así salvo que se sepa cómo compensa los excedentes la distribuidora bajo la Ley 27.424.",
     );
@@ -267,6 +343,34 @@ export function calculateQuote(i: QuoteInputs): QuoteResults | null {
 const nf = (n: number, d = 0) =>
   new Intl.NumberFormat("es-AR", { minimumFractionDigits: d, maximumFractionDigits: d }).format(n);
 
+const SYSTEM_LABELS: Record<SystemType, string> = {
+  ongrid: "On-grid (conectado a la red)",
+  hibrido: "Híbrido (red + baterías)",
+  offgrid: "Off-grid (aislado con baterías)",
+};
+
+function systemLines(i: QuoteInputs, r: QuoteResults): string[] {
+  if (!r.systemType) return [];
+  const lines = ["TIPO DE SISTEMA", `- ${SYSTEM_LABELS[r.systemType]}`];
+  if (r.systemReason) lines.push(`- Motivo: ${r.systemReason}`);
+  if (r.inverterKw) lines.push(`- Inversor necesario: ${nf(r.inverterKw, 1)} kW`);
+  if (r.batteryKwh) lines.push(`- Almacenamiento necesario: ${nf(r.batteryKwh, 1)} kWh`);
+  lines.push("");
+  return lines;
+}
+
+function bomLines(r: QuoteResults): string[] {
+  const lines = (r.bom ?? []).filter((l) => l.included && l.qty > 0);
+  if (r.costSource !== "lista" || lines.length === 0) return [];
+  return [
+    "",
+    "LISTA DE MATERIALES (USD)",
+    ...lines.map(
+      (l) => `- ${l.name}: ${nf(l.qty, l.qty % 1 === 0 ? 0 : 2)} ${l.unitLabel} × US$ ${nf(l.unitPriceUSD, 2)} = US$ ${nf(l.qty * l.unitPriceUSD)}`,
+    ),
+  ];
+}
+
 function historyLines(i: QuoteInputs, r: QuoteResults): string[] {
   const h = summarizeHistory(i.history);
   if (!h) return [];
@@ -301,6 +405,7 @@ export function buildQuoteSummary(args: {
     `- Precio del kWh: $ ${nf(i.pricePerKwh, 2)}`,
     ...historyLines(i, r),
     "",
+    ...systemLines(i, r),
     "SISTEMA RECOMENDADO",
     `- Potencia: ${nf(r.realKwp, 2)} kWp`,
     `- Paneles: ${r.panels} de ${nf(i.panelW)} W (${nf(r.realW)} W)`,
@@ -316,6 +421,7 @@ export function buildQuoteSummary(args: {
       `- Retorno de la inversión: ${nf(r.paybackYears, 1)} años (${nf(r.paybackMonths ?? 0)} meses) al dólar de $ ${nf(i.exchangeRate)}`,
     );
   }
+  lines.push(...bomLines(r));
   lines.push(
     "",
     `Parámetros: performance ratio ${nf(i.performanceRatio, 2)}, cobertura objetivo ${nf(i.coveragePct)}%.`,
