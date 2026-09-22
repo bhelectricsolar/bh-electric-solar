@@ -58,7 +58,7 @@ export default function ProductCard({
           {product.shortDescription}
         </p>
 
-        <div className="mt-4 rounded-xl bg-cream-100 px-3 py-2.5">
+        <div className="premium-surface mt-4 rounded-xl bg-cream-100 px-3 py-2.5">
           <div className="flex items-baseline justify-between gap-2">
             <span className="font-data text-xl font-extrabold text-ink">
               {formatUSD(product.priceUSD)}

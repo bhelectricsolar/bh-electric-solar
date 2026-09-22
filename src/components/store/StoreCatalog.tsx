@@ -68,10 +68,10 @@ function FilterPill({
     <button
       type="button"
       onClick={onClick}
-      className={`cursor-pointer touch-manipulation rounded-full border px-4 py-2 text-xs font-semibold transition-colors ${
+      className={`cursor-pointer touch-manipulation rounded-full border px-4 py-2 text-xs font-semibold transition-all ${
         active
           ? "border-navy-900 bg-navy-900 text-white"
-          : "border-ink/10 bg-white text-ink hover:border-navy-900/30"
+          : "border-ink/10 bg-white text-ink shadow-[0_6px_16px_-8px_rgba(12,24,48,0.25)] hover:-translate-y-0.5 hover:border-navy-900/30 hover:shadow-[0_10px_22px_-10px_rgba(12,24,48,0.35)]"
       }`}
     >
       {children}

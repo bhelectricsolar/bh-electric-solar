@@ -261,16 +261,32 @@ export default function AdminPedidosPage() {
                         </dl>
                       </div>
                     )}
-                    <ul className="flex flex-col gap-2 text-sm">
+                    <ul className="flex flex-col gap-2.5 text-sm">
                       {items.map((item) => (
                         <li
                           key={item.productId}
-                          className="flex justify-between text-body"
+                          className="flex items-center justify-between gap-3 text-body"
                         >
-                          <span>
-                            {item.product?.name ?? "Producto"} x{item.qty}
-                          </span>
-                          <span className="font-data text-ink">
+                          <div className="flex min-w-0 items-center gap-2.5">
+                            <div
+                              className={`h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-ink/10 ${
+                                item.product?.images?.[0] ? "bg-white" : `bg-gradient-to-br ${item.product?.gradient ?? ""}`
+                              }`}
+                            >
+                              {item.product?.images?.[0] && (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={item.product.images[0]}
+                                  alt={item.product.name}
+                                  className="h-full w-full object-contain p-1"
+                                />
+                              )}
+                            </div>
+                            <span className="truncate">
+                              {item.product?.name ?? "Producto"} x{item.qty}
+                            </span>
+                          </div>
+                          <span className="font-data shrink-0 text-ink">
                             {formatPrice((item.product?.priceUSD ?? 0) * item.qty)}
                           </span>
                         </li>

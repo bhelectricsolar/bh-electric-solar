@@ -75,7 +75,7 @@ export default async function ProductPage({
               {product.description}
             </p>
 
-            <div className="mt-6 rounded-2xl border border-ink/10 bg-cream-100 p-5">
+            <div className="premium-surface mt-6 rounded-2xl border border-ink/10 bg-cream-100 p-5">
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                 <span className="font-data text-4xl font-extrabold text-ink">
                   {formatUSD(product.priceUSD)}

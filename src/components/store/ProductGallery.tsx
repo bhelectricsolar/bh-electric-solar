@@ -31,7 +31,7 @@ export default function ProductGallery({
 
   return (
     <div>
-      <div className="relative flex h-72 items-end justify-end overflow-hidden rounded-2xl bg-white p-4 sm:h-96">
+      <div className="premium-surface relative flex h-72 items-end justify-end overflow-hidden rounded-2xl border border-ink/10 bg-white p-4 sm:h-96">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={images[active]}
@@ -51,7 +51,7 @@ export default function ProductGallery({
               key={url}
               type="button"
               onClick={() => setActive(i)}
-              className={`h-16 w-16 shrink-0 cursor-pointer overflow-hidden rounded-lg border-2 bg-white transition-colors ${
+              className={`h-16 w-16 shrink-0 cursor-pointer overflow-hidden rounded-lg border-2 bg-white shadow-sm transition-colors ${
                 i === active ? "border-gold-500" : "border-ink/10 hover:border-ink/30"
               }`}
             >

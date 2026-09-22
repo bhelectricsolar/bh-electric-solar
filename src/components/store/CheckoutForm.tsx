@@ -11,6 +11,7 @@ import {
   type PublicShippingZone,
   type StoreOrderResult,
 } from "@/lib/store-checkout";
+import type { OrderPdfItem } from "@/lib/order-pdf";
 
 const SAVED_KEY = "bh-checkout-v1";
 
@@ -58,7 +59,22 @@ export default function CheckoutForm({
   const [accepted, setAccepted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<(StoreOrderResult & { name: string; method: string }) | null>(null);
+  type Done = StoreOrderResult & {
+    name: string;
+    method: "retiro" | "envio";
+    createdAt: string;
+    phone: string;
+    email: string;
+    doc: string;
+    address: string;
+    city: string;
+    province: string;
+    zoneRegion?: string;
+    zoneEta?: string;
+    items: OrderPdfItem[];
+  };
+  const [done, setDone] = useState<Done | null>(null);
+  const [savingPdf, setSavingPdf] = useState<"download" | "share" | null>(null);
   const [hydrated, setHydrated] = useState(false);
 
   // Datos guardados de una compra anterior: el cliente no vuelve a escribirlos.
@@ -118,7 +134,26 @@ export default function CheckoutForm({
       } catch {
         // ignorar
       }
-      setDone({ ...result, name: form.name.trim(), method: form.method });
+      setDone({
+        ...result,
+        name: form.name.trim(),
+        method: form.method,
+        createdAt: new Date().toISOString(),
+        phone: form.phone.trim(),
+        email: form.email.trim(),
+        doc: form.doc.trim(),
+        address: form.address.trim(),
+        city: form.city.trim(),
+        province: form.province,
+        zoneRegion: zone?.region,
+        zoneEta: zone?.etaDays,
+        items: items.map((i) => ({
+          name: i.product.name,
+          qty: i.qty,
+          priceUSD: i.product.priceUSD,
+          image: i.product.images?.[0],
+        })),
+      });
       clearCart();
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
@@ -131,6 +166,57 @@ export default function CheckoutForm({
       );
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function savePdf(mode: "download" | "share") {
+    if (!done) return;
+    setSavingPdf(mode);
+    try {
+      const { buildOrderPdf } = await import("@/lib/order-pdf");
+      const blob = await buildOrderPdf({
+        id: done.id,
+        createdAt: done.createdAt,
+        customerName: done.name,
+        customerPhone: done.phone,
+        customerEmail: done.email,
+        customerDoc: done.doc,
+        method: done.method,
+        address: done.address,
+        city: done.city,
+        province: done.province,
+        zoneRegion: done.zoneRegion,
+        zoneEta: done.zoneEta,
+        items: done.items,
+        subtotalUSD: done.subtotalUSD,
+        shippingUSD: done.shippingUSD,
+        totalUSD: done.totalUSD,
+        exchangeRate,
+        store: { name: storeName, whatsapp: WHATSAPP_NUMBER, email: "" },
+        logoUrl: `${window.location.origin}/logo-mark.png`,
+      });
+      const fileName = `Comprobante ${done.id}.pdf`;
+      const file = new File([blob], fileName, { type: "application/pdf" });
+      if (mode === "share" && navigator.canShare?.({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: fileName, text: `Comprobante de pedido ${done.id}` });
+          return;
+        } catch (e) {
+          if ((e as Error).name === "AbortError") return;
+        }
+      }
+      const url = URL.createObjectURL(file);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 10000);
+    } catch (e) {
+      console.error("Comprobante:", e);
+    } finally {
+      setSavingPdf(null);
     }
   }
 
@@ -174,11 +260,29 @@ export default function CheckoutForm({
             <li>{done.method === "envio" ? "Despachamos tu pedido a la dirección indicada." : "Te avisamos cuando puedas retirarlo."}</li>
           </ol>
         </div>
+        <div className="mt-5 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => savePdf("download")}
+            disabled={savingPdf != null}
+            className="flex items-center justify-center gap-2 rounded-xl border border-ink/15 bg-white px-4 py-3 text-xs font-bold text-ink shadow-sm transition-all hover:shadow-md disabled:opacity-60"
+          >
+            {savingPdf === "download" ? "Generando…" : "Descargar comprobante"}
+          </button>
+          <button
+            type="button"
+            onClick={() => savePdf("share")}
+            disabled={savingPdf != null}
+            className="flex items-center justify-center gap-2 rounded-xl border border-ink/15 bg-white px-4 py-3 text-xs font-bold text-ink shadow-sm transition-all hover:shadow-md disabled:opacity-60"
+          >
+            {savingPdf === "share" ? "Generando…" : "Compartir comprobante"}
+          </button>
+        </div>
         <a
           href={wa}
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-5 flex items-center justify-center gap-2 rounded-xl bg-[#25D366] px-5 py-3.5 text-sm font-bold text-white shadow-[0_15px_35px_-15px_rgba(37,211,102,0.6)]"
+          className="mt-2.5 flex items-center justify-center gap-2 rounded-xl bg-[#25D366] px-5 py-3.5 text-sm font-bold text-white shadow-[0_15px_35px_-15px_rgba(37,211,102,0.6)]"
         >
           Coordinar el pago por WhatsApp
         </a>
@@ -393,7 +497,7 @@ export default function CheckoutForm({
 
 function Section({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-3xl border border-ink/10 bg-white p-6 shadow-sm">
+    <section className="premium-surface rounded-3xl border border-ink/10 bg-white p-6">
       <h2 className="flex items-center gap-3 text-lg font-extrabold text-ink">
         <span className="grid h-7 w-7 place-items-center rounded-full bg-navy-900 text-xs text-white">{n}</span>
         {title}

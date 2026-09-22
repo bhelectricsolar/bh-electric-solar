@@ -307,16 +307,6 @@ function FullAdminShell({
             <ThemeIcon theme={theme} />
           </button>
           <FullscreenToggle compact />
-          <Link
-            href="/"
-            title="Volver al sitio"
-            aria-label="Volver al sitio"
-            className="grid h-9 w-9 place-items-center rounded-lg text-body hover:bg-cream-200"
-          >
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 11.5 12 4l9 7.5M5.5 10v9a1 1 0 0 0 1 1H9v-6h6v6h2.5a1 1 0 0 0 1-1v-9" />
-            </svg>
-          </Link>
           <button
             type="button"
             onClick={() => signOut()}
@@ -484,17 +474,10 @@ function FullAdminShell({
               </Link>
             )}
 
-            <Link
-              href="/"
-              onClick={() => setMoreOpen(false)}
-              className="mt-5 flex cursor-pointer touch-manipulation items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium text-body hover:bg-cream-200"
-            >
-              ← Volver al sitio
-            </Link>
             <button
               type="button"
               onClick={() => signOut()}
-              className="flex cursor-pointer touch-manipulation items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium text-red-500 hover:bg-red-500/10"
+              className="mt-5 flex cursor-pointer touch-manipulation items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium text-red-500 hover:bg-red-500/10"
             >
               Cerrar sesión
             </button>
