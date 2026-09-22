@@ -28,7 +28,7 @@ export default function Chip({
       type="button"
       onClick={onClick}
       title={title}
-      className={`cursor-pointer touch-manipulation rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-all ${
+      className={`shrink-0 cursor-pointer touch-manipulation whitespace-nowrap rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-all ${
         active
           ? ACTIVE_STYLES[tone]
           : "border-ink/15 bg-surface text-body shadow-sm hover:border-ink/25 hover:text-ink hover:shadow-md"

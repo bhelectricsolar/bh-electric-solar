@@ -25,6 +25,7 @@ import { useAdminSettings } from "@/lib/admin-settings";
 import PrintDocument from "@/components/admin/PrintDocument";
 import SectorEyebrow from "@/components/admin/SectorEyebrow";
 import Chip from "@/components/admin/Chip";
+import StatusSelect from "@/components/admin/StatusSelect";
 import StatusBadge from "@/components/admin/StatusBadge";
 
 export default function AdminProyectosPage() {
@@ -271,22 +272,17 @@ export default function AdminProyectosPage() {
                     </label>
 
                     <div className="mt-4">
-                      <span className="text-xs font-semibold text-body">
-                        Avanzar etapa:
-                      </span>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {PROJECT_STAGES.map((s) => (
-                          <Chip
-                            key={s.value}
-                            active={project.status === s.value}
-                            onClick={() => updateStatus(project.id, s.value)}
-                            tone={PROJECT_STAGE_TONE[s.value]}
-                            title={s.hint}
-                          >
-                            {s.label}
-                          </Chip>
-                        ))}
-                      </div>
+                      <StatusSelect
+                        label="Etapa del proyecto"
+                        value={project.status}
+                        onChange={(status) => updateStatus(project.id, status)}
+                        options={PROJECT_STAGES.map((s) => ({
+                          value: s.value,
+                          label: s.label,
+                          tone: PROJECT_STAGE_TONE[s.value],
+                          hint: s.hint,
+                        }))}
+                      />
                     </div>
 
                     <div className="mt-4 flex flex-wrap gap-2 border-t border-ink/10 pt-4">

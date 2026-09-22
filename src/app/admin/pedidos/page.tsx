@@ -30,6 +30,7 @@ import PrintDocument from "@/components/admin/PrintDocument";
 import SectorEyebrow from "@/components/admin/SectorEyebrow";
 import Chip from "@/components/admin/Chip";
 import StatusBadge from "@/components/admin/StatusBadge";
+import StatusSelect from "@/components/admin/StatusSelect";
 
 type OriginFilter = "todos" | OrderOrigin | "pendientes";
 
@@ -196,7 +197,7 @@ export default function AdminPedidosPage() {
 
         {loading && <p className="mt-5 text-sm text-body">Cargando pedidos…</p>}
 
-        <div className="mt-5 flex flex-wrap gap-2">
+        <div className="mt-5 flex gap-2 overflow-x-auto pb-1">
           <Chip active={originFilter === "todos"} onClick={() => setOriginFilter("todos")}>
             Todos ({orders.length})
           </Chip>
@@ -272,16 +273,16 @@ export default function AdminPedidosPage() {
                     {(order.customerEmail || order.customerAddress || order.notes || order.customerPhone) && (
                       <div className="mb-4 rounded-xl border border-ink/10 bg-background p-4 text-sm">
                         <p className="text-[11px] font-bold uppercase tracking-wide text-body">Datos del cliente</p>
-                        <dl className="mt-2 grid grid-cols-1 gap-x-4 gap-y-1.5 sm:grid-cols-2">
-                          <div><dt className="text-[11px] text-body">Nombre</dt><dd className="font-semibold text-ink">{order.customerName}</dd></div>
-                          {order.customerPhone && <div><dt className="text-[11px] text-body">WhatsApp / teléfono</dt><dd className="font-semibold text-ink">{order.customerPhone}</dd></div>}
-                          {order.customerEmail && <div><dt className="text-[11px] text-body">Email</dt><dd className="break-all font-semibold text-ink">{order.customerEmail}</dd></div>}
-                          {order.customerDoc && <div><dt className="text-[11px] text-body">DNI / CUIT</dt><dd className="font-semibold text-ink">{order.customerDoc}</dd></div>}
+                        <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2">
+                          <div className="col-span-2 sm:col-span-1"><dt className="text-[11px] text-body">Nombre</dt><dd className="truncate font-semibold text-ink">{order.customerName}</dd></div>
+                          {order.customerPhone && <div><dt className="text-[11px] text-body">WhatsApp / teléfono</dt><dd className="truncate font-semibold text-ink">{order.customerPhone}</dd></div>}
+                          {order.customerEmail && <div className="col-span-2 sm:col-span-1"><dt className="text-[11px] text-body">Email</dt><dd className="break-all font-semibold text-ink">{order.customerEmail}</dd></div>}
+                          {order.customerDoc && <div><dt className="text-[11px] text-body">DNI / CUIT</dt><dd className="truncate font-semibold text-ink">{order.customerDoc}</dd></div>}
                           {order.shippingMethod && (
-                            <div><dt className="text-[11px] text-body">Entrega</dt><dd className="font-semibold text-ink">{order.shippingMethod === "envio" ? "Envío a domicilio" : "Retiro en el local"}</dd></div>
+                            <div><dt className="text-[11px] text-body">Entrega</dt><dd className="truncate font-semibold text-ink">{order.shippingMethod === "envio" ? "Envío a domicilio" : "Retiro en el local"}</dd></div>
                           )}
                           {order.customerAddress && (
-                            <div className="sm:col-span-2">
+                            <div className="col-span-2">
                               <dt className="text-[11px] text-body">Dirección de entrega</dt>
                               <dd className="font-semibold text-ink">
                                 {[order.customerAddress, order.customerCity, order.customerProvince, order.customerPostal && `CP ${order.customerPostal}`].filter(Boolean).join(", ")}
@@ -289,7 +290,7 @@ export default function AdminPedidosPage() {
                             </div>
                           )}
                           {order.notes && (
-                            <div className="sm:col-span-2"><dt className="text-[11px] text-body">Notas del cliente</dt><dd className="text-ink">{order.notes}</dd></div>
+                            <div className="col-span-2"><dt className="text-[11px] text-body">Notas del cliente</dt><dd className="text-ink">{order.notes}</dd></div>
                           )}
                         </dl>
                       </div>
@@ -372,34 +373,29 @@ export default function AdminPedidosPage() {
                       )}
                     </ul>
 
-                    <div className="mt-4 flex flex-wrap items-center gap-2">
-                      <span className="text-xs font-semibold text-body">
-                        Cambiar estado:
-                      </span>
-                      {(Object.keys(ORDER_STATUS_LABELS) as OrderStatus[]).map(
-                        (status) => (
-                          <Chip
-                            key={status}
-                            active={order.status === status}
-                            onClick={() => updateStatus(order.id, status)}
-                            tone={ORDER_STATUS_TONE[status]}
-                          >
-                            {ORDER_STATUS_LABELS[status]}
-                          </Chip>
-                        ),
-                      )}
+                    <div className="mt-4">
+                      <StatusSelect
+                        label="Estado del pedido"
+                        value={order.status}
+                        onChange={(status) => updateStatus(order.id, status)}
+                        options={(Object.keys(ORDER_STATUS_LABELS) as OrderStatus[]).map((status) => ({
+                          value: status,
+                          label: ORDER_STATUS_LABELS[status],
+                          tone: ORDER_STATUS_TONE[status],
+                        }))}
+                      />
                     </div>
 
-                    <div className="mt-4 flex flex-wrap gap-2 border-t border-ink/10 pt-4">
+                    <div className="mt-4 grid grid-cols-2 gap-2 border-t border-ink/10 pt-4">
                       <button
                         type="button"
                         onClick={() =>
                           openWhatsApp(order.customerPhone, orderStatusMessage(order, settings.storeName))
                         }
                         title={`Avisar por WhatsApp a ${order.customerPhone}`}
-                        className="flex cursor-pointer touch-manipulation items-center gap-2 rounded-lg border border-green-500/20 bg-green-500/10 px-3 py-2 text-xs font-semibold text-green-600 shadow-sm transition-all hover:shadow-md"
+                        className="flex cursor-pointer touch-manipulation items-center justify-center gap-1.5 rounded-lg border border-green-500/20 bg-green-500/10 px-2.5 py-2.5 text-center text-[11px] font-semibold leading-tight text-green-600 shadow-sm transition-all hover:shadow-md sm:text-xs"
                       >
-                        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor">
+                        <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="currentColor">
                           <path d="M12.01 2C6.48 2 2 6.48 2 12c0 1.85.5 3.58 1.36 5.07L2 22l5.06-1.33A9.94 9.94 0 0 0 12.01 22C17.53 22 22 17.52 22 12S17.53 2 12.01 2Zm5.4 14.27c-.23.64-1.13 1.18-1.85 1.33-.49.1-1.13.18-3.29-.7-2.76-1.14-4.53-3.92-4.67-4.1-.14-.18-1.12-1.49-1.12-2.84 0-1.35.7-2.01.96-2.28.23-.24.5-.3.66-.3h.48c.16 0 .37-.06.58.44l.7 1.68c.06.14.1.3.02.48-.08.18-.12.3-.24.46-.12.16-.26.35-.37.47-.12.13-.25.27-.11.53.14.26.64 1.05 1.37 1.7.94.84 1.73 1.1 1.99 1.23.26.12.42.1.57-.06.16-.16.65-.75.83-1.01.18-.26.36-.22.6-.13.25.09 1.58.75 1.85.88.27.13.45.2.52.31.07.12.07.66-.16 1.31Z" />
                         </svg>
                         Avisar por WhatsApp
@@ -408,9 +404,9 @@ export default function AdminPedidosPage() {
                         type="button"
                         onClick={() => openWhatsApp(order.customerPhone, orderPaymentMessage(order, settings.storeName))}
                         title={`Preguntarle a ${order.customerName.split(" ")[0]} cómo quiere pagar`}
-                        className="flex cursor-pointer touch-manipulation items-center gap-2 rounded-lg border border-gold-500/30 bg-gold-500/10 px-3 py-2 text-xs font-semibold text-gold-600 shadow-sm transition-all hover:shadow-md"
+                        className="flex cursor-pointer touch-manipulation items-center justify-center gap-1.5 rounded-lg border border-gold-500/30 bg-gold-500/10 px-2.5 py-2.5 text-center text-[11px] font-semibold leading-tight text-gold-600 shadow-sm transition-all hover:shadow-md sm:text-xs"
                       >
-                        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                        <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
                           <rect x="2.5" y="5" width="19" height="14" rx="2.5" />
                           <path d="M2.5 9.5h19" />
                         </svg>
@@ -419,7 +415,7 @@ export default function AdminPedidosPage() {
                       <button
                         type="button"
                         onClick={() => setReciboOrder(order)}
-                        className="cursor-pointer touch-manipulation rounded-lg border border-ink/15 bg-background px-3 py-2 text-xs font-semibold text-ink shadow-sm transition-all hover:shadow-md"
+                        className="col-span-2 cursor-pointer touch-manipulation rounded-lg border border-ink/15 bg-background px-3 py-2.5 text-xs font-semibold text-ink shadow-sm transition-all hover:shadow-md"
                       >
                         Imprimir comprobante
                       </button>
@@ -427,7 +423,7 @@ export default function AdminPedidosPage() {
                         <button
                           type="button"
                           onClick={() => markPaid(order.id, false)}
-                          className="cursor-pointer touch-manipulation rounded-lg border border-ink/15 bg-background px-3 py-2 text-xs font-semibold text-body shadow-sm transition-all hover:shadow-md"
+                          className="col-span-2 cursor-pointer touch-manipulation rounded-lg border border-ink/15 bg-background px-3 py-2.5 text-xs font-semibold text-body shadow-sm transition-all hover:shadow-md"
                         >
                           Marcar como no pagado
                         </button>

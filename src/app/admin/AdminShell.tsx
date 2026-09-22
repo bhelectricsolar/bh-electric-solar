@@ -7,6 +7,7 @@ import { useTheme } from "./ThemeProvider";
 import FullscreenToggle from "@/components/admin/FullscreenToggle";
 import { ICONS, SECTORS, sectorForPath, type Sector } from "@/lib/admin-sectors";
 import { useCurrentTeamMember, useCurrentDeveloper, signOut } from "@/lib/current-user";
+import { useAdminBadges } from "@/lib/admin-badges";
 
 // Las únicas rutas a las que puede entrar alguien que NO es administrador ni desarrollador.
 const RESTRICTED_ALLOWED_PATHS = ["/admin/caja", "/admin/cotizador"];
@@ -138,6 +139,7 @@ function FullAdminShell({
   const pathname = usePathname();
   const { theme, toggle } = useTheme();
   const [moreOpen, setMoreOpen] = useState(false);
+  const badges = useAdminBadges();
 
   const currentSector = sectorForPath(pathname);
   const isActivePath = (href: string) =>
@@ -165,6 +167,7 @@ function FullAdminShell({
         active: isActivePath(item.href),
         accentText: ACCENT_TEXT[currentSector.accent],
         accentBg: ACCENT_BG_SOFT[currentSector.accent],
+        badge: badges[item.href] ?? 0,
       }))
     : SECTORS.map((sector) => ({
         href: sector.items[0]?.href ?? "/admin",
@@ -173,6 +176,7 @@ function FullAdminShell({
         active: false,
         accentText: ACCENT_TEXT[sector.accent],
         accentBg: ACCENT_BG_SOFT[sector.accent],
+        badge: sector.items.reduce((sum, item) => sum + (badges[item.href] ?? 0), 0),
       }));
 
   const needsMore = !!currentSector && currentSector.items.length > 4;
@@ -250,6 +254,7 @@ function FullAdminShell({
               <div className="flex flex-col gap-1">
                 {sector.items.map((item) => {
                   const active = isActivePath(item.href);
+                  const count = badges[item.href] ?? 0;
                   return (
                     <Link
                       key={item.href}
@@ -263,7 +268,8 @@ function FullAdminShell({
                       <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
                         <path d={ICONS[item.icon]} />
                       </svg>
-                      {item.label}
+                      <span className="flex-1">{item.label}</span>
+                      {count > 0 && <NavBadge count={count} />}
                     </Link>
                   );
                 })}
@@ -436,6 +442,7 @@ function FullAdminShell({
                       icon={ICONS[item.icon]}
                       accentText={ACCENT_TEXT[sheetSector.accent]}
                       accentBg={ACCENT_BG_SOFT[sheetSector.accent]}
+                      badge={badges[item.href] ?? 0}
                       onClick={() => setMoreOpen(false)}
                     />
                   ))}
@@ -454,6 +461,7 @@ function FullAdminShell({
                       icon={ICONS[sector.icon]}
                       accentText={ACCENT_TEXT[sector.accent]}
                       accentBg={ACCENT_BG_SOFT[sector.accent]}
+                      badge={sector.items.reduce((sum, item) => sum + (badges[item.href] ?? 0), 0)}
                       onClick={() => setMoreOpen(false)}
                     />
                   ))}
@@ -517,6 +525,7 @@ function BottomTab({
   active,
   accentText,
   accentBg,
+  badge,
 }: {
   href: string;
   label: string;
@@ -524,6 +533,7 @@ function BottomTab({
   active: boolean;
   accentText: string;
   accentBg: string;
+  badge?: number;
 }) {
   return (
     <Link
@@ -532,10 +542,11 @@ function BottomTab({
         active ? accentText : "text-body"
       }`}
     >
-      <span className={`grid h-8 w-11 place-items-center rounded-full transition-colors ${active ? accentBg : "bg-transparent"}`}>
+      <span className={`relative grid h-8 w-11 place-items-center rounded-full transition-colors ${active ? accentBg : "bg-transparent"}`}>
         <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={active ? 2.2 : 1.8} strokeLinecap="round" strokeLinejoin="round">
           <path d={icon} />
         </svg>
+        {!!badge && <NavBadge count={badge} floating />}
       </span>
       {label}
     </Link>
@@ -549,6 +560,7 @@ function MenuCard({
   icon,
   accentText,
   accentBg,
+  badge,
   onClick,
 }: {
   href: string;
@@ -557,14 +569,16 @@ function MenuCard({
   icon: string;
   accentText: string;
   accentBg: string;
+  badge?: number;
   onClick: () => void;
 }) {
   return (
     <Link
       href={href}
       onClick={onClick}
-      className="flex cursor-pointer touch-manipulation flex-col gap-2 rounded-2xl border border-ink/10 bg-background p-4 shadow-sm transition-all active:scale-[0.97]"
+      className="relative flex cursor-pointer touch-manipulation flex-col gap-2 rounded-2xl border border-ink/10 bg-background p-4 shadow-sm transition-all active:scale-[0.97]"
     >
+      {!!badge && <NavBadge count={badge} floating />}
       <span className={`grid h-10 w-10 place-items-center rounded-xl ${accentBg} ${accentText}`}>
         <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
           <path d={icon} />
@@ -573,6 +587,20 @@ function MenuCard({
       <span className="text-sm font-bold text-ink">{label}</span>
       <span className="text-[11px] leading-snug text-body">{description}</span>
     </Link>
+  );
+}
+
+// Aviso minimalista de "esto necesita atención" — un número chico en rojo,
+// o flotando en la esquina cuando va sobre un ícono.
+function NavBadge({ count, floating }: { count: number; floating?: boolean }) {
+  return (
+    <span
+      className={`grid min-w-[1.1rem] place-items-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white ${
+        floating ? "absolute -right-0.5 -top-0.5 h-[1.1rem] shadow-[0_0_0_2px_var(--color-surface)]" : "h-[1.1rem]"
+      }`}
+    >
+      {count > 9 ? "9+" : count}
+    </span>
   );
 }
 
