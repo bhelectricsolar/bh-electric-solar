@@ -181,9 +181,12 @@ export default function Footer() {
             href="https://zentrixstudios.com"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 transition-colors hover:text-white"
+            className="inline-flex items-center gap-2 transition-colors hover:text-white"
           >
-            Diseñado y desarrollado por Zentrix Studios
+            Diseñado y desarrollado por
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/zentrix-logo.png" alt="Zentrix Studios" className="h-4 w-auto" />
+            <span className="font-semibold">Zentrix Studios</span>
           </a>
         </div>
       </div>
