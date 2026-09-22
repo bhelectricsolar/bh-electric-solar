@@ -1,19 +1,30 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import type { Product } from "@/lib/products";
 import { useCart, buildSingleItemWhatsappUrl } from "@/lib/cart-context";
 
 export default function AddToCartButton({ product }: { product: Product }) {
-  const { addItem } = useCart();
+  const { addItem, closeCart } = useCart();
+  const router = useRouter();
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
+  const [going, setGoing] = useState(false);
   const outOfStock = product.stock <= 0;
 
   function handleAdd() {
     addItem(product, qty);
     setAdded(true);
     window.setTimeout(() => setAdded(false), 1800);
+  }
+
+  // Va directo al pedido con este producto ya cargado, sin pasar por el carrito.
+  function handleBuyNow() {
+    setGoing(true);
+    addItem(product, qty);
+    closeCart();
+    router.push("/tienda/checkout");
   }
 
   return (
@@ -40,13 +51,21 @@ export default function AddToCartButton({ product }: { product: Product }) {
         </div>
         <button
           type="button"
-          onClick={handleAdd}
-          disabled={outOfStock}
-          className="flex-1 rounded-lg bg-navy-900 px-6 py-3.5 text-sm font-semibold text-white shadow-[0_15px_40px_-12px_rgba(12,24,48,0.55)] transition-all hover:-translate-y-0.5 hover:bg-navy-800 disabled:cursor-not-allowed disabled:translate-y-0 disabled:bg-ink/20 disabled:shadow-none"
+          onClick={handleBuyNow}
+          disabled={outOfStock || going}
+          className="flex-1 rounded-lg bg-gold-500 px-6 py-3.5 text-sm font-bold text-navy-950 shadow-[0_15px_40px_-12px_rgba(245,154,31,0.5)] transition-all hover:-translate-y-0.5 hover:brightness-105 disabled:cursor-not-allowed disabled:translate-y-0 disabled:bg-ink/20 disabled:text-ink/30 disabled:shadow-none"
         >
-          {added ? "✓ Agregado al carrito" : "Agregar al carrito"}
+          {going ? "Yendo al pedido…" : "Comprar ahora"}
         </button>
       </div>
+      <button
+        type="button"
+        onClick={handleAdd}
+        disabled={outOfStock}
+        className="rounded-lg border border-ink/15 bg-white px-6 py-3 text-sm font-semibold text-ink shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-40"
+      >
+        {added ? "✓ Agregado al carrito" : "Agregar al carrito"}
+      </button>
       <a
         href={buildSingleItemWhatsappUrl(product, qty)}
         target="_blank"

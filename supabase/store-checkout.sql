@@ -94,15 +94,8 @@ begin
   insert into order_items (order_id, product_id, qty)
     select v_id, l->>'id', (l->>'qty')::int from jsonb_array_elements(v_lines) l;
 
-  -- Deja al cliente como lead para el seguimiento (sin duplicar si ya existe).
-  if not exists (
-    select 1 from customers
-    where (v_email <> '' and lower(email) = lower(v_email))
-       or regexp_replace(phone, '\D', '', 'g') = regexp_replace(v_phone, '\D', '', 'g')
-  ) then
-    insert into customers (name, email, phone, city, status, source)
-    values (v_name, v_email, v_phone, v_city, 'lead', 'Tienda');
-  end if;
+  -- No se crea un lead: el pedido de la tienda queda solo en Pedidos, no
+  -- se mezcla con la lista de Leads.
 
   return jsonb_build_object('id', v_id, 'subtotal_usd', v_sub, 'shipping_usd', v_ship, 'total_usd', v_sub + v_ship);
 end;

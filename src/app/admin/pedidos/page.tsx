@@ -12,6 +12,7 @@ import {
   PAYMENT_LINE_METHODS,
   getOrderItemsWithProduct,
   orderStatusMessage,
+  orderPaymentMessage,
   type Order,
   type OrderOrigin,
   type OrderStatus,
@@ -353,6 +354,18 @@ export default function AdminPedidosPage() {
                           <path d="M12.01 2C6.48 2 2 6.48 2 12c0 1.85.5 3.58 1.36 5.07L2 22l5.06-1.33A9.94 9.94 0 0 0 12.01 22C17.53 22 22 17.52 22 12S17.53 2 12.01 2Zm5.4 14.27c-.23.64-1.13 1.18-1.85 1.33-.49.1-1.13.18-3.29-.7-2.76-1.14-4.53-3.92-4.67-4.1-.14-.18-1.12-1.49-1.12-2.84 0-1.35.7-2.01.96-2.28.23-.24.5-.3.66-.3h.48c.16 0 .37-.06.58.44l.7 1.68c.06.14.1.3.02.48-.08.18-.12.3-.24.46-.12.16-.26.35-.37.47-.12.13-.25.27-.11.53.14.26.64 1.05 1.37 1.7.94.84 1.73 1.1 1.99 1.23.26.12.42.1.57-.06.16-.16.65-.75.83-1.01.18-.26.36-.22.6-.13.25.09 1.58.75 1.85.88.27.13.45.2.52.31.07.12.07.66-.16 1.31Z" />
                         </svg>
                         Avisar por WhatsApp
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openWhatsApp(order.customerPhone, orderPaymentMessage(order, settings.storeName))}
+                        title={`Preguntarle a ${order.customerName.split(" ")[0]} cómo quiere pagar`}
+                        className="flex cursor-pointer touch-manipulation items-center gap-2 rounded-lg border border-gold-500/30 bg-gold-500/10 px-3 py-2 text-xs font-semibold text-gold-600 shadow-sm transition-all hover:shadow-md"
+                      >
+                        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="2.5" y="5" width="19" height="14" rx="2.5" />
+                          <path d="M2.5 9.5h19" />
+                        </svg>
+                        Coordinar el pago
                       </button>
                       <button
                         type="button"

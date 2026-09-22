@@ -82,9 +82,13 @@ function RestrictedShell({
           <button
             type="button"
             onClick={() => signOut()}
-            className="cursor-pointer touch-manipulation rounded-lg border border-ink/15 bg-background px-3 py-2 text-xs font-semibold text-ink shadow-sm hover:shadow-md"
+            title="Cerrar sesión"
+            aria-label="Cerrar sesión"
+            className="grid h-9 w-9 cursor-pointer touch-manipulation place-items-center rounded-lg border border-ink/15 bg-background text-red-500 shadow-sm hover:shadow-md"
           >
-            Cerrar sesión
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3M15 16l4-4-4-4M19 12H9" />
+            </svg>
           </button>
         </div>
       </header>
@@ -292,28 +296,37 @@ function FullAdminShell({
           </div>
         )}
 
-        <div className="flex shrink-0 flex-col gap-1 border-t border-ink/10 p-5">
+        <div className="flex shrink-0 items-center gap-1 border-t border-ink/10 p-3">
           <button
             type="button"
             onClick={toggle}
-            className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-ink hover:bg-cream-200"
+            title={theme === "dark" ? "Tema claro" : "Tema oscuro"}
+            aria-label={theme === "dark" ? "Tema claro" : "Tema oscuro"}
+            className="grid h-9 w-9 cursor-pointer touch-manipulation place-items-center rounded-lg text-ink hover:bg-cream-200"
           >
             <ThemeIcon theme={theme} />
-            {theme === "dark" ? "Tema claro" : "Tema oscuro"}
           </button>
-          <FullscreenToggle />
+          <FullscreenToggle compact />
           <Link
             href="/"
-            className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-xs font-medium text-body hover:bg-cream-200"
+            title="Volver al sitio"
+            aria-label="Volver al sitio"
+            className="grid h-9 w-9 place-items-center rounded-lg text-body hover:bg-cream-200"
           >
-            ← Volver al sitio
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 11.5 12 4l9 7.5M5.5 10v9a1 1 0 0 0 1 1H9v-6h6v6h2.5a1 1 0 0 0 1-1v-9" />
+            </svg>
           </Link>
           <button
             type="button"
             onClick={() => signOut()}
-            className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-xs font-medium text-red-500 hover:bg-red-500/10"
+            title="Cerrar sesión"
+            aria-label="Cerrar sesión"
+            className="ml-auto grid h-9 w-9 cursor-pointer touch-manipulation place-items-center rounded-lg text-red-500 hover:bg-red-500/10"
           >
-            Cerrar sesión
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3M15 16l4-4-4-4M19 12H9" />
+            </svg>
           </button>
         </div>
       </aside>

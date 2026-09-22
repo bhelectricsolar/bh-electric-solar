@@ -90,6 +90,17 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   combinado: "Pago combinado",
 };
 
+// Mensaje para coordinar cómo va a pagar — el pago no se hace desde la
+// tienda, así que hace falta preguntarlo aparte.
+export function orderPaymentMessage(order: Order, storeName: string) {
+  const firstName = order.customerName.split(" ")[0];
+  const total = order.totalUSD ? ` (total US$ ${Math.round(order.totalUSD)})` : "";
+  return (
+    `Hola ${firstName}! Te escribimos de ${storeName} por tu pedido ${order.id}${total}. ` +
+    "¿Cómo te gustaría abonarlo — transferencia, tarjeta, efectivo u otra forma? Así coordinamos y avanzamos con tu pedido."
+  );
+}
+
 export function orderStatusMessage(order: Order, storeName: string) {
   const firstName = order.customerName.split(" ")[0];
   switch (order.status) {

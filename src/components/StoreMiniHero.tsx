@@ -62,7 +62,7 @@ export default async function StoreMiniHero() {
         </div>
 
         {featured.length > 0 ? (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
             {featured.map((p) => (
               <Link
                 key={p.id}
@@ -78,9 +78,9 @@ export default async function StoreMiniHero() {
                     className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                   />
                 </div>
-                <div className="p-3.5">
-                  <p className="line-clamp-2 text-sm font-semibold leading-snug">{p.name}</p>
-                  <p className="font-data mt-1.5 text-base font-extrabold text-gold-400">{formatUSD(p.priceUSD)}</p>
+                <div className="p-2 sm:p-3.5">
+                  <p className="line-clamp-2 text-[11px] font-semibold leading-snug sm:text-sm">{p.name}</p>
+                  <p className="font-data mt-1 text-xs font-extrabold text-gold-400 sm:mt-1.5 sm:text-base">{formatUSD(p.priceUSD)}</p>
                 </div>
               </Link>
             ))}
