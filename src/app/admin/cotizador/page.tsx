@@ -10,6 +10,7 @@ import { readBarChart, type Region } from "@/lib/chart-ocr";
 import SectorEyebrow from "@/components/admin/SectorEyebrow";
 import StatusBadge from "@/components/admin/StatusBadge";
 import Chip from "@/components/admin/Chip";
+import DevToggle from "@/components/admin/DevToggle";
 import { useAdminSettings } from "@/lib/admin-settings";
 import { useCurrentTeamMember, useCurrentDeveloper } from "@/lib/current-user";
 import { getDevTeamMemberIds } from "@/lib/team";
@@ -1341,12 +1342,12 @@ function CotizadorInner() {
             )}
           </div>
           {developer && (
-            <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-violet-500/25 bg-violet-500/10 px-3 py-2.5">
-              <Chip active={showDevQuotes} onClick={() => setShowDevQuotes((v) => !v)}>
-                Incluir mis cotizaciones de prueba
-              </Chip>
-              <span className="text-[11px] text-body">Solo las ves vos — el dueño no las ve.</span>
-            </div>
+            <DevToggle
+              active={showDevQuotes}
+              onClick={() => setShowDevQuotes((v) => !v)}
+              label="Incluir mis cotizaciones de prueba"
+              caption="Solo las ves vos — el dueño no las ve."
+            />
           )}
           {projectMsg && <p className="mt-2 text-xs font-semibold text-red-500">{projectMsg}</p>}
           <div className="mt-3 grid gap-3 md:grid-cols-2">

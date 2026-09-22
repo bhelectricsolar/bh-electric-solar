@@ -17,7 +17,7 @@ import { pickField } from "@/lib/csv-import";
 import ImportButton from "@/components/admin/ImportButton";
 import SectorEyebrow from "@/components/admin/SectorEyebrow";
 import StatusBadge from "@/components/admin/StatusBadge";
-import Chip from "@/components/admin/Chip";
+import DevToggle from "@/components/admin/DevToggle";
 
 const EMPTY_DRAFT = { name: "", email: "", phone: "", city: "" };
 
@@ -161,12 +161,12 @@ export default function AdminClientesPage() {
         />
 
         {developer && (
-          <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-violet-500/25 bg-violet-500/10 px-3 py-2.5">
-            <Chip active={showDev} onClick={() => setShowDev((v) => !v)}>
-              Incluir mis clientes de prueba
-            </Chip>
-            <span className="text-[11px] text-body">Solo las ves vos — el dueño no las ve.</span>
-          </div>
+          <DevToggle
+            active={showDev}
+            onClick={() => setShowDev((v) => !v)}
+            label="Incluir mis clientes de prueba"
+            caption="Solo las ves vos — el dueño no las ve."
+          />
         )}
 
         <div className="mt-4 flex flex-col gap-3">

@@ -74,7 +74,7 @@ export default function Projects() {
           {PROJECTS.map((project) => (
             <article
               key={project.title}
-              className="premium-card group overflow-hidden rounded-2xl border border-ink/10 bg-white transition-all hover:-translate-y-1 hover:shadow-[0_30px_60px_-25px_rgba(245,154,31,0.3)]"
+              className="premium-card group overflow-hidden rounded-2xl border border-ink/10 bg-white transition-all duration-150 hover:-translate-y-1 hover:shadow-[0_30px_60px_-25px_rgba(245,154,31,0.3)] active:translate-y-0 active:scale-[0.98] active:border-gold-400/60 active:shadow-[0_0_0_4px_rgba(245,154,31,0.25)]"
             >
               <div className={`relative h-52 overflow-hidden bg-gradient-to-br sm:h-56 ${project.gradient}`}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}

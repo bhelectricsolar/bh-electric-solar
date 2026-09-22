@@ -21,6 +21,7 @@ import { getShippingZones, type ShippingZone } from "@/lib/shipping";
 import { useLiveRefresh } from "@/lib/realtime";
 import { computeStats, rangeBounds, RANGE_OPTIONS, type Range } from "@/lib/dashboard-stats";
 import Chip from "@/components/admin/Chip";
+import DevToggle from "@/components/admin/DevToggle";
 import StatusBadge from "@/components/admin/StatusBadge";
 
 const LEAD_STALE_DAYS = 3;
@@ -200,12 +201,12 @@ export default function AdminPage() {
         ) : (
           <>
             {developer && (
-              <div className="mt-6 flex flex-wrap items-center gap-2 rounded-xl border border-violet-500/25 bg-violet-500/10 px-3 py-2.5">
-                <Chip active={showDev} onClick={() => setShowDev((v) => !v)}>
-                  Incluir mis pruebas (ventas, leads, clientes y proyectos)
-                </Chip>
-                <span className="text-[11px] text-body">Solo las ves vos — el dueño no las ve.</span>
-              </div>
+              <DevToggle
+                active={showDev}
+                onClick={() => setShowDev((v) => !v)}
+                label="Incluir mis pruebas (ventas, leads, clientes y proyectos)"
+                caption="Solo las ves vos — el dueño no las ve."
+              />
             )}
 
             <div className="mt-6 flex flex-wrap gap-2">

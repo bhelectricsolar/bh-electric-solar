@@ -67,7 +67,7 @@ export default async function StoreMiniHero() {
               <Link
                 key={p.id}
                 href={`/tienda/${p.slug}`}
-                className="group overflow-hidden rounded-2xl border border-white/10 bg-white/[0.06] shadow-[0_10px_24px_-14px_rgba(0,0,0,0.5),0_0_34px_-14px_rgba(245,154,31,0.5)] backdrop-blur transition-all hover:-translate-y-1 hover:border-gold-500/50 hover:shadow-[0_14px_30px_-14px_rgba(0,0,0,0.5),0_0_50px_-8px_rgba(245,154,31,0.85)]"
+                className="group overflow-hidden rounded-2xl border border-white/10 bg-white/[0.06] shadow-[0_10px_24px_-14px_rgba(0,0,0,0.5),0_0_34px_-14px_rgba(245,154,31,0.5)] backdrop-blur transition-all duration-150 hover:-translate-y-1 hover:border-gold-500/50 hover:shadow-[0_14px_30px_-14px_rgba(0,0,0,0.5),0_0_50px_-8px_rgba(245,154,31,0.85)] active:translate-y-0 active:scale-[0.96] active:border-gold-400/70 active:shadow-[0_0_0_4px_rgba(245,154,31,0.3)]"
               >
                 <div className="aspect-square overflow-hidden bg-white">
                   {/* eslint-disable-next-line @next/next/no-img-element */}

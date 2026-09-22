@@ -68,19 +68,42 @@ export default function Hero() {
             </div>
 
             <p className="mt-5 text-xs font-medium text-body">Tu factura de luz, antes y después</p>
-            <div className="mt-2 flex flex-wrap items-end gap-x-3 gap-y-1">
-              <span className="font-data text-xl font-semibold text-body/60 line-through decoration-red-400/70 decoration-2">
-                $85.000
-              </span>
-              <svg viewBox="0 0 24 24" className="mb-1.5 h-4 w-4 shrink-0 text-body/50" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
-                <path d="M5 12h14M13 6l6 6-6 6" />
-              </svg>
-              <span className="font-data text-4xl font-extrabold text-ink sm:text-5xl">$12.400</span>
-              <span className="mb-1.5 rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-bold text-emerald-600">
-                −85%
-              </span>
+            <div className="relative mt-2.5 overflow-hidden rounded-xl border border-white/10 bg-navy-950 p-4">
+              <div
+                className="pointer-events-none absolute inset-0 opacity-[0.12] [background-image:linear-gradient(rgba(255,255,255,0.6)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.6)_1px,transparent_1px)] [background-size:14px_14px]"
+                aria-hidden
+              />
+              <div className="relative flex flex-col gap-2.5">
+                <div>
+                  <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.12em] text-white/45">
+                    <span>Antes</span>
+                    <span className="font-data text-xs text-white/70">$85.000</span>
+                  </div>
+                  <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-white/10">
+                    <div className="h-full w-full rounded-full bg-gradient-to-r from-red-500/60 to-red-400/70" />
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.12em] text-gold-300">
+                    <span>Después</span>
+                    <span className="font-data text-xs text-gold-300">$12.400</span>
+                  </div>
+                  <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-white/10">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-gold-400 to-gold-300 shadow-[0_0_12px_rgba(245,154,31,0.85)]"
+                      style={{ width: "15%" }}
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="relative mt-3 flex items-center justify-between border-t border-white/10 pt-2.5">
+                <span className="text-[10px] font-medium text-white/45">Reducción medida</span>
+                <span className="rounded-full bg-emerald-500/20 px-2.5 py-1 text-xs font-bold text-emerald-300">
+                  −85%
+                </span>
+              </div>
             </div>
-            <p className="mt-1.5 text-xs text-body">
+            <p className="mt-2 text-xs text-body">
               Ahorro de <span className="font-data font-semibold text-ink">$52.360/mes</span> con un sistema de 3,2 kWp
             </p>
 

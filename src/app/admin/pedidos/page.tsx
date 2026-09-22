@@ -6,6 +6,7 @@ import {
   createOrder,
   updateOrderStatus,
   updateOrderPaid,
+  deleteOrder,
   ORDER_STATUS_LABELS,
   ORDER_STATUS_TONE,
   ORDER_ORIGIN_LABELS,
@@ -51,6 +52,7 @@ export default function AdminPedidosPage() {
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [reciboOrder, setReciboOrder] = useState<Order | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [originFilter, setOriginFilter] = useState<OriginFilter>("todos");
 
   const [manualOpen, setManualOpen] = useState(false);
@@ -83,6 +85,13 @@ export default function AdminPedidosPage() {
   async function markPaid(id: string, paid: boolean) {
     setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, paid } : o)));
     await updateOrderPaid(id, paid);
+  }
+
+  async function handleDelete(id: string) {
+    await deleteOrder(id);
+    setOrders((prev) => prev.filter((o) => o.id !== id));
+    setConfirmDeleteId(null);
+    if (expandedId === id) setExpandedId(null);
   }
 
   function orderTotal(order: Order) {
@@ -428,6 +437,35 @@ export default function AdminPedidosPage() {
                           className="col-span-2 cursor-pointer touch-manipulation rounded-lg border border-ink/15 bg-background px-3 py-2.5 text-xs font-semibold text-body shadow-sm transition-all hover:shadow-md"
                         >
                           Marcar como no pagado
+                        </button>
+                      )}
+                      {confirmDeleteId === order.id ? (
+                        <div className="col-span-2 flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/5 px-3 py-2">
+                          <p className="flex-1 text-[11px] font-semibold text-red-500">
+                            ¿Eliminar este pedido? No se puede deshacer.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(order.id)}
+                            className="cursor-pointer touch-manipulation rounded-lg bg-red-500 px-3 py-2 text-xs font-bold text-white"
+                          >
+                            Sí
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteId(null)}
+                            className="cursor-pointer touch-manipulation rounded-lg bg-cream-200 px-3 py-2 text-xs font-semibold text-ink"
+                          >
+                            No
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDeleteId(order.id)}
+                          className="col-span-2 cursor-pointer touch-manipulation rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2.5 text-xs font-semibold text-red-500 shadow-sm transition-all hover:shadow-md"
+                        >
+                          Eliminar pedido
                         </button>
                       )}
                     </div>

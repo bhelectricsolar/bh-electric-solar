@@ -81,7 +81,7 @@ export default function Header() {
               key={link.label}
               href={link.href}
               onClick={() => setOpen(false)}
-              className="menu-link flex w-full items-center justify-between gap-2 rounded-xl border border-ink/10 bg-white/70 px-3.5 py-3.5 text-sm font-semibold text-navy-900 shadow-sm"
+              className="menu-link flex w-full items-center justify-between gap-2 rounded-xl border border-ink/10 bg-white/70 px-3.5 py-3.5 text-sm font-semibold text-navy-900 shadow-sm transition-all duration-150 active:scale-[0.97] active:border-gold-400/60 active:bg-gold-500/10 active:shadow-none"
             >
               {link.label}
               <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-navy-900/35" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">

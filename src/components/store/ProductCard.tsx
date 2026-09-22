@@ -18,7 +18,7 @@ export default function ProductCard({
   const outOfStock = product.stock <= 0;
 
   return (
-    <article className="premium-card group flex flex-col overflow-hidden rounded-2xl border border-ink/10 bg-white transition-all hover:-translate-y-1 hover:border-ink/20 hover:shadow-[0_30px_60px_-25px_rgba(245,154,31,0.35)]">
+    <article className="premium-card group flex flex-col overflow-hidden rounded-2xl border border-ink/10 bg-white transition-all duration-150 hover:-translate-y-1 hover:border-ink/20 hover:shadow-[0_30px_60px_-25px_rgba(245,154,31,0.35)] active:translate-y-0 active:scale-[0.97] active:border-gold-400/60 active:shadow-[0_0_0_4px_rgba(245,154,31,0.25)]">
       <Link href={`/tienda/${product.slug}`} className="block">
         <div
           className={`relative flex h-44 items-start justify-between overflow-hidden p-3 transition-transform duration-500 group-hover:scale-[1.03] ${

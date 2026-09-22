@@ -25,6 +25,7 @@ import { useAdminSettings } from "@/lib/admin-settings";
 import PrintDocument from "@/components/admin/PrintDocument";
 import SectorEyebrow from "@/components/admin/SectorEyebrow";
 import Chip from "@/components/admin/Chip";
+import DevToggle from "@/components/admin/DevToggle";
 import StatusSelect from "@/components/admin/StatusSelect";
 import StatusBadge from "@/components/admin/StatusBadge";
 
@@ -227,12 +228,12 @@ export default function AdminProyectosPage() {
         </div>
 
         {developer && (
-          <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-violet-500/25 bg-violet-500/10 px-3 py-2.5">
-            <Chip active={showDev} onClick={() => setShowDev((v) => !v)}>
-              Incluir mis proyectos de prueba
-            </Chip>
-            <span className="text-[11px] text-body">Solo los ves vos — el dueño no los ve.</span>
-          </div>
+          <DevToggle
+            active={showDev}
+            onClick={() => setShowDev((v) => !v)}
+            label="Incluir mis proyectos de prueba"
+            caption="Solo los ves vos — el dueño no los ve."
+          />
         )}
 
         <div className="mt-5 flex flex-col gap-3">

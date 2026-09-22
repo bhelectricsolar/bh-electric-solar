@@ -292,6 +292,18 @@ export async function updateOrderStatus(id: string, status: OrderStatus) {
   if (error) throw error;
 }
 
+// Borra el pedido y todo lo que depende de él (ítems y pagos). No repone
+// stock automáticamente: si el pedido ya había descontado stock al vender,
+// hay que ajustarlo a mano en Stock si corresponde.
+export async function deleteOrder(id: string) {
+  const { error: paymentsError } = await supabase.from("order_payments").delete().eq("order_id", id);
+  if (paymentsError) throw paymentsError;
+  const { error: itemsError } = await supabase.from("order_items").delete().eq("order_id", id);
+  if (itemsError) throw itemsError;
+  const { error } = await supabase.from("orders").delete().eq("id", id);
+  if (error) throw error;
+}
+
 // Recién al marcarlo pagado un pedido de la tienda entra en los resúmenes
 // de ventas (Inicio y Reportes).
 export async function updateOrderPaid(id: string, paid: boolean) {
