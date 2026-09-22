@@ -4,6 +4,7 @@ import CornerFrame from "./CornerFrame";
 import GlowOrb from "./GlowOrb";
 
 const MONTH_BARS = [38, 52, 61, 70, 84, 94];
+const MONTH_LABELS = ["Abr", "May", "Jun", "Jul", "Ago", "Sep"];
 
 const PROOF_STATS = [
   { value: "1.2–80", unit: "kWp", label: "Rango de sistemas dimensionados" },
@@ -56,38 +57,56 @@ export default function Hero() {
 
           <CornerFrame className="rounded-2xl border border-white/60 bg-white/70 p-6 shadow-[0_30px_70px_-25px_rgba(12,24,48,0.4)] backdrop-blur-md sm:backdrop-blur-xl sm:p-7">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wide text-body">
-                Ejemplo de estimación
+              <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-body">
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+                </span>
+                Ejemplo real
               </span>
               <span className="rounded-full bg-cream-100 px-3 py-1 text-[11px] font-semibold text-ink">
                 NEA · Misiones
               </span>
             </div>
 
-            <p className="mt-4 text-xs font-medium text-body">
-              Ahorro mensual estimado
-            </p>
-            <p className="font-data mt-1 text-4xl font-semibold text-ink sm:text-5xl">
-              $52.360
+            <p className="mt-5 text-xs font-medium text-body">Tu factura de luz, antes y después</p>
+            <div className="mt-2 flex flex-wrap items-end gap-x-3 gap-y-1">
+              <span className="font-data text-xl font-semibold text-body/60 line-through decoration-red-400/70 decoration-2">
+                $85.000
+              </span>
+              <svg viewBox="0 0 24 24" className="mb-1.5 h-4 w-4 shrink-0 text-body/50" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 12h14M13 6l6 6-6 6" />
+              </svg>
+              <span className="font-data text-4xl font-extrabold text-ink sm:text-5xl">$12.400</span>
+              <span className="mb-1.5 rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-bold text-emerald-600">
+                −85%
+              </span>
+            </div>
+            <p className="mt-1.5 text-xs text-body">
+              Ahorro de <span className="font-data font-semibold text-ink">$52.360/mes</span> con un sistema de 3,2 kWp
             </p>
 
             <div className="mt-6 flex h-24 items-end gap-2">
               {MONTH_BARS.map((value, index) => (
-                <div
-                  key={index}
-                  className={`flex-1 rounded-t-[3px] ${
-                    index === MONTH_BARS.length - 1
-                      ? "bg-gold-500 shadow-[0_0_18px_rgba(245,154,31,0.6)]"
-                      : "bg-navy-900/10"
-                  }`}
-                  style={{ height: `${value}%` }}
-                />
+                <div key={index} className="flex flex-1 flex-col items-center gap-1.5">
+                  <div
+                    className={`w-full rounded-t-[3px] transition-all ${
+                      index === MONTH_BARS.length - 1
+                        ? "bg-gold-500 shadow-[0_0_18px_rgba(245,154,31,0.6)]"
+                        : "bg-navy-900/10"
+                    }`}
+                    style={{ height: `${value}%` }}
+                  />
+                  <span className={`text-[9px] font-medium ${index === MONTH_BARS.length - 1 ? "text-gold-600" : "text-body/50"}`}>
+                    {MONTH_LABELS[index]}
+                  </span>
+                </div>
               ))}
             </div>
 
-            <div className="mt-6 grid grid-cols-3 gap-2 border-t border-ink/10 pt-5">
+            <div className="mt-4 grid grid-cols-3 gap-2 border-t border-ink/10 pt-5">
               <div>
-                <p className="font-data text-sm font-semibold text-ink">3.2 kWp</p>
+                <p className="font-data text-sm font-semibold text-ink">3,2 kWp</p>
                 <p className="text-[11px] text-body">Sistema</p>
               </div>
               <div>
@@ -102,10 +121,11 @@ export default function Hero() {
 
             <Link
               href="/calculadora-solar"
-              className="mt-6 flex items-center justify-center gap-1.5 rounded-lg bg-cream-100 py-3 text-sm font-semibold text-ink transition-colors hover:bg-cream-200"
+              className="mt-6 flex items-center justify-center gap-1.5 rounded-lg bg-gold-500 py-3.5 text-sm font-bold text-navy-950 shadow-[0_15px_35px_-12px_rgba(245,154,31,0.6)] transition-all hover:-translate-y-0.5"
             >
-              Calculá el tuyo →
+              Calculá tu ahorro real en 2 minutos →
             </Link>
+            <p className="mt-2.5 text-center text-[11px] text-body">🔒 Gratis, sin compromiso</p>
           </CornerFrame>
         </div>
       </div>

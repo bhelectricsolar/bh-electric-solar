@@ -177,7 +177,14 @@ export default function Footer() {
               Términos
             </Link>
           </p>
-          <p>Diseñado y desarrollado por Zentrix Studios</p>
+          <a
+            href="https://zentrixstudios.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 transition-colors hover:text-white"
+          >
+            Diseñado y desarrollado por Zentrix Studios
+          </a>
         </div>
       </div>
     </footer>
