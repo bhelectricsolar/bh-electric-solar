@@ -255,6 +255,18 @@ button:disabled {
   overscroll-behavior: contain;
 }
 
+/* En celular cada menú que se despliega (hoja inferior) lleva un contorno
+   simple de todo su ancho, para que se distinga bien del fondo oscurecido. */
+@media (max-width: 639.98px) {
+  [data-sheet="side"] > div {
+    border-left: 1px solid var(--color-border-token);
+  }
+  [data-sheet]:not([data-sheet="side"]) > div {
+    border: 1px solid var(--color-border-token);
+    border-bottom: none;
+  }
+}
+
 /* Colores nativos según el tema: sin esto, en iPhone las listas
    desplegables se ven blancas con letra clara (ilegible) en modo oscuro. */
 :root {

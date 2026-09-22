@@ -60,6 +60,9 @@ export type Order = {
   shippingCostUSD?: number;
   totalUSD?: number;
   notes?: string;
+  // Los pedidos hechos desde la tienda online empiezan sin pagar: hasta que
+  // no se marcan como pagados no entran en los resúmenes de ventas.
+  paid: boolean;
 };
 
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
@@ -141,6 +144,7 @@ type OrderRow = {
   shipping_cost_usd?: number | null;
   total_usd?: number | null;
   notes?: string | null;
+  paid?: boolean | null;
 };
 
 type OrderItemRow = { order_id: string; product_id: string; qty: number };
@@ -196,6 +200,7 @@ function fromRows(order: OrderRow, items: OrderItemRow[], payments: OrderPayment
     shippingCostUSD: order.shipping_cost_usd != null ? Number(order.shipping_cost_usd) : undefined,
     totalUSD: order.total_usd != null ? Number(order.total_usd) : undefined,
     notes: order.notes ?? undefined,
+    paid: order.paid !== false,
   };
 }
 
@@ -269,6 +274,13 @@ export async function createOrder(order: Order) {
 
 export async function updateOrderStatus(id: string, status: OrderStatus) {
   const { error } = await supabase.from("orders").update({ status }).eq("id", id);
+  if (error) throw error;
+}
+
+// Recién al marcarlo pagado un pedido de la tienda entra en los resúmenes
+// de ventas (Inicio y Reportes).
+export async function updateOrderPaid(id: string, paid: boolean) {
+  const { error } = await supabase.from("orders").update({ paid }).eq("id", id);
   if (error) throw error;
 }
 

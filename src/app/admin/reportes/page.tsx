@@ -67,7 +67,7 @@ export default function AdminReportesPage() {
       .then(([o, p, pr, devIds]) => {
         // Las ventas de prueba del desarrollador no cuentan en los reportes
         // reales del negocio.
-        setOrders(o.filter((ord) => !devIds.includes(ord.soldBy ?? "")));
+        setOrders(o.filter((ord) => !devIds.includes(ord.soldBy ?? "") && ord.paid !== false));
         setProducts(p);
         setProjects(pr);
       })

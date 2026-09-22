@@ -138,6 +138,7 @@ export default function AdminPage() {
   );
 
   const pendingOrders = orders.filter((o) => o.status === "nuevo" || o.status === "en_proceso").length;
+  const pendingPaymentOrders = orders.filter((o) => !o.paid);
   const lowStockProducts = products.filter((p) => p.stock <= settings.lowStockThreshold);
   const outOfStock = products.filter((p) => p.stock <= 0).length;
   const activeProjects = projects.filter((p) => p.status !== "mantenimiento").length;
@@ -177,6 +178,20 @@ export default function AdminPage() {
 
         {error && (
           <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-600">{error}</p>
+        )}
+
+        {pendingPaymentOrders.length > 0 && (
+          <Link
+            href="/admin/pedidos"
+            className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm transition-all hover:shadow-md"
+          >
+            <span className="font-semibold text-red-600">
+              {pendingPaymentOrders.length} pedido{pendingPaymentOrders.length > 1 ? "s" : ""} de la tienda con pago pendiente
+            </span>
+            <span className="text-xs font-semibold text-red-600/80">
+              No suman en los resúmenes todavía — revisalos en Pedidos →
+            </span>
+          </Link>
         )}
 
         {loading ? (

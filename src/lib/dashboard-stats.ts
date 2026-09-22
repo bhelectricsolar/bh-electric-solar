@@ -99,7 +99,11 @@ export function computeStats(input: {
   closedSessions: CashSession[];
   exchangeRate: number;
 }) {
-  const { orders, prevOrders, products, zones, team, openSessions, closedSessions, exchangeRate } = input;
+  const { products, zones, team, openSessions, closedSessions, exchangeRate } = input;
+  // Un pedido de la tienda sin pagar todavía no es una venta: se excluye de
+  // todos los resúmenes hasta que alguien lo marque como pagado.
+  const orders = input.orders.filter((o) => o.paid !== false);
+  const prevOrders = input.prevOrders.filter((o) => o.paid !== false);
 
   const productById = new Map(products.map((p) => [p.id, p]));
   const zoneById = new Map(zones.map((z) => [z.id, z]));

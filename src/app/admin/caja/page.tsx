@@ -346,6 +346,7 @@ function AdminCajaPageInner() {
         origin: "manual",
         soldBy: member.id,
         createdAt: new Date().toISOString(),
+        paid: true,
       };
       await createOrder(newOrder);
 

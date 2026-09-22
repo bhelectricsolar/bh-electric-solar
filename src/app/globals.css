@@ -252,16 +252,19 @@ body {
   color: var(--color-navy-950);
 }
 
-/* Botones: profundidad de base + glow dorado al pasar el mouse */
+/* Botones: relieve suave + resplandor de color, siempre encendido (no solo
+   al pasar el mouse), más fuerte al tocarlo/pasar el mouse. */
 :where(a, button:not(:disabled))[class*="bg-navy-900"] {
   box-shadow:
     0 2px 0 rgba(255, 255, 255, 0.08) inset,
-    0 10px 24px -10px rgba(12, 24, 48, 0.55);
+    0 6px 16px -8px rgba(12, 24, 48, 0.45),
+    0 0 26px -6px rgba(31, 95, 230, 0.55);
 }
 :where(a, button:not(:disabled))[class*="bg-gold-"] {
   box-shadow:
     0 2px 0 rgba(255, 255, 255, 0.35) inset,
-    0 10px 26px -10px rgba(245, 154, 31, 0.65);
+    0 6px 16px -8px rgba(245, 154, 31, 0.4),
+    0 0 30px -6px rgba(245, 154, 31, 0.85);
 }
 :where(a, button)[class*="bg-navy-900"],
 :where(a, button)[class*="bg-gold-"] {
@@ -276,16 +279,16 @@ body {
     transform: translateY(-2px);
     box-shadow:
       0 0 0 1px rgba(255, 182, 72, 0.5),
-      0 18px 40px -10px rgba(12, 26, 56, 0.65),
-      0 0 30px rgba(245, 154, 31, 0.45);
+      0 10px 22px -10px rgba(12, 26, 56, 0.55),
+      0 0 42px -4px rgba(31, 95, 230, 0.75);
   }
   :where(a, button:not(:disabled))[class*="bg-gold-"]:hover {
     transform: translateY(-2px);
     filter: brightness(1.06);
     box-shadow:
       0 0 0 1px rgba(255, 217, 138, 0.7),
-      0 18px 42px -10px rgba(245, 154, 31, 0.8),
-      0 0 38px rgba(255, 182, 72, 0.6);
+      0 10px 24px -10px rgba(245, 154, 31, 0.5),
+      0 0 48px -2px rgba(245, 154, 31, 1);
   }
 }
 :where(a, button):active[class*="bg-navy-900"],
@@ -349,13 +352,15 @@ body {
 }
 
 /* Tarjetas: sombra en capas, bien presente en reposo, y elevación al pasar
-   el mouse — pensado sobre todo para las tarjetas de la tienda. */
+   el mouse — pensado sobre todo para las tarjetas de la tienda. Lleva
+   relieve (para que se sienta profunda) y un resplandor dorado ambiente
+   detrás, que se enciende del todo al pasar el mouse. */
 .premium-card {
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.9) inset,
-    0 3px 8px rgba(12, 24, 48, 0.07),
-    0 20px 42px -16px rgba(12, 24, 48, 0.32),
-    0 44px 80px -30px rgba(12, 24, 48, 0.32);
+    0 3px 8px rgba(12, 24, 48, 0.06),
+    0 16px 30px -14px rgba(12, 24, 48, 0.28),
+    0 0 46px -20px rgba(245, 154, 31, 0.55);
   transition:
     box-shadow 0.35s ease,
     transform 0.35s ease,
@@ -364,23 +369,24 @@ body {
 @media (hover: hover) {
   .premium-card:hover {
     transform: translateY(-5px);
-    border-color: rgba(245, 154, 31, 0.5);
+    border-color: rgba(245, 154, 31, 0.55);
     box-shadow:
       0 1px 0 rgba(255, 255, 255, 0.9) inset,
-      0 6px 14px rgba(12, 24, 48, 0.09),
-      0 32px 58px -18px rgba(12, 24, 48, 0.45),
-      0 0 0 1px rgba(245, 154, 31, 0.25),
-      0 0 50px -8px rgba(245, 154, 31, 0.45);
+      0 4px 10px rgba(12, 24, 48, 0.07),
+      0 22px 40px -16px rgba(12, 24, 48, 0.32),
+      0 0 0 1px rgba(245, 154, 31, 0.3),
+      0 0 70px -14px rgba(245, 154, 31, 0.85);
   }
 }
 
 /* Superficie secundaria: cajas de precio, resúmenes, imagen del producto —
-   sombra propia más suave que la de las tarjetas principales. */
+   mismo relieve + resplandor, más suave que el de la tarjeta principal. */
 .premium-surface {
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.85) inset,
     0 2px 6px rgba(12, 24, 48, 0.05),
-    0 16px 32px -18px rgba(12, 24, 48, 0.28);
+    0 12px 26px -16px rgba(12, 24, 48, 0.24),
+    0 0 32px -16px rgba(245, 154, 31, 0.4);
 }
 
 /* Campos: aro dorado al enfocar */

@@ -5,6 +5,7 @@ import {
   getOrders,
   createOrder,
   updateOrderStatus,
+  updateOrderPaid,
   ORDER_STATUS_LABELS,
   ORDER_STATUS_TONE,
   ORDER_ORIGIN_LABELS,
@@ -30,7 +31,7 @@ import SectorEyebrow from "@/components/admin/SectorEyebrow";
 import Chip from "@/components/admin/Chip";
 import StatusBadge from "@/components/admin/StatusBadge";
 
-type OriginFilter = "todos" | OrderOrigin;
+type OriginFilter = "todos" | OrderOrigin | "pendientes";
 
 const EMPTY_MANUAL = {
   customerName: "",
@@ -68,11 +69,19 @@ export default function AdminPedidosPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const visible = orders.filter((o) => originFilter === "todos" || o.origin === originFilter);
+  const visible = orders.filter((o) =>
+    originFilter === "todos" ? true : originFilter === "pendientes" ? !o.paid : o.origin === originFilter,
+  );
 
   async function updateStatus(id: string, status: OrderStatus) {
     setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
     await updateOrderStatus(id, status);
+  }
+
+  // Recién acá el pedido pasa a sumar en los resúmenes de ventas.
+  async function markPaid(id: string, paid: boolean) {
+    setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, paid } : o)));
+    await updateOrderPaid(id, paid);
   }
 
   function orderTotal(order: Order) {
@@ -138,6 +147,7 @@ export default function AdminPedidosPage() {
       origin: "manual",
       soldBy: member?.id ?? null,
       createdAt: new Date().toISOString(),
+      paid: true,
     };
     await createOrder(newOrder);
     setOrders((prev) => [newOrder, ...prev]);
@@ -196,6 +206,11 @@ export default function AdminPedidosPage() {
           <Chip active={originFilter === "manual"} onClick={() => setOriginFilter("manual")} tone="negocio">
             Cargados en el admin ({orders.filter((o) => o.origin === "manual").length})
           </Chip>
+          {orders.some((o) => !o.paid) && (
+            <Chip active={originFilter === "pendientes"} onClick={() => setOriginFilter("pendientes")} tone="danger">
+              Pago pendiente ({orders.filter((o) => !o.paid).length})
+            </Chip>
+          )}
         </div>
 
         <div className="mt-5 flex flex-col gap-3">
@@ -219,6 +234,7 @@ export default function AdminPedidosPage() {
                       <StatusBadge tone={order.origin === "tienda" ? "gold" : "negocio"}>
                         {ORDER_ORIGIN_LABELS[order.origin]}
                       </StatusBadge>
+                      {!order.paid && <StatusBadge tone="danger">Pago pendiente</StatusBadge>}
                     </div>
                     <p className="mt-1 text-xs text-body">
                       {order.customerName} · {order.customerCity}
@@ -236,6 +252,23 @@ export default function AdminPedidosPage() {
 
                 {isOpen && (
                   <div className="border-t border-ink/10 p-5">
+                    {!order.paid && (
+                      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-500/25 bg-red-500/10 p-4">
+                        <div>
+                          <p className="text-sm font-bold text-red-600">Pago pendiente</p>
+                          <p className="mt-0.5 text-xs text-body">
+                            Todavía no cuenta en los resúmenes de ventas. Marcalo pagado apenas confirmes el cobro.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => markPaid(order.id, true)}
+                          className="shrink-0 cursor-pointer touch-manipulation rounded-lg bg-red-500 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition-all hover:shadow-md"
+                        >
+                          Marcar como pagado
+                        </button>
+                      </div>
+                    )}
                     {(order.customerEmail || order.customerAddress || order.notes || order.customerPhone) && (
                       <div className="mb-4 rounded-xl border border-ink/10 bg-background p-4 text-sm">
                         <p className="text-[11px] font-bold uppercase tracking-wide text-body">Datos del cliente</p>
@@ -390,6 +423,15 @@ export default function AdminPedidosPage() {
                       >
                         Imprimir comprobante
                       </button>
+                      {order.paid && order.origin === "tienda" && (
+                        <button
+                          type="button"
+                          onClick={() => markPaid(order.id, false)}
+                          className="cursor-pointer touch-manipulation rounded-lg border border-ink/15 bg-background px-3 py-2 text-xs font-semibold text-body shadow-sm transition-all hover:shadow-md"
+                        >
+                          Marcar como no pagado
+                        </button>
+                      )}
                     </div>
                   </div>
                 )}

@@ -81,14 +81,14 @@ begin
     id, customer_name, customer_phone, customer_city, shipping_zone_id, status,
     payment_method, origin, customer_email, customer_doc, customer_province,
     customer_address, customer_postal, shipping_method, shipping_cost_usd,
-    subtotal_usd, total_usd, notes, payment_notes
+    subtotal_usd, total_usd, notes, payment_notes, paid
   ) values (
     v_id, v_name, v_phone, v_city, v_zone_id, 'nuevo',
     'transferencia', 'tienda', nullif(v_email, ''), nullif(btrim(coalesce(p->>'doc', '')), ''),
     nullif(btrim(coalesce(p->>'province', '')), ''), nullif(v_addr, ''),
     nullif(btrim(coalesce(p->>'postal', '')), ''), v_method, v_ship,
     v_sub, v_sub + v_ship, nullif(left(btrim(coalesce(p->>'notes', '')), 800), ''),
-    'Pago a coordinar con el cliente (pedido hecho desde la tienda online)'
+    'Pago a coordinar con el cliente (pedido hecho desde la tienda online)', false
   );
 
   insert into order_items (order_id, product_id, qty)
