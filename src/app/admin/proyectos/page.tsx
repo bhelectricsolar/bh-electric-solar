@@ -48,8 +48,14 @@ export default function AdminProyectosPage() {
 
   useEffect(() => {
     getCustomers().then(setCustomers).catch(() => {});
-    getSolarQuotes().then(setQuotes).catch(() => {});
-  }, []);
+    // Las cotizaciones sin convertir son privadas de quien las creó — solo
+    // entran acá las mías (para poder armar el proyecto) o las que ya se
+    // convirtieron en un proyecto (para poder mostrarlas junto a él).
+    getSolarQuotes()
+      .then((all) => setQuotes(all.filter((q) => q.projectId || !q.createdBy || q.createdBy === member?.id)))
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [member?.id]);
 
   useEffect(() => {
     Promise.all([getProjects(), getTeam(!!developer), getDevTeamMemberIds()])

@@ -200,11 +200,22 @@ function CotizadorInner() {
       Promise.all([getSolarQuotes(), getDevTeamMemberIds()])
         .then(([all, ids]) => {
           setDevIds(ids);
-          const includeDev = !!developer && showDevQuotes;
-          setQuotes(includeDev ? all : all.filter((q) => !q.createdBy || !ids.includes(q.createdBy)));
+          const includeDevTest = !!developer && showDevQuotes;
+          // Cada cotización es privada de quien la creó — recién se comparte
+          // con el resto del equipo si se convierte en un proyecto real. Las
+          // convertidas siguen el mismo criterio de prueba/real que Proyectos.
+          setQuotes(
+            all.filter((q) => {
+              const mine = !q.createdBy || q.createdBy === member?.id;
+              if (mine) return true;
+              if (!q.projectId) return false;
+              const isDevOwned = !!q.createdBy && ids.includes(q.createdBy);
+              return !isDevOwned || includeDevTest;
+            }),
+          );
         })
         .catch((e) => console.error("Cotizaciones:", e)),
-    [developer, showDevQuotes],
+    [developer, showDevQuotes, member?.id],
   );
 
   useEffect(() => {
@@ -1341,6 +1352,9 @@ function CotizadorInner() {
               </Chip>
             )}
           </div>
+          <p className="mt-1 text-xs text-body">
+            Cada cotización es privada de quien la guardó. Recién se comparte con el resto del equipo al convertirla en proyecto.
+          </p>
           {developer && (
             <DevToggle
               active={showDevQuotes}
