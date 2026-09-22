@@ -17,7 +17,6 @@ export default function Hero() {
     <section id="inicio" className="relative isolate overflow-hidden bg-background px-4 pb-16 pt-14 sm:pt-20">
       <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[520px] bg-dot-grid [mask-image:radial-gradient(ellipse_60%_60%_at_50%_0%,black,transparent)]" />
       <GlowOrb color="#2a4a8a" size={640} opacity={0.6} className="-right-24 top-0" />
-      <GlowOrb color="#f59a1f" size={420} opacity={0.4} className="bottom-0 left-1/3" />
 
       <div className="mx-auto grid max-w-6xl gap-14 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
         <div className="text-center lg:text-left">
