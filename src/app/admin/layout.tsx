@@ -39,7 +39,9 @@ export const metadata: Metadata = {
       { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
       { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
     ],
-    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180" }],
+    // El ícono de iPhone lo pone solo Next desde src/app/apple-icon.png,
+    // igual en todas las páginas (sitio, login y admin) — así da lo mismo
+    // desde cuál la agregues a la pantalla de inicio.
   },
 };
 
