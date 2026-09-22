@@ -68,52 +68,60 @@ export default function Hero() {
             </div>
 
             <p className="mt-5 text-xs font-medium text-body">Tu factura de luz, antes y después</p>
-            <div className="relative mt-2.5 overflow-hidden rounded-xl border border-ink/10 bg-white p-4">
+            <div className="relative mt-2.5 flex items-center gap-4 overflow-hidden rounded-xl border border-ink/10 bg-white p-4">
               <div
                 className="pointer-events-none absolute inset-0 opacity-60 [background-image:linear-gradient(rgba(16,28,61,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(16,28,61,0.05)_1px,transparent_1px)] [background-size:13px_13px]"
                 aria-hidden
               />
-              <span className="pointer-events-none absolute left-2.5 top-2.5 h-2 w-2 border-l border-t border-gold-500/50" aria-hidden />
-              <span className="pointer-events-none absolute right-2.5 top-2.5 h-2 w-2 border-r border-t border-gold-500/50" aria-hidden />
 
-              <div className="relative flex flex-col gap-3">
-                <div>
-                  <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.14em] text-body/55">
-                    <span className="flex items-center gap-1.5">
-                      <span className="h-1 w-1 rounded-full bg-body/35" />
-                      Antes
-                    </span>
-                    <span className="font-data text-xs text-body/70">$85.000</span>
-                  </div>
-                  <div className="mt-1.5 h-[3px] w-full overflow-hidden rounded-full bg-ink/8">
-                    <div className="h-full w-full rounded-full bg-ink/20" />
-                  </div>
-                </div>
-                <div>
-                  <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.14em] text-gold-600">
-                    <span className="flex items-center gap-1.5">
-                      <span className="h-1 w-1 rounded-full bg-gold-500 shadow-[0_0_6px_rgba(245,154,31,0.9)]" />
-                      Después
-                    </span>
-                    <span className="font-data text-xs text-gold-600">$12.400</span>
-                  </div>
-                  <div className="mt-1.5 h-[3px] w-full overflow-hidden rounded-full bg-ink/8">
-                    <div
-                      className="h-full rounded-full bg-gold-500 shadow-[0_0_10px_rgba(245,154,31,0.7)]"
-                      style={{ width: "15%" }}
-                    />
-                  </div>
+              {/* Gauge circular: el foco visual fuerte de la tarjeta */}
+              <div className="relative h-[104px] w-[104px] shrink-0">
+                <div className="absolute inset-1 rounded-full bg-gold-400/25 blur-xl" aria-hidden />
+                <svg viewBox="0 0 100 100" className="relative h-full w-full -rotate-90">
+                  <circle cx="50" cy="50" r="42" fill="none" strokeWidth="9" className="stroke-ink/8" />
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="42"
+                    fill="none"
+                    strokeWidth="9"
+                    strokeLinecap="round"
+                    stroke="url(#heroGaugeGradient)"
+                    strokeDasharray={2 * Math.PI * 42}
+                    strokeDashoffset={2 * Math.PI * 42 * 0.15}
+                    className="drop-shadow-[0_0_8px_rgba(245,154,31,0.75)]"
+                  />
+                  <defs>
+                    <linearGradient id="heroGaugeGradient" x1="0" y1="1" x2="1" y2="0">
+                      <stop offset="0%" stopColor="#d97a0c" />
+                      <stop offset="100%" stopColor="#ffc86b" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="font-data text-2xl font-extrabold leading-none text-ink">−85%</span>
+                  <span className="mt-1 text-[9px] font-bold uppercase tracking-wide text-body/55">factura</span>
                 </div>
               </div>
 
-              <div className="relative mt-3 flex items-center justify-between border-t border-ink/8 pt-2.5">
-                <span className="text-[10px] font-medium uppercase tracking-wide text-body/45">Reducción medida</span>
-                <span className="font-data text-xs font-extrabold text-emerald-600">−85%</span>
+              <div className="relative min-w-0 flex-1">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-body/50">Antes</span>
+                  <span className="font-data text-sm font-semibold text-body/60 line-through decoration-red-400/70 decoration-2">
+                    $85.000
+                  </span>
+                </div>
+                <div className="mt-1.5 flex items-baseline justify-between gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-gold-600">Después</span>
+                  <span className="font-data text-xl font-extrabold text-ink">$12.400</span>
+                </div>
+                <div className="mt-2.5 rounded-lg bg-emerald-500/10 px-2.5 py-1.5 text-center">
+                  <span className="text-[11px] font-bold text-emerald-600">
+                    Ahorrás <span className="font-data">$52.360</span>/mes
+                  </span>
+                </div>
               </div>
             </div>
-            <p className="mt-2 text-xs text-body">
-              Ahorro de <span className="font-data font-semibold text-ink">$52.360/mes</span> con un sistema de 3,2 kWp
-            </p>
 
             <div className="mt-6 flex h-24 items-end gap-2">
               {MONTH_BARS.map((value, index) => (
