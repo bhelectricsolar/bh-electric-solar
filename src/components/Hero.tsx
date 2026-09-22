@@ -128,16 +128,18 @@ export default function Hero() {
         </div>
       </div>
 
-      <div className="mx-auto mt-16 grid max-w-6xl gap-6 border-t border-ink/10 pt-8 sm:grid-cols-3">
+      <div className="mx-auto mt-16 grid max-w-6xl gap-x-8 gap-y-6 border-t border-ink/10 pt-8 text-center sm:grid-cols-3 sm:text-left">
         {PROOF_STATS.map((stat) => (
-          <div key={stat.label} className="flex items-baseline gap-2">
-            <span className="font-data text-2xl font-semibold text-ink">
-              {stat.value}
-            </span>
-            <span className="text-xs font-semibold uppercase tracking-wide text-gold-600">
-              {stat.unit}
-            </span>
-            <span className="ml-auto max-w-[10rem] text-right text-xs leading-snug text-body">
+          <div key={stat.label} className="flex flex-col items-center gap-1 sm:items-start">
+            <div className="flex items-baseline gap-1.5">
+              <span className="font-data text-2xl font-semibold text-ink sm:text-3xl">
+                {stat.value}
+              </span>
+              <span className="text-xs font-semibold uppercase tracking-wide text-gold-600">
+                {stat.unit}
+              </span>
+            </div>
+            <span className="max-w-[14rem] text-xs leading-snug text-body">
               {stat.label}
             </span>
           </div>
