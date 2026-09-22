@@ -12,7 +12,9 @@ export function GET() {
       scope: "/admin",
       display: "standalone",
       orientation: "portrait-primary",
-      background_color: "#f6efe1",
+      // Navy, igual que la pantalla de carga — así el sistema no muestra un
+      // flash blanco/crema al abrir la app instalada antes de que cargue el JS.
+      background_color: "#0c1a38",
       theme_color: "#0c1a38",
       icons: [
         {

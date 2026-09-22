@@ -8,6 +8,7 @@ import FullscreenToggle from "@/components/admin/FullscreenToggle";
 import { ICONS, SECTORS, sectorForPath, type Sector } from "@/lib/admin-sectors";
 import { useCurrentTeamMember, useCurrentDeveloper, signOut } from "@/lib/current-user";
 import { useAdminBadges } from "@/lib/admin-badges";
+import SplashScreen from "@/components/admin/SplashScreen";
 
 // Las únicas rutas a las que puede entrar alguien que NO es administrador ni desarrollador.
 const RESTRICTED_ALLOWED_PATHS = ["/admin/caja", "/admin/cotizador"];
@@ -40,11 +41,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   }, [isRestricted, isDeveloper, pathname, router]);
 
   if (loading) {
-    return (
-      <div className="grid min-h-dvh place-items-center bg-background">
-        <p className="text-sm text-body">Cargando…</p>
-      </div>
-    );
+    return <SplashScreen />;
   }
 
   if (isRestricted) {

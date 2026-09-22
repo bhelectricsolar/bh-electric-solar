@@ -164,9 +164,28 @@ h2 {
   animation: bh-panel-in 0.18s ease-out;
 }
 
+/* Pantalla de carga: el logo late suave mientras la app arranca. */
+@keyframes bh-splash-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 0.85;
+  }
+}
+.bh-splash-pulse {
+  animation: bh-splash-pulse 1.8s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-sheet-in,
   .animate-panel-in {
+    animation: none;
+  }
+  .bh-splash-pulse {
     animation: none;
   }
 }
