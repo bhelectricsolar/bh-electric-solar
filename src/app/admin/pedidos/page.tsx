@@ -325,9 +325,9 @@ export default function AdminPedidosPage() {
                           </span>
                         </li>
                       ))}
-                      <li className="flex justify-between border-t border-ink/10 pt-2 text-body">
-                        <span>Envío ({zone?.region})</span>
-                        <span className="font-data text-ink">
+                      <li className="flex justify-between gap-3 border-t border-ink/10 pt-2 text-body">
+                        <span className="shrink-0">Envío ({zone?.region})</span>
+                        <span className="font-data shrink-0 text-ink">
                           {formatPrice(zone?.priceUSD ?? 0)}
                         </span>
                       </li>
@@ -349,26 +349,26 @@ export default function AdminPedidosPage() {
                           </ul>
                         </li>
                       ) : (
-                        <li className="flex justify-between text-body">
-                          <span>Método de pago</span>
-                          <span className="text-ink">
+                        <li className="flex justify-between gap-3 text-body">
+                          <span className="shrink-0">Método de pago</span>
+                          <span className="text-right text-ink">
                             {PAYMENT_METHOD_LABELS[order.paymentMethod]}
                             {order.paymentCurrency === "USD" ? " (dólares)" : ""}
                           </span>
                         </li>
                       )}
                       {order.changeGiven != null && order.changeGiven > 0 && (
-                        <li className="flex justify-between text-body">
-                          <span>Vuelto</span>
-                          <span className="font-data text-ink">
+                        <li className="flex justify-between gap-3 text-body">
+                          <span className="shrink-0">Vuelto</span>
+                          <span className="font-data shrink-0 text-ink">
                             {order.paymentCurrency === "USD" ? "US$" : "$"} {order.changeGiven.toFixed(2)}
                           </span>
                         </li>
                       )}
                       {order.payments.length <= 1 && order.paymentNotes && (
-                        <li className="flex justify-between text-body">
-                          <span>Nota de pago</span>
-                          <span className="text-ink">{order.paymentNotes}</span>
+                        <li className="text-body">
+                          <span className="text-xs">Nota de pago</span>
+                          <p className="mt-0.5 text-ink">{order.paymentNotes}</p>
                         </li>
                       )}
                     </ul>
