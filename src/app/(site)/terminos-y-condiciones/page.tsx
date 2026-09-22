@@ -4,6 +4,7 @@ import LegalPageLayout from "@/components/LegalPageLayout";
 export const metadata: Metadata = {
   title: "Términos y Condiciones | BH Electric Solar",
   description: "Condiciones de uso del sitio web de BH Electric Solar.",
+  alternates: { canonical: "/terminos-y-condiciones" },
 };
 
 const TOC = [

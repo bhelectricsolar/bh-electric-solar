@@ -7,6 +7,7 @@ export const metadata: Metadata = {
   title: "Calculadora Solar | Calculá tu Ahorro con Paneles Solares",
   description:
     "Calculá en minutos el sistema solar ideal para tu hogar, comercio o industria.",
+  alternates: { canonical: "/calculadora-solar" },
 };
 
 export default function CalculadoraSolarPage() {

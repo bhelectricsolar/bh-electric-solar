@@ -4,6 +4,7 @@ import LegalPageLayout from "@/components/LegalPageLayout";
 export const metadata: Metadata = {
   title: "Política de Privacidad | BH Electric Solar",
   description: "Cómo BH Electric Solar recopila, usa y protege tus datos personales.",
+  alternates: { canonical: "/politica-de-privacidad" },
 };
 
 const TOC = [

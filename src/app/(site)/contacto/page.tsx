@@ -7,6 +7,7 @@ export const metadata: Metadata = {
   title: "Solicitá gratis tu Asesoramiento Solar | BH Electric Solar",
   description:
     "Solicitá tu asesoramiento solar con BH Electric Solar y recibí un análisis profesional de tu consumo energético.",
+  alternates: { canonical: "/contacto" },
 };
 
 const STEPS = [

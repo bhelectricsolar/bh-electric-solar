@@ -4,6 +4,7 @@ import LegalPageLayout from "@/components/LegalPageLayout";
 export const metadata: Metadata = {
   title: "Política de Cookies | BH Electric Solar",
   description: "Qué cookies utiliza el sitio de BH Electric Solar y cómo gestionarlas.",
+  alternates: { canonical: "/politica-de-cookies" },
 };
 
 export default function PoliticaDeCookiesPage() {

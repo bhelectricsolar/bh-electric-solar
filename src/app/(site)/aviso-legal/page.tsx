@@ -4,6 +4,7 @@ import LegalPageLayout from "@/components/LegalPageLayout";
 export const metadata: Metadata = {
   title: "Aviso Legal de la Empresa | BH Electric Solar",
   description: "Información legal sobre BH Electric Solar y el uso de este sitio web.",
+  alternates: { canonical: "/aviso-legal" },
 };
 
 export default function AvisoLegalPage() {

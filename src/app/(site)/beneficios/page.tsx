@@ -8,6 +8,7 @@ export const metadata: Metadata = {
   title: "Beneficios de la Energía Solar | BH Electric Solar",
   description:
     "Ahorro en la factura, independencia energética, menor impacto ambiental y mayor valor de la propiedad: los beneficios concretos de instalar paneles solares con BH Electric Solar.",
+  alternates: { canonical: "/beneficios" },
 };
 
 export default function BeneficiosPage() {

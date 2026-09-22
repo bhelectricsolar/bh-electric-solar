@@ -24,9 +24,20 @@ export async function generateMetadata({
   const { slug } = await params;
   const product = await getProductBySlug(slug);
   if (!product) return {};
+  const title = `${product.name} | BH Electric Solar`;
+  const image = product.images?.[0];
   return {
-    title: `${product.name} | BH Electric Solar`,
+    title,
     description: product.shortDescription,
+    alternates: { canonical: `/tienda/${slug}` },
+    openGraph: {
+      title,
+      description: product.shortDescription,
+      url: `/tienda/${slug}`,
+      type: "website",
+      ...(image ? { images: [{ url: image, width: 1000, height: 1000, alt: product.name }] } : {}),
+    },
+    ...(image ? { twitter: { card: "summary_large_image" as const, images: [image] } } : {}),
   };
 }
 
@@ -47,8 +58,27 @@ export default async function ProductPage({
   const categoryLabel = categories.find((c) => c.value === product.category)?.label ?? product.category;
   const arsPrice = product.priceARS ?? product.priceUSD * exchangeRate;
 
+  const productJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.name,
+    description: product.shortDescription || product.description,
+    ...(product.images?.[0] ? { image: product.images } : {}),
+    category: categoryLabel,
+    brand: { "@type": "Brand", name: "BH Electric Solar" },
+    offers: {
+      "@type": "Offer",
+      priceCurrency: "USD",
+      price: product.priceUSD.toFixed(2),
+      availability:
+        product.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+      url: `https://bhelectricsolar.com/tienda/${product.slug}`,
+    },
+  };
+
   return (
     <section className="bg-white px-4 py-16 sm:py-20">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }} />
       <div className="mx-auto max-w-6xl">
         <nav className="text-xs text-body">
           <Link href="/tienda" className="hover:text-ink">

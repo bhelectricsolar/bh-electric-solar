@@ -9,6 +9,13 @@ export const metadata: Metadata = {
   title: "Tienda de Equipos Solares | BH Electric Solar",
   description:
     "Paneles solares, inversores, baterías, estructuras de montaje y accesorios. Consultá disponibilidad y coordiná tu pedido por WhatsApp.",
+  alternates: { canonical: "/tienda" },
+  openGraph: {
+    title: "Tienda de Equipos Solares | BH Electric Solar",
+    description:
+      "Paneles solares, inversores, baterías, estructuras de montaje y accesorios. Consultá disponibilidad y coordiná tu pedido por WhatsApp.",
+    url: "/tienda",
+  },
 };
 
 export const revalidate = 0;
