@@ -1182,7 +1182,7 @@ function CotizadorInner() {
             </Card>
           </div>
 
-          <div className="lg:sticky lg:top-6">
+          <div>
             <Card title="Cotización">
               {needsConfirm ? (
                 <div className="rounded-lg border border-gold-500/40 bg-gold-500/10 p-4">
