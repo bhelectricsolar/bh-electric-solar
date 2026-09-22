@@ -62,13 +62,14 @@ export default function AdminPage() {
         getShippingZones(),
         getCashHistory(),
       ]);
-      // Las ventas y cajas de prueba del desarrollador no son del negocio.
+      // Las ventas, cajas, leads/clientes y proyectos de prueba del
+      // desarrollador no son del negocio real — el dueño no los ve.
       setOrders(includeDev ? o : o.filter((ord) => !devIds.includes(ord.soldBy ?? "")));
       setClosedSessions(includeDev ? hist : hist.filter((h) => !devIds.includes(h.openedBy ?? "")));
       setProducts(p);
-      setProjects(pr);
+      setProjects(includeDev ? pr : pr.filter((proj) => !proj.salespersonId || !devIds.includes(proj.salespersonId)));
       setTeam(t);
-      setCustomers(c);
+      setCustomers(includeDev ? c : c.filter((cu) => !cu.isTest && !(cu.createdBy && devIds.includes(cu.createdBy))));
       setOpenSessions(s);
       setZones(z);
       setUpdatedAt(new Date());
@@ -201,7 +202,7 @@ export default function AdminPage() {
             {developer && (
               <div className="mt-6 flex flex-wrap items-center gap-2 rounded-xl border border-violet-500/25 bg-violet-500/10 px-3 py-2.5">
                 <Chip active={showDev} onClick={() => setShowDev((v) => !v)}>
-                  Incluir mis ventas de prueba
+                  Incluir mis pruebas (ventas, leads, clientes y proyectos)
                 </Chip>
                 <span className="text-[11px] text-body">Solo las ves vos — el dueño no las ve.</span>
               </div>

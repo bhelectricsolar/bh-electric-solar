@@ -6,32 +6,53 @@ import {
   getCustomers,
   createCustomer,
   deleteCustomer,
+  updateCustomer,
   CUSTOMER_STATUS_TONE,
   type Customer,
 } from "@/lib/customers";
+import { getDevTeamMemberIds } from "@/lib/team";
+import { useCurrentDeveloper, useCurrentTeamMember } from "@/lib/current-user";
 import { downloadCSV } from "@/lib/csv-export";
 import { pickField } from "@/lib/csv-import";
 import ImportButton from "@/components/admin/ImportButton";
 import SectorEyebrow from "@/components/admin/SectorEyebrow";
 import StatusBadge from "@/components/admin/StatusBadge";
+import Chip from "@/components/admin/Chip";
 
 const EMPTY_DRAFT = { name: "", email: "", phone: "", city: "" };
 
 export default function AdminClientesPage() {
+  const { developer } = useCurrentDeveloper();
+  const { member } = useCurrentTeamMember();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [panelOpen, setPanelOpen] = useState(false);
   const [draft, setDraft] = useState(EMPTY_DRAFT);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [devIds, setDevIds] = useState<string[]>([]);
+  const [showDev, setShowDev] = useState(true);
+
+  const isDevRecord = (c: Customer) => c.isTest || (!!c.createdBy && devIds.includes(c.createdBy));
 
   function loadAll() {
-    return getCustomers().then((all) => setCustomers(all.filter((c) => c.status === "cliente")));
+    return Promise.all([getCustomers(), getDevTeamMemberIds()]).then(([all, ids]) => {
+      setDevIds(ids);
+      const own = all.filter((c) => c.status === "cliente");
+      setCustomers(developer && showDev ? own : own.filter((c) => !c.isTest && !(c.createdBy && ids.includes(c.createdBy))));
+    });
   }
 
   useEffect(() => {
     loadAll().finally(() => setLoading(false));
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [developer, showDev]);
+
+  async function toggleTest(customer: Customer) {
+    const next = !customer.isTest;
+    setCustomers((prev) => prev.map((c) => (c.id === customer.id ? { ...c, isTest: next } : c)));
+    await updateCustomer(customer.id, { isTest: next });
+  }
 
   const visible = customers.filter(
     (c) =>
@@ -65,6 +86,7 @@ export default function AdminClientesPage() {
         city: pickField(row, ["ciudad", "city"]),
         status: "cliente",
         source: "Manual",
+        createdBy: member?.id,
       });
     });
     if (imported.length > 0) {
@@ -81,7 +103,7 @@ export default function AdminClientesPage() {
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     if (!draft.name.trim()) return;
-    await createCustomer({ ...draft, status: "cliente", source: "Manual" });
+    await createCustomer({ ...draft, status: "cliente", source: "Manual", createdBy: member?.id });
     setPanelOpen(false);
     loadAll();
   }
@@ -138,6 +160,15 @@ export default function AdminClientesPage() {
           className="mt-5 w-full rounded-lg border border-ink/10 bg-surface px-4 py-2.5 text-sm text-ink"
         />
 
+        {developer && (
+          <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-violet-500/25 bg-violet-500/10 px-3 py-2.5">
+            <Chip active={showDev} onClick={() => setShowDev((v) => !v)}>
+              Incluir mis clientes de prueba
+            </Chip>
+            <span className="text-[11px] text-body">Solo las ves vos — el dueño no las ve.</span>
+          </div>
+        )}
+
         <div className="mt-4 flex flex-col gap-3">
           {visible.map((customer) => (
             <div
@@ -146,7 +177,10 @@ export default function AdminClientesPage() {
             >
               <div className="flex items-start justify-between gap-3">
                 <p className="font-semibold text-ink">{customer.name}</p>
-                <StatusBadge tone={CUSTOMER_STATUS_TONE[customer.status]}>Cliente</StatusBadge>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  {isDevRecord(customer) && <StatusBadge tone="danger">Prueba</StatusBadge>}
+                  <StatusBadge tone={CUSTOMER_STATUS_TONE[customer.status]}>Cliente</StatusBadge>
+                </div>
               </div>
               <p className="mt-1 flex flex-wrap items-center gap-x-3 text-xs text-body">
                 {customer.city}
@@ -194,13 +228,25 @@ export default function AdminClientesPage() {
                   </button>
                 </div>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => setConfirmDeleteId(customer.id)}
-                  className="mt-3 w-full cursor-pointer touch-manipulation rounded-lg border border-red-500/20 bg-red-500/10 py-2 text-xs font-semibold text-red-500 shadow-sm hover:shadow-md"
-                >
-                  Quitar
-                </button>
+                <div className="mt-3 flex gap-2 border-t border-ink/10 pt-3">
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDeleteId(customer.id)}
+                    className="flex-1 cursor-pointer touch-manipulation rounded-lg border border-red-500/20 bg-red-500/10 py-2 text-xs font-semibold text-red-500 shadow-sm hover:shadow-md"
+                  >
+                    Quitar
+                  </button>
+                  {developer && (
+                    <button
+                      type="button"
+                      onClick={() => toggleTest(customer)}
+                      title="Ocultarlo del dueño: no es un cliente real"
+                      className="flex-1 cursor-pointer touch-manipulation rounded-lg border border-violet-500/25 bg-violet-500/10 py-2 text-xs font-semibold text-violet-600 shadow-sm hover:shadow-md"
+                    >
+                      {customer.isTest ? "Es de prueba ✓" : "Marcar como prueba"}
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           ))}

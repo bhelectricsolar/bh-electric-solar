@@ -65,11 +65,11 @@ export default function AdminReportesPage() {
   useEffect(() => {
     Promise.all([getOrders(), getProducts(), getProjects(), getDevTeamMemberIds()])
       .then(([o, p, pr, devIds]) => {
-        // Las ventas de prueba del desarrollador no cuentan en los reportes
-        // reales del negocio.
+        // Las ventas y los proyectos de prueba del desarrollador no cuentan
+        // en los reportes reales del negocio.
         setOrders(o.filter((ord) => !devIds.includes(ord.soldBy ?? "") && ord.paid !== false));
         setProducts(p);
-        setProjects(pr);
+        setProjects(pr.filter((proj) => !proj.salespersonId || !devIds.includes(proj.salespersonId)));
       })
       .finally(() => setLoading(false));
   }, []);

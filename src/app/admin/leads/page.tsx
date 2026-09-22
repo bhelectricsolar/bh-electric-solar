@@ -9,6 +9,8 @@ import {
   getInvoiceSignedUrl,
   type Customer,
 } from "@/lib/customers";
+import { getDevTeamMemberIds } from "@/lib/team";
+import { useCurrentDeveloper } from "@/lib/current-user";
 import { downloadCSV } from "@/lib/csv-export";
 import SectorEyebrow from "@/components/admin/SectorEyebrow";
 import StatusBadge from "@/components/admin/StatusBadge";
@@ -31,6 +33,7 @@ function isStale(c: Customer) {
 }
 
 export default function AdminLeadsPage() {
+  const { developer } = useCurrentDeveloper();
   const [leads, setLeads] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
@@ -38,14 +41,31 @@ export default function AdminLeadsPage() {
   const [convertingId, setConvertingId] = useState<string | null>(null);
   const [attendingId, setAttendingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [devIds, setDevIds] = useState<string[]>([]);
+  const [showDev, setShowDev] = useState(true);
+
+  // Los leads que cargó el desarrollador probando el formulario público
+  // (marcados a mano con "Es de prueba") no son leads reales del negocio.
+  const isDevRecord = (c: Customer) => c.isTest || (!!c.createdBy && devIds.includes(c.createdBy));
 
   function loadAll() {
-    return getCustomers().then((all) => setLeads(all.filter((c) => c.status === "lead")));
+    return Promise.all([getCustomers(), getDevTeamMemberIds()]).then(([all, ids]) => {
+      setDevIds(ids);
+      const own = all.filter((c) => c.status === "lead");
+      setLeads(developer && showDev ? own : own.filter((c) => !c.isTest && !(c.createdBy && ids.includes(c.createdBy))));
+    });
   }
 
   useEffect(() => {
     loadAll().finally(() => setLoading(false));
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [developer, showDev]);
+
+  async function toggleTest(lead: Customer) {
+    const next = !lead.isTest;
+    setLeads((prev) => prev.map((l) => (l.id === lead.id ? { ...l, isTest: next } : l)));
+    await updateCustomer(lead.id, { isTest: next });
+  }
 
   const staleCount = leads.filter(isStale).length;
 
@@ -133,6 +153,15 @@ export default function AdminLeadsPage() {
           className="mt-5 w-full rounded-lg border border-ink/10 bg-surface px-4 py-2.5 text-sm text-ink"
         />
 
+        {developer && (
+          <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-violet-500/25 bg-violet-500/10 px-3 py-2.5">
+            <Chip active={showDev} onClick={() => setShowDev((v) => !v)}>
+              Incluir mis leads de prueba
+            </Chip>
+            <span className="text-[11px] text-body">Solo las ves vos — el dueño no las ve.</span>
+          </div>
+        )}
+
         {staleCount > 0 && (
           <div className="mt-3">
             <Chip active={onlyStale} onClick={() => setOnlyStale((v) => !v)} tone="danger">
@@ -154,6 +183,7 @@ export default function AdminLeadsPage() {
                     <StatusBadge tone="danger">{daysSince(referenceDate(lead))}d sin atender</StatusBadge>
                   )}
                   <StatusBadge tone="gold">Lead</StatusBadge>
+                  {isDevRecord(lead) && <StatusBadge tone="danger">Prueba</StatusBadge>}
                 </div>
               </div>
               <p className="mt-1 flex flex-wrap items-center gap-x-3 text-xs text-body">
@@ -265,6 +295,16 @@ export default function AdminLeadsPage() {
                   >
                     Descartar
                   </button>
+                  {developer && (
+                    <button
+                      type="button"
+                      onClick={() => toggleTest(lead)}
+                      title="Ocultarlo del dueño: no llegó de un cliente real"
+                      className="cursor-pointer touch-manipulation rounded-lg border border-violet-500/25 bg-violet-500/10 px-3 py-2 text-xs font-semibold text-violet-600 shadow-sm hover:shadow-md"
+                    >
+                      {lead.isTest ? "Es de prueba ✓" : "Marcar como prueba"}
+                    </button>
+                  )}
                 </div>
               )}
             </div>

@@ -11,7 +11,8 @@ import SectorEyebrow from "@/components/admin/SectorEyebrow";
 import StatusBadge from "@/components/admin/StatusBadge";
 import Chip from "@/components/admin/Chip";
 import { useAdminSettings } from "@/lib/admin-settings";
-import { useCurrentTeamMember } from "@/lib/current-user";
+import { useCurrentTeamMember, useCurrentDeveloper } from "@/lib/current-user";
+import { getDevTeamMemberIds } from "@/lib/team";
 import { getCustomers, type Customer } from "@/lib/customers";
 import { getProjects, type Project } from "@/lib/projects";
 import {
@@ -129,6 +130,9 @@ export default function CotizadorPage() {
 function CotizadorInner() {
   const { settings } = useAdminSettings();
   const { member } = useCurrentTeamMember();
+  const { developer } = useCurrentDeveloper();
+  const [devIds, setDevIds] = useState<string[]>([]);
+  const [showDevQuotes, setShowDevQuotes] = useState(true);
   const searchParams = useSearchParams();
   const customerParam = searchParams.get("cliente");
 
@@ -190,7 +194,17 @@ function CotizadorInner() {
   const cameraRef = useRef<HTMLInputElement>(null);
   const appliedParam = useRef(false);
 
-  const reloadQuotes = useCallback(() => getSolarQuotes().then(setQuotes).catch((e) => console.error("Cotizaciones:", e)), []);
+  const reloadQuotes = useCallback(
+    () =>
+      Promise.all([getSolarQuotes(), getDevTeamMemberIds()])
+        .then(([all, ids]) => {
+          setDevIds(ids);
+          const includeDev = !!developer && showDevQuotes;
+          setQuotes(includeDev ? all : all.filter((q) => !q.createdBy || !ids.includes(q.createdBy)));
+        })
+        .catch((e) => console.error("Cotizaciones:", e)),
+    [developer, showDevQuotes],
+  );
 
   useEffect(() => {
     getCustomers().then(setCustomers).catch((e) => console.error(e));
@@ -1326,13 +1340,28 @@ function CotizadorInner() {
               </Chip>
             )}
           </div>
+          {developer && (
+            <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-violet-500/25 bg-violet-500/10 px-3 py-2.5">
+              <Chip active={showDevQuotes} onClick={() => setShowDevQuotes((v) => !v)}>
+                Incluir mis cotizaciones de prueba
+              </Chip>
+              <span className="text-[11px] text-body">Solo las ves vos — el dueño no las ve.</span>
+            </div>
+          )}
           {projectMsg && <p className="mt-2 text-xs font-semibold text-red-500">{projectMsg}</p>}
           <div className="mt-3 grid gap-3 md:grid-cols-2">
             {visibleQuotes.map((q) => (
               <div key={q.id} className="flex flex-col rounded-xl border border-ink/10 bg-surface p-4 shadow-sm">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="truncate font-semibold text-ink">{q.clientName || "Sin nombre"}</p>
+                    <p className="truncate font-semibold text-ink">
+                      {q.clientName || "Sin nombre"}
+                      {!!q.createdBy && devIds.includes(q.createdBy) && (
+                        <span className="ml-2 align-middle">
+                          <StatusBadge tone="danger">Prueba</StatusBadge>
+                        </span>
+                      )}
+                    </p>
                     <p className="text-[11px] text-body">
                       {new Date(q.createdAt).toLocaleDateString("es-AR")} · {q.province}
                       {q.address ? ` · ${q.address}` : ""}

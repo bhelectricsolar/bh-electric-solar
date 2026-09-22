@@ -27,6 +27,13 @@ export type Customer = {
   // Última vez que alguien del equipo habló con este lead — sin esto, un
   // lead contactado hoy seguía marcado "sin atender" para siempre.
   lastContactedAt?: string;
+  // Quién lo cargó desde el admin (nulo = llegó solo por el formulario
+  // público) — sirve para no mezclar las pruebas del desarrollador con los
+  // leads/clientes reales del dueño.
+  createdBy?: string;
+  // Marca manual para ocultar un lead de prueba que llegó por el
+  // formulario público (ahí no hay forma automática de saber quién lo cargó).
+  isTest?: boolean;
 };
 
 type CustomerRow = {
@@ -45,6 +52,8 @@ type CustomerRow = {
   message: string | null;
   invoice_path: string | null;
   last_contacted_at: string | null;
+  created_by: string | null;
+  is_test: boolean | null;
 };
 
 function fromRow(row: CustomerRow): Customer {
@@ -64,6 +73,8 @@ function fromRow(row: CustomerRow): Customer {
     message: row.message ?? undefined,
     invoicePath: row.invoice_path ?? undefined,
     lastContactedAt: row.last_contacted_at ?? undefined,
+    createdBy: row.created_by ?? undefined,
+    isTest: row.is_test ?? false,
   };
 }
 
@@ -85,6 +96,7 @@ export async function updateCustomer(id: string, patch: Partial<Customer>) {
   if (patch.status !== undefined) row.status = patch.status;
   if (patch.source !== undefined) row.source = patch.source;
   if (patch.lastContactedAt !== undefined) row.last_contacted_at = patch.lastContactedAt;
+  if (patch.isTest !== undefined) row.is_test = patch.isTest;
   const { error } = await supabase.from("customers").update(row).eq("id", id);
   if (error) throw error;
 }
@@ -108,6 +120,7 @@ export async function createCustomer(customer: Omit<Customer, "id" | "createdAt"
     roof_type: customer.roofType ?? null,
     message: customer.message ?? null,
     invoice_path: customer.invoicePath ?? null,
+    created_by: customer.createdBy ?? null,
   });
   if (error) throw error;
 }

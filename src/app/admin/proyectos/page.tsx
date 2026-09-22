@@ -14,11 +14,11 @@ import {
 } from "@/lib/projects";
 import { createProjectFromQuote, getSolarQuotes, type SolarQuote } from "@/lib/solar-quotes";
 import { getCustomers, type Customer } from "@/lib/customers";
-import { useCurrentTeamMember } from "@/lib/current-user";
+import { useCurrentTeamMember, useCurrentDeveloper } from "@/lib/current-user";
 import { PROVINCES } from "@/lib/solar-quote";
 import NumberField from "@/components/NumberField";
 import ConsumptionHistory, { CurrencyToggle, formatMoney, type Cur } from "@/components/admin/ConsumptionHistory";
-import { getTeam, type TeamMember } from "@/lib/team";
+import { getTeam, getDevTeamMemberIds, type TeamMember } from "@/lib/team";
 import { downloadCSV } from "@/lib/csv-export";
 import { openWhatsApp } from "@/lib/whatsapp";
 import { useAdminSettings } from "@/lib/admin-settings";
@@ -38,9 +38,12 @@ export default function AdminProyectosPage() {
   const [reciboProject, setReciboProject] = useState<Project | null>(null);
   const [conformidadProject, setConformidadProject] = useState<Project | null>(null);
   const { member } = useCurrentTeamMember();
+  const { developer } = useCurrentDeveloper();
   const [newOpen, setNewOpen] = useState(false);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [quotes, setQuotes] = useState<SolarQuote[]>([]);
+  const [devIds, setDevIds] = useState<string[]>([]);
+  const [showDev, setShowDev] = useState(true);
 
   useEffect(() => {
     getCustomers().then(setCustomers).catch(() => {});
@@ -48,13 +51,16 @@ export default function AdminProyectosPage() {
   }, []);
 
   useEffect(() => {
-    Promise.all([getProjects(), getTeam()])
-      .then(([p, t]) => {
-        setProjects(p);
+    Promise.all([getProjects(), getTeam(!!developer), getDevTeamMemberIds()])
+      .then(([p, t, ids]) => {
+        setDevIds(ids);
         setTeam(t);
+        const includeDev = !!developer && showDev;
+        setProjects(includeDev ? p : p.filter((pr) => !pr.salespersonId || !ids.includes(pr.salespersonId)));
       })
       .finally(() => setLoading(false));
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [developer, showDev]);
 
   function personName(id: string | null) {
     if (!id) return "Sin asignar";
@@ -220,6 +226,15 @@ export default function AdminProyectosPage() {
           ))}
         </div>
 
+        {developer && (
+          <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-violet-500/25 bg-violet-500/10 px-3 py-2.5">
+            <Chip active={showDev} onClick={() => setShowDev((v) => !v)}>
+              Incluir mis proyectos de prueba
+            </Chip>
+            <span className="text-[11px] text-body">Solo los ves vos — el dueño no los ve.</span>
+          </div>
+        )}
+
         <div className="mt-5 flex flex-col gap-3">
           {visible.map((project) => {
             const isOpen = expandedId === project.id;
@@ -241,7 +256,12 @@ export default function AdminProyectosPage() {
                       <p className="mt-1 line-clamp-2 max-w-xl text-xs text-body/80">{project.description}</p>
                     )}
                   </div>
-                  <StatusBadge tone={PROJECT_STAGE_TONE[project.status]}>{stage?.label}</StatusBadge>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    {!!project.salespersonId && devIds.includes(project.salespersonId) && (
+                      <StatusBadge tone="danger">Prueba</StatusBadge>
+                    )}
+                    <StatusBadge tone={PROJECT_STAGE_TONE[project.status]}>{stage?.label}</StatusBadge>
+                  </div>
                 </button>
 
                 {isOpen && (
