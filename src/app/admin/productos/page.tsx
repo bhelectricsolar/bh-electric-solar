@@ -396,6 +396,8 @@ export default function AdminProductosPage() {
                   <img
                     src={product.images[0]}
                     alt={product.name}
+                    loading="lazy"
+                    decoding="async"
                     className="absolute inset-0 h-full w-full object-contain p-1.5"
                   />
                 )}

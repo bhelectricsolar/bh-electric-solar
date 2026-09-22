@@ -48,14 +48,15 @@ type MovementRow = {
   at: string;
 };
 
-function fromRows(row: SessionRow, movements: MovementRow[]): CashSession {
+const EMPTY_MOVEMENTS: Map<string, MovementRow[]> = new Map();
+
+function fromRows(row: SessionRow, movementsBySession: Map<string, MovementRow[]> = EMPTY_MOVEMENTS): CashSession {
   return {
     id: row.id,
     openedBy: row.opened_by,
     openedAt: row.opened_at,
     openingAmount: Number(row.opening_amount),
-    movements: movements
-      .filter((m) => m.session_id === row.id)
+    movements: (movementsBySession.get(row.id) ?? [])
       .map((m) => ({
         id: String(m.id),
         type: m.type,
@@ -86,7 +87,7 @@ export async function getOpenSessionFor(teamMemberId: string): Promise<CashSessi
     .eq("session_id", session.id)
     .order("at", { ascending: false });
   if (movError) throw movError;
-  return fromRows(session, movements ?? []);
+  return fromRows(session, new Map([[session.id, movements ?? []]]));
 }
 
 // Todas las cajas abiertas ahora mismo, de cualquier persona (para el dueño).
@@ -113,7 +114,13 @@ export async function getAllOpenSessions(includeDev = false): Promise<CashSessio
     if (movError) throw movError;
     movements = movs ?? [];
   }
-  return (sessions ?? []).map((s) => fromRows(s, movements));
+  const movementsBySession = new Map<string, MovementRow[]>();
+  for (const m of movements) {
+    const arr = movementsBySession.get(m.session_id);
+    if (arr) arr.push(m);
+    else movementsBySession.set(m.session_id, [m]);
+  }
+  return (sessions ?? []).map((s) => fromRows(s, movementsBySession));
 }
 
 export async function getCashHistory(teamMemberId?: string): Promise<CashSession[]> {
@@ -125,7 +132,7 @@ export async function getCashHistory(teamMemberId?: string): Promise<CashSession
   if (teamMemberId) query = query.eq("opened_by", teamMemberId);
   const { data: sessions, error } = await query;
   if (error) throw error;
-  return (sessions ?? []).map((s) => fromRows(s, []));
+  return (sessions ?? []).map((s) => fromRows(s));
 }
 
 export async function openCashSession(teamMemberId: string, openingAmount: number): Promise<CashSession> {
@@ -135,7 +142,7 @@ export async function openCashSession(teamMemberId: string, openingAmount: numbe
     .select()
     .single();
   if (error) throw error;
-  return fromRows(data, []);
+  return fromRows(data);
 }
 
 export async function addCashMovement(

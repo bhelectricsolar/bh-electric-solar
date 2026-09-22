@@ -160,15 +160,17 @@ type OrderPaymentRow = {
   surcharge_pct: number | null;
 };
 
-function fromRows(order: OrderRow, items: OrderItemRow[], payments: OrderPaymentRow[]): Order {
+function fromRows(
+  order: OrderRow,
+  itemsByOrder: Map<string, OrderItemRow[]>,
+  paymentsByOrder: Map<string, OrderPaymentRow[]>,
+): Order {
   return {
     id: order.id,
     customerName: order.customer_name,
     customerPhone: order.customer_phone ?? "",
     customerCity: order.customer_city ?? "",
-    items: items
-      .filter((i) => i.order_id === order.id)
-      .map((i) => ({ productId: i.product_id, qty: i.qty })),
+    items: (itemsByOrder.get(order.id) ?? []).map((i) => ({ productId: i.product_id, qty: i.qty })),
     shippingZoneId: order.shipping_zone_id ?? "",
     status: order.status,
     paymentMethod: order.payment_method,
@@ -176,9 +178,7 @@ function fromRows(order: OrderRow, items: OrderItemRow[], payments: OrderPayment
     amountReceived: order.amount_received != null ? Number(order.amount_received) : undefined,
     changeGiven: order.change_given != null ? Number(order.change_given) : undefined,
     paymentNotes: order.payment_notes ?? undefined,
-    payments: payments
-      .filter((p) => p.order_id === order.id)
-      .map((p) => ({
+    payments: (paymentsByOrder.get(order.id) ?? []).map((p) => ({
         method: p.method,
         currency: p.currency,
         amount: Number(p.amount),
@@ -217,7 +217,22 @@ export async function getOrders(): Promise<Order[]> {
   if (error) throw error;
   if (itemsError) throw itemsError;
   if (paymentsError) throw paymentsError;
-  return (orders ?? []).map((o) => fromRows(o, items ?? [], payments ?? []));
+  // Agrupamos una sola vez (en vez de filtrar items/payments por cada pedido)
+  // para que esto siga siendo rápido a medida que crece el historial de ventas.
+  const itemsByOrder = groupBy(items ?? [], (i) => i.order_id);
+  const paymentsByOrder = groupBy(payments ?? [], (p) => p.order_id);
+  return (orders ?? []).map((o) => fromRows(o, itemsByOrder, paymentsByOrder));
+}
+
+function groupBy<T>(rows: T[], key: (row: T) => string): Map<string, T[]> {
+  const map = new Map<string, T[]>();
+  for (const row of rows) {
+    const k = key(row);
+    const arr = map.get(k);
+    if (arr) arr.push(row);
+    else map.set(k, [row]);
+  }
+  return map;
 }
 
 export async function createOrder(order: Order) {
@@ -284,9 +299,19 @@ export async function updateOrderPaid(id: string, paid: boolean) {
   if (error) throw error;
 }
 
+// Se llama muchas veces seguidas con el mismo array de productos (Reportes,
+// Caja, Pedidos, Equipo) — cacheamos el índice por id en vez de recorrer la
+// lista completa de productos por cada ítem de cada pedido.
+const productIndexCache = new WeakMap<Product[], Map<string, Product>>();
+
 export function getOrderItemsWithProduct(order: Order, products: Product[]) {
+  let index = productIndexCache.get(products);
+  if (!index) {
+    index = new Map(products.map((p) => [p.id, p]));
+    productIndexCache.set(products, index);
+  }
   return order.items.map((item) => ({
     ...item,
-    product: products.find((p) => p.id === item.productId),
+    product: index!.get(item.productId),
   }));
 }

@@ -7,6 +7,39 @@ export type UploadedImage = { id: string; url: string; name: string };
 
 const ACCEPTED = ".png,.jpg,.jpeg,.webp,.gif,.svg,.avif";
 const BUCKET = "product-images";
+const MAX_DIMENSION = 1600;
+const MIN_SIZE_TO_COMPRESS = 350_000; // 350 KB — no vale la pena recomprimir algo ya liviano
+
+// Las fotos de producto suelen venir directo del celular (varios MB a
+// resolución completa). Las achicamos y recomprimimos en el navegador antes
+// de subir para que la tienda y el admin no tengan que bajar esas fotos
+// pesadas cada vez que se muestra una miniatura.
+async function compressImage(file: File): Promise<File> {
+  if (file.type === "image/svg+xml" || file.type === "image/gif") return file;
+  if (file.size < MIN_SIZE_TO_COMPRESS) return file;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, MAX_DIMENSION / Math.max(bitmap.width, bitmap.height));
+    const w = Math.round(bitmap.width * scale);
+    const h = Math.round(bitmap.height * scale);
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return file;
+    ctx.drawImage(bitmap, 0, 0, w, h);
+    bitmap.close?.();
+    const blob: Blob | null = await new Promise((resolve) =>
+      canvas.toBlob(resolve, "image/webp", 0.82),
+    );
+    if (!blob || blob.size >= file.size) return file;
+    const newName = file.name.replace(/\.[a-zA-Z0-9]+$/, "") + ".webp";
+    return new File([blob], newName, { type: "image/webp" });
+  } catch {
+    // Si algo falla (formato raro, navegador viejo), subimos el original.
+    return file;
+  }
+}
 
 export default function ImageUploader({
   images,
@@ -31,9 +64,10 @@ export default function ImageUploader({
     const uploaded: UploadedImage[] = [];
 
     for (const file of toUpload) {
-      const ext = file.name.split(".").pop() ?? "jpg";
+      const optimized = await compressImage(file);
+      const ext = optimized.name.split(".").pop() ?? "jpg";
       const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-      const { error: uploadError } = await supabase.storage.from(BUCKET).upload(path, file);
+      const { error: uploadError } = await supabase.storage.from(BUCKET).upload(path, optimized);
       if (uploadError) {
         setError(`No se pudo subir "${file.name}": ${uploadError.message}`);
         continue;

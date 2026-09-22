@@ -56,7 +56,7 @@ export default function ProductGallery({
               }`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={url} alt="" className="h-full w-full object-contain p-1" />
+              <img src={url} alt="" loading="lazy" decoding="async" className="h-full w-full object-contain p-1" />
             </button>
           ))}
         </div>

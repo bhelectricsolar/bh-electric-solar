@@ -584,7 +584,7 @@ function AdminCajaPageInner() {
                         <span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-md bg-gradient-to-br from-navy-800 to-navy-950">
                           {p.images[0] ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={p.images[0]} alt="" className="h-full w-full object-cover" />
+                            <img src={p.images[0]} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
                           ) : (
                             <svg viewBox="0 0 24 24" className="h-4 w-4 text-gold-500/70" fill="none" stroke="currentColor" strokeWidth={1.6}>
                               <path d="M4 5h16v14H4V5Zm0 4.7h16M4 14.3h16M9.3 5v14M14.7 5v14" />

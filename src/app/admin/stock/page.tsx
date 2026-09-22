@@ -189,6 +189,8 @@ export default function AdminStockPage() {
                     <img
                       src={product.images[0]}
                       alt={product.name}
+                      loading="lazy"
+                      decoding="async"
                       className="h-full w-full object-contain p-1"
                     />
                   )}

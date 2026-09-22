@@ -312,6 +312,8 @@ export default function AdminPedidosPage() {
                                 <img
                                   src={item.product.images[0]}
                                   alt={item.product.name}
+                                  loading="lazy"
+                                  decoding="async"
                                   className="h-full w-full object-contain p-1"
                                 />
                               )}
